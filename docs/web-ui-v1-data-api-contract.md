@@ -279,8 +279,14 @@ app/page.tsx                              页面入口
 app/workbench/contracts.ts                V1 DTO、命令和错误类型
 app/workbench/workbench-api.ts             浏览器 HTTP 适配器与 ETag 缓存
 app/workbench/selectors.ts                筛选、计数和格式化纯函数
-app/workbench/server/workbench-repository.ts 可替换的服务端读仓库
+app/workbench/server/workbench-repository.ts 服务端读仓库接口与 Demo 实现
+app/workbench/server/workbench-repository-factory.ts 数据源选择与仓库装配
+app/workbench/server/postgres-workbench-repository.ts PostgreSQL 投影映射
+app/workbench/server/neon-workbench-store.ts Neon/Drizzle 原子分页读取
+app/workbench/server/neon-workbench-projection-writer.ts 投影批量替换入口
 app/workbench/server/demo-workbench-snapshot.ts 服务端演示种子
+db/postgres-schema.ts                     PostgreSQL 读模型表结构
+drizzle-postgres/                         PostgreSQL 迁移记录
 app/api/v1/workbench/route.ts              V1 聚合读取接口
 app/workbench/components/workbench-app.tsx 状态协调与页面路由
 app/workbench/components/app-shell.tsx     Sidebar、Topbar
@@ -290,10 +296,45 @@ app/workbench/components/ui.tsx            通用状态、进度和 Stepper
 ```
 
 当前页面已经通过服务端仓库完成 SSR，并在 hydration 后使用 `WorkbenchApi.getWorkbench()` 刷新。
-接入 PostgreSQL 时只替换 `WorkbenchReadRepository`；页面组件不应读取数据库字段、拼接领域状态
-或自行计算服务端排序。
+仓库工厂根据环境选择 Demo 或 PostgreSQL 实现；页面组件不读取数据库字段、拼接领域状态或自行
+计算服务端排序。
 
-## 9. 后端实现验收清单
+## 9. PostgreSQL 读模型与运行契约
+
+PostgreSQL 只承载工作台投影，不替代 Goal、Issue、Run 或 Scheduler 的事实表：
+
+- `workbench_snapshots`：每个 `scope_id` 保存 revision、生成时间和全局 summary；
+- `workbench_tasks`：每个 `scope_id + task_id` 保存稳定 rank、筛选列和完整 `GlobalTask` JSON；
+- 分页读取把 snapshot、任务页和 total 放在同一个 Neon/Drizzle batch 中，避免一次响应混用不同
+  revision 的结果；
+- 投影发布由聚合器调用 `NeonWorkbenchProjectionWriter.replaceProjection()`，同一 scope 必须单写者
+  串行发布，revision 必须单调递增；
+- scope 是租户/项目隔离键。上线前仍须在事实源、投影写入和 API 鉴权三层校验用户可见范围。
+
+运行配置：
+
+| 环境变量 | 默认值 | 行为 |
+|---|---|---|
+| `WORKBENCH_DATA_SOURCE` | `auto` | `auto \| demo \| postgres`；生产环境应显式使用 `postgres` |
+| `DATABASE_URL` | 无 | Neon/PostgreSQL 连接串；显式 PostgreSQL 模式缺失时启动读取会失败 |
+| `WORKBENCH_SCOPE_ID` | `default` | 当前工作台投影 scope |
+
+初始化命令：
+
+```bash
+cd prototype/web-ui
+export DATABASE_URL='postgresql://...'
+export WORKBENCH_SCOPE_ID='default'
+npm run db:migrate:postgres
+npm run db:seed:postgres
+WORKBENCH_DATA_SOURCE=postgres npm run dev
+```
+
+`db:seed:postgres` 只用于首次验证，会把服务端 Demo snapshot 写入指定 scope。正式数据由聚合器
+发布。接口通过 `x-workbench-source: demo | postgres` 暴露当前读取源，便于部署巡检；生产环境使用
+显式 `postgres` 模式，避免数据库 Secret 丢失时静默退回演示数据。
+
+## 10. 后端实现验收清单
 
 - OpenAPI Schema 与 `contracts.ts` 字段一致；
 - 默认队列排序对相同快照稳定；
