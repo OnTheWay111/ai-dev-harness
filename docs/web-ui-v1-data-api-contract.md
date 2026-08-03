@@ -50,6 +50,7 @@ flowchart LR
 | `revision` | `number` | 聚合快照版本，用于实时增量和缓存校验 |
 | `generatedAt` | ISO 8601 | 服务端生成快照的时间 |
 | `summary.metrics` | `WorkbenchMetric[]` | 首屏六项可操作统计 |
+| `summary.taskCounts` | `Record<TaskFilter, number>` | 不受分页影响的任务筛选总数 |
 | `tasks` | `GlobalTask[]` | 已按服务端规则排序的统一任务队列 |
 
 ### 3.2 GlobalTask
@@ -276,8 +277,11 @@ V1 错误码：`validation_failed`、`forbidden`、`not_found`、`version_confli
 ```text
 app/page.tsx                              页面入口
 app/workbench/contracts.ts                V1 DTO、命令和错误类型
-app/workbench/mock-data.ts                与契约一致的演示快照
+app/workbench/workbench-api.ts             浏览器 HTTP 适配器与 ETag 缓存
 app/workbench/selectors.ts                筛选、计数和格式化纯函数
+app/workbench/server/workbench-repository.ts 可替换的服务端读仓库
+app/workbench/server/demo-workbench-snapshot.ts 服务端演示种子
+app/api/v1/workbench/route.ts              V1 聚合读取接口
 app/workbench/components/workbench-app.tsx 状态协调与页面路由
 app/workbench/components/app-shell.tsx     Sidebar、Topbar
 app/workbench/components/overview-view.tsx 首屏统计与统一任务队列
@@ -285,8 +289,9 @@ app/workbench/components/*-view.tsx        各独立业务视图
 app/workbench/components/ui.tsx            通用状态、进度和 Stepper
 ```
 
-接入真实接口时，只需用 `WorkbenchApi.getWorkbench()` 替换 `mock-data.ts` 注入；页面组件不应读取
-数据库字段、拼接领域状态或自行计算服务端排序。
+当前页面已经通过服务端仓库完成 SSR，并在 hydration 后使用 `WorkbenchApi.getWorkbench()` 刷新。
+接入 PostgreSQL 时只替换 `WorkbenchReadRepository`；页面组件不应读取数据库字段、拼接领域状态
+或自行计算服务端排序。
 
 ## 9. 后端实现验收清单
 
