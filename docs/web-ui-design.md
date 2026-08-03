@@ -140,6 +140,9 @@ Token 使用采用周期预算曲线，而不是简单“跑满并发”：
 
 ## 7. HTML 交互原型
 
+V1 首屏的数据模型、排序口径、接口、异步 receipt 和错误协议见
+[Web UI V1 数据模型与接口契约](web-ui-v1-data-api-contract.md)。
+
 原型目录：
 
 ```text
