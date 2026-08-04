@@ -24,6 +24,8 @@ const expectedPermissions = {
     "role_binding.manage",
     "goal.read",
     "goal.write",
+    "spec.read",
+    "spec.generate",
     "run.operate",
     "evidence.read",
   ],
@@ -31,11 +33,14 @@ const expectedPermissions = {
     "goal.read",
     "goal.write",
     "goal.approve",
+    "spec.read",
+    "spec.generate",
+    "spec.approve",
     "issue.approve",
     "evidence.read",
   ],
-  operator: ["goal.read", "run.operate", "evidence.read"],
-  viewer: ["goal.read", "evidence.read"],
+  operator: ["goal.read", "spec.read", "run.operate", "evidence.read"],
+  viewer: ["goal.read", "spec.read", "evidence.read"],
 };
 
 function binding(role, actorId = role, projectId) {

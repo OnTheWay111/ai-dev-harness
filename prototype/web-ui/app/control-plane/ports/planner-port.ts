@@ -33,6 +33,7 @@ export type PlannerOutputSchema = Readonly<Record<string, unknown>>;
 export interface PlannerRequest {
   goal: GoalContract;
   outputSchema: PlannerOutputSchema;
+  purpose?: "clarification" | "specification";
 }
 
 export interface PlannerDraft<T = unknown> {

@@ -790,6 +790,22 @@ export const specRevisions = pgTable(
     sourceGoalVersion: integer("source_goal_version").notNull(),
     artifactRef: text("artifact_ref").notNull(),
     artifactDigest: text("artifact_digest").notNull(),
+    artifactMediaType: text("artifact_media_type")
+      .$type<"application/json">()
+      .default("application/json")
+      .notNull(),
+    artifactSizeBytes: bigint("artifact_size_bytes", { mode: "number" })
+      .default(0)
+      .notNull(),
+    plannerRunId: text("planner_run_id").default("legacy-migration").notNull(),
+    plannerConfiguration: jsonb("planner_configuration")
+      .$type<import("../app/control-plane/domain/spec-artifact.ts").PlannerConfiguration>()
+      .default(sql`'{"adapter":"legacy","modelProfile":"unknown","schemaVersion":"spec-bundle.v1"}'::jsonb`)
+      .notNull(),
+    generatedAt: timestamp("generated_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at", {
       withTimezone: true,
@@ -851,7 +867,11 @@ export const specRevisions = pgTable(
     ),
     check(
       "spec_revisions_artifact_chk",
-      sql`char_length(btrim(${table.artifactRef})) BETWEEN 1 AND 1000 AND ${table.artifactDigest} ~ '^[0-9a-f]{64}$'`,
+      sql`char_length(btrim(${table.artifactRef})) BETWEEN 1 AND 1000 AND ${table.artifactDigest} ~ '^[0-9a-f]{64}$' AND ${table.artifactMediaType} = 'application/json' AND ${table.artifactSizeBytes} >= 0`,
+    ),
+    check(
+      "spec_revisions_planner_metadata_chk",
+      sql`char_length(btrim(${table.plannerRunId})) BETWEEN 1 AND 200 AND ${table.generatedAt} >= ${table.createdAt}`,
     ),
     check(
       "spec_revisions_versions_chk",

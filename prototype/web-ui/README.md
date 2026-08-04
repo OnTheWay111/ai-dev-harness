@@ -209,6 +209,9 @@ and diagnostic contract are documented in
 The append-only clarification rounds, question/answer revisions, human
 decisions, API/UI timeline, and concurrency rules are documented in
 [`../../docs/clarification-history.md`](../../docs/clarification-history.md).
+The strict Proposal/PRD bundle, immutable content-addressed Artifact Store,
+SpecRevision generation API, and controlled Planner smoke test are documented
+in [`../../docs/spec-artifacts.md`](../../docs/spec-artifacts.md).
 The versioned deterministic S/M/L/XL and risk policy, factor explanations,
 required Artifacts, approvers, and persistence contract are documented in
 [`../../docs/deterministic-classification.md`](../../docs/deterministic-classification.md).

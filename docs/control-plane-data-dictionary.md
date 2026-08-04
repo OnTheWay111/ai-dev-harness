@@ -197,6 +197,9 @@ A versioned, artifact-backed proposal derived from a particular Goal version.
 | `status` | `draft`, `in_review`, `approved`, `rejected`, or `superseded` |
 | `source_goal_version` | Goal version used to generate the artifact |
 | `artifact_ref`, `artifact_digest` | Credential-free immutable content reference and SHA-256 digest |
+| `artifact_media_type`, `artifact_size_bytes` | Verified JSON representation metadata |
+| `planner_run_id`, `planner_configuration` | Exact generation run and non-secret adapter/model-profile/schema configuration |
+| `generated_at` | Planner generation timestamp, distinct from later state changes |
 | `version` | Positive optimistic state-machine version |
 | `created_at`, `updated_at` | Ordered lifecycle timestamps |
 

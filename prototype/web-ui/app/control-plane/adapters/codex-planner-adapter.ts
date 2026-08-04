@@ -185,7 +185,9 @@ export class CodexPlannerAdapter implements PlannerPort {
         cwd: directory,
         environment: this.environment,
         stdin: [
-          "You are the Goal Planner. Analyze only the supplied Goal context.",
+          request.purpose === "specification"
+            ? "You are the Specification Planner. Produce Proposal, PRD, architecture, migration, rollback, and traceable solution-element drafts."
+            : "You are the Goal Planner. Analyze only the supplied Goal context.",
           "Return a JSON draft matching the output schema.",
           "Do not approve business decisions and do not inspect any repository.",
           `<goal-context>${context}</goal-context>`,

@@ -46,6 +46,12 @@ import { PostgresClassificationRepository } from
   "../app/control-plane/adapters/postgres-classification-repository.ts";
 import { ClassificationService } from
   "../app/control-plane/application/classification-service.ts";
+import { PostgresSpecRevisionRepository } from
+  "../app/control-plane/adapters/postgres-spec-revision-repository.ts";
+import { MemoryArtifactStore } from
+  "../app/control-plane/adapters/memory-artifact-store.ts";
+import { SpecGenerationService } from
+  "../app/control-plane/application/spec-generation-service.ts";
 import {
   IdempotencyConflictError,
 } from "../app/control-plane/domain/errors.ts";
@@ -168,7 +174,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 10);
+  assert.equal(migrations.length, 11);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -372,6 +378,123 @@ integrationTest(
     assert.equal(timeline.classifications[0].policyRevisionId, timeline.classifications[1].policyRevisionId);
     await assert.rejects(() => pool.query(`UPDATE classifications SET risk='low' WHERE id=$1`, [first.classification.id]), /append-only/i);
     await assert.rejects(() => pool.query(`DELETE FROM classification_policy_revisions WHERE id=$1`, [first.policy.id]), /append-only/i);
+  },
+);
+
+integrationTest(
+  "appends immutable artifact-backed specification revisions in PostgreSQL",
+  async () => {
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const goalId = crypto.randomUUID();
+    const criterionId = crypto.randomUUID();
+    const suffix = `${process.pid}-${crypto.randomUUID().slice(0, 8)}`;
+    await pool.query(
+      `INSERT INTO organizations (id, slug, name) VALUES ($1,$2,'Spec org')`,
+      [organizationId, `spec-org-${suffix}`],
+    );
+    await pool.query(
+      `INSERT INTO projects (id, organization_id, slug, name)
+       VALUES ($1,$2,$3,'Spec project')`,
+      [projectId, organizationId, `spec-project-${suffix}`],
+    );
+    await pool.query(
+      `INSERT INTO goals
+         (id, organization_id, project_id, title, problem_statement,
+          desired_outcome, status)
+       VALUES ($1,$2,$3,'Immutable spec','Specs can be overwritten',
+               'Every revision is content addressed','planning')`,
+      [goalId, organizationId, projectId],
+    );
+    await pool.query(
+      `INSERT INTO acceptance_criteria
+         (id, organization_id, project_id, goal_id, position, statement)
+       VALUES ($1,$2,$3,$4,1,'Prior revisions remain readable')`,
+      [criterionId, organizationId, projectId, goalId],
+    );
+    const output = {
+      schemaVersion: "spec-bundle.v1",
+      proposal: {
+        summary: "Store immutable specifications.",
+        value: "Approvers review exact content.",
+        inScope: ["Spec generation"],
+        outOfScope: ["Issue compilation"],
+        deliverySlices: ["Generate and persist one revision"],
+      },
+      prd: {
+        problem: "Specs can be overwritten.",
+        users: ["Approver"],
+        requirements: [{
+          id: "REQ-1",
+          statement: "Retain every revision.",
+          acceptanceCriterionRefs: [criterionId],
+        }],
+        nonGoals: ["Issue compilation"],
+        constraints: [],
+      },
+      architecture: {
+        summary: "Use content-addressed artifacts.",
+        components: [{
+          id: "store",
+          name: "Artifact Store",
+          responsibility: "Keep immutable content.",
+          requirementRefs: ["REQ-1"],
+        }],
+        decisions: ["PostgreSQL stores only metadata"],
+      },
+      migration: { required: false, steps: [], verification: [] },
+      rollback: {
+        triggers: ["Artifact lookup fails"],
+        steps: ["Stop generation"],
+        dataRecovery: "Retain prior artifacts.",
+      },
+      solutionElements: [{
+        id: "EL-1",
+        title: "Content addressing",
+        kind: "architecture",
+        description: "Address specifications by digest.",
+        acceptanceCriterionRefs: [criterionId],
+        constraintRefs: [],
+        estimatedCost: "medium",
+        removalImpact: "Revisions could be overwritten.",
+        evidence: ["REQ-1"],
+      }],
+    };
+    const artifacts = new MemoryArtifactStore();
+    const repository = new PostgresSpecRevisionRepository(pool);
+    const service = new SpecGenerationService({
+      planner: new FakePlannerAdapter([output]),
+      artifacts,
+      repository,
+      goals: new PostgresGoalWorkspaceRepository(pool),
+      authorizer: { async authorize() {} },
+    });
+    const generated = await service.generate({
+      organizationId,
+      projectId,
+      goalId,
+      actorId: "spec-reviewer",
+      expectedGoalVersion: 1,
+      reason: "Generate integration revision",
+    });
+    assert.equal(generated.specRevision.revision, 1);
+    assert.deepEqual(
+      (await service.timeline({
+        organizationId,
+        projectId,
+        goalId,
+        actorId: "spec-viewer",
+      })).revisions[0].artifact.content,
+      output,
+    );
+    const row = await pool.query(
+      `SELECT artifact_digest, planner_configuration, generated_at
+         FROM spec_revisions WHERE id=$1`,
+      [generated.specRevision.id],
+    );
+    assert.equal(row.rows[0].artifact_digest, generated.artifact.digest);
+    assert.equal(row.rows[0].planner_configuration.schemaVersion, "spec-bundle.v1");
+    assert.ok(row.rows[0].generated_at);
   },
 );
 

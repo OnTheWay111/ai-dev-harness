@@ -88,6 +88,8 @@ test("keeps every environment template credential-free and correctly mapped", ()
       WORKBENCH_DATA_SOURCE: "postgres",
       WORKBENCH_SCOPE_ID: environment,
       DATABASE_URL: "",
+      ARTIFACT_STORE_PATH: `/var/lib/ai-dev-harness/${environment}-artifacts`,
+      CODEX_PLANNER_MODEL: "",
       OIDC_ISSUER: "https://idp.example.invalid",
       OIDC_CLIENT_ID: "",
       OIDC_CLIENT_SECRET: "",
