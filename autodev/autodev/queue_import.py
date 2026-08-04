@@ -388,6 +388,10 @@ def build_queue_tasks(
             "completion_evidence": deepcopy(imported["completion_evidence"]),
             "expected_files": list(imported["expected_files"]),
             "execution_wave": imported["wave"],
+            # P7 resolves a capability tier through the configured task-level
+            # builder catalog. Keeping the selector on the imported task lets
+            # AutoDev enforce that the requested builder exists and is writable.
+            "preferred_builder": imported["capability_tier"],
             "model_route": {
                 "capability_tier": imported["capability_tier"],
                 "reasoning_effort": imported["reasoning_effort"],

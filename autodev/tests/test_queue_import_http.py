@@ -12,7 +12,7 @@ import yaml
 
 from autodev.queue_adapter import TaskHarnessQueueAdapter
 from autodev.queue_import_http import create_import_server
-from tests.test_queue_import import import_payload
+from test_queue_import import import_payload
 
 
 class QueueImportHttpTests(unittest.TestCase):

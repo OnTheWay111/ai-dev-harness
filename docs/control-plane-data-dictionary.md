@@ -306,6 +306,39 @@ One numbered execution attempt for a particular Issue revision.
 The Issue/attempt tuple is unique. Status checks require timestamps appropriate
 to queued, running, terminal, and cancelled attempts.
 
+## `scheduler_jobs`
+
+The durable supervisor record for one Run. It stores claim/retry state,
+deadline and attempt budget, the required execution capability, AutoDev
+task/Run identities, current phase,
+node/lease digest, heartbeat, last applied source sequence, and the explicit
+`reconciliation_required` flag. Claim and reconciliation indexes keep the
+worker query bounded. The Run is unique so a second Job cannot silently execute
+the same attempt.
+
+## `execution_nodes` and `execution_leases`
+
+`execution_nodes` is the live capacity registry: provider, capabilities,
+maximum concurrent Runs, `online | draining | offline`, heartbeat, and offline
+deadline. `execution_leases` binds one Run to one node and supervisor using only
+a SHA-256 token digest. A partial unique index permits exactly one active lease
+per Run; row locking and a live-lease count enforce provider capacity.
+
+## `external_event_inbox`
+
+The durable AutoDev event boundary. Source event identity and digest reject
+conflicting replay; `(source, external_run_id, source_sequence)` preserves one
+ordered stream. Processing state records applied, gap, terminal-ignore, and
+failure outcomes without letting an external payload update Run directly.
+
+## `execution_controls` and `execution_command_receipts`
+
+Global/project execution state, failure circuit, reason, and optimistic version
+live in `execution_controls`. Append-only command receipts bind actor,
+Idempotency-Key, canonical request hash, request ID, reason, operation, scope,
+and exact response. These rows provide both replay and operator audit evidence;
+the resulting control event is added to Outbox in the same transaction.
+
 ## `evidence`
 
 Immutable metadata for a Run artifact.

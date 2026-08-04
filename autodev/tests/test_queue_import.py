@@ -105,6 +105,7 @@ class YamlQueueImportTests(unittest.TestCase):
         self.assertEqual(first["development_prompt"], import_payload()["tasks"][0]["developmentPrompt"])
         self.assertEqual(first["exclusive_resources"], ["app/import.py"])
         self.assertEqual(first["model_route"]["capability_tier"], "general_coding")
+        self.assertEqual(first["preferred_builder"], "general_coding")
         self.assertTrue(first["completion_evidence"][0]["required"])
 
     def test_replay_by_key_or_plan_identity_does_not_duplicate_tasks(self) -> None:

@@ -9,6 +9,7 @@ import re
 import shutil
 import sys
 from typing import Any, Callable, TypeVar
+import uuid
 import warnings
 
 import yaml
@@ -332,6 +333,8 @@ def append_event(
     persistence = resolve_persistence_config()
     paths = run_paths(repo_root, run_id)
     event = {
+        "schema_version": "autodev.run-event.v1",
+        "event_id": f"{validate_run_id(run_id)}:{uuid.uuid4().hex}",
         "timestamp": now_iso(),
         "level": level,
         "phase": phase,
@@ -365,6 +368,11 @@ def append_event(
         return stored
     paths.events_jsonl.parent.mkdir(parents=True, exist_ok=True)
     with file_lock(paths.events_jsonl):
+        sequence = 1
+        if paths.events_jsonl.exists():
+            with paths.events_jsonl.open("r", encoding="utf-8") as handle:
+                sequence += sum(1 for line in handle if line.strip())
+        event["sequence"] = sequence
         with paths.events_jsonl.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
     mirror_events(

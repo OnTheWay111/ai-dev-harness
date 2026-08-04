@@ -190,7 +190,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 15);
+  assert.equal(migrations.length, 17);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -215,7 +215,12 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
       "classifications",
       "decisions",
       "evidence",
+      "execution_command_receipts",
+      "execution_controls",
+      "execution_leases",
+      "execution_nodes",
       "execution_waves",
+      "external_event_inbox",
       "goals",
       "idempotency_records",
       "issue_dependencies",
@@ -229,6 +234,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
       "repositories",
       "role_bindings",
       "runs",
+      "scheduler_jobs",
       "spec_revisions",
       "workbench_snapshots",
       "workbench_tasks",

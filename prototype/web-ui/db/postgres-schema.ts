@@ -100,6 +100,45 @@ export type IssuePlanStatus = (typeof issuePlanStatuses)[number];
 export const queueProjectionStatuses = ["completed", "failed"] as const;
 export type QueueProjectionStatus = (typeof queueProjectionStatuses)[number];
 
+export const schedulerJobStates = [
+  "pending",
+  "claimed",
+  "starting",
+  "running",
+  "retry_wait",
+  "reconciling",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "blocked",
+] as const;
+export type SchedulerJobState = (typeof schedulerJobStates)[number];
+
+export const executionNodeStatuses = ["online", "draining", "offline"] as const;
+export type ExecutionNodeStatus = (typeof executionNodeStatuses)[number];
+
+export const executionLeaseStatuses = ["active", "released", "expired"] as const;
+export type ExecutionLeaseStatus = (typeof executionLeaseStatuses)[number];
+
+export const externalEventProcessingStatuses = [
+  "pending",
+  "applied",
+  "duplicate",
+  "gap",
+  "terminal_ignored",
+  "failed",
+] as const;
+export type ExternalEventProcessingStatus =
+  (typeof externalEventProcessingStatuses)[number];
+
+export const executionControlStates = [
+  "active",
+  "paused",
+  "draining",
+  "stopped",
+] as const;
+export type ExecutionControlState = (typeof executionControlStates)[number];
+
 export const organizations = pgTable(
   "organizations",
   {
@@ -1341,6 +1380,12 @@ export const runs = pgTable(
       table.issueId,
       table.id,
     ),
+    unique("runs_goal_id_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.id,
+    ),
     uniqueIndex("runs_issue_attempt_uidx").on(
       table.organizationId,
       table.projectId,
@@ -1369,6 +1414,345 @@ export const runs = pgTable(
     check(
       "runs_timestamps_order_chk",
       sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const executionNodes = pgTable(
+  "execution_nodes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    provider: text("provider").notNull(),
+    capabilities: jsonb("capabilities").$type<string[]>()
+      .default(sql`'[]'::jsonb`).notNull(),
+    maxConcurrentRuns: integer("max_concurrent_runs").notNull(),
+    status: text("status").$type<ExecutionNodeStatus>().default("offline").notNull(),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true, mode: "date" }).notNull(),
+    offlineAfter: timestamp("offline_after", { withTimezone: true, mode: "date" }).notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("execution_nodes_name_uidx").on(table.name),
+    index("execution_nodes_provider_status_idx").on(table.provider, table.status),
+    check(
+      "execution_nodes_identity_chk",
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 200 AND char_length(btrim(${table.provider})) BETWEEN 1 AND 100`,
+    ),
+    check(
+      "execution_nodes_capabilities_chk",
+      sql`jsonb_typeof(${table.capabilities}) = 'array'`,
+    ),
+    check(
+      "execution_nodes_capacity_chk",
+      sql`${table.maxConcurrentRuns} > 0 AND ${table.maxConcurrentRuns} <= 1000`,
+    ),
+    check(
+      "execution_nodes_status_chk",
+      sql`${table.status} IN ('online','draining','offline')`,
+    ),
+    check(
+      "execution_nodes_liveness_chk",
+      sql`${table.offlineAfter} > ${table.heartbeatAt}`,
+    ),
+    check("execution_nodes_version_chk", sql`${table.version} > 0`),
+    check(
+      "execution_nodes_timestamps_chk",
+      sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const schedulerJobs = pgTable(
+  "scheduler_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    runId: uuid("run_id").notNull(),
+    externalTaskId: text("external_task_id").notNull(),
+    requiredCapability: text("required_capability")
+      .$type<import("../app/control-plane/domain/model-router.ts").CapabilityTier>()
+      .default("general_coding").notNull(),
+    state: text("state").$type<SchedulerJobState>().default("pending").notNull(),
+    phase: text("phase").default("queued").notNull(),
+    priority: integer("priority").default(100).notNull(),
+    attempt: integer("attempt").default(1).notNull(),
+    maxAttempts: integer("max_attempts").default(1).notNull(),
+    budget: jsonb("budget").$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`).notNull(),
+    deadlineAt: timestamp("deadline_at", { withTimezone: true, mode: "date" }).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    externalRunId: text("external_run_id"),
+    nodeId: uuid("node_id"),
+    leaseTokenDigest: text("lease_token_digest"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true, mode: "date" }),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true, mode: "date" }),
+    lastEventSequence: integer("last_event_sequence").default(0).notNull(),
+    reconciliationRequired: boolean("reconciliation_required").default(false).notNull(),
+    failureCode: text("failure_code"),
+    failureReason: text("failure_reason"),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "scheduler_jobs_run_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.issueId,
+        table.runId,
+      ],
+      foreignColumns: [
+        runs.organizationId, runs.projectId, runs.goalId, runs.issueId, runs.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "scheduler_jobs_node_fk",
+      columns: [table.nodeId],
+      foreignColumns: [executionNodes.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("scheduler_jobs_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    uniqueIndex("scheduler_jobs_run_uidx").on(table.runId),
+    uniqueIndex("scheduler_jobs_external_run_uidx").on(table.externalRunId),
+    index("scheduler_jobs_claim_idx").on(
+      table.state, table.nextAttemptAt, table.priority, table.createdAt,
+    ),
+    index("scheduler_jobs_reconcile_idx").on(
+      table.reconciliationRequired, table.state, table.updatedAt,
+    ),
+    check(
+      "scheduler_jobs_state_chk",
+      sql`${table.state} IN ('pending','claimed','starting','running','retry_wait','reconciling','succeeded','failed','cancelled','blocked')`,
+    ),
+    check(
+      "scheduler_jobs_attempt_chk",
+      sql`${table.attempt} > 0 AND ${table.maxAttempts} >= ${table.attempt}`,
+    ),
+    check(
+      "scheduler_jobs_sequence_chk",
+      sql`${table.lastEventSequence} >= 0`,
+    ),
+    check(
+      "scheduler_jobs_identity_chk",
+      sql`char_length(btrim(${table.externalTaskId})) BETWEEN 1 AND 128 AND (${table.externalRunId} IS NULL OR char_length(btrim(${table.externalRunId})) BETWEEN 1 AND 128)`,
+    ),
+    check(
+      "scheduler_jobs_capability_chk",
+      sql`${table.requiredCapability} IN ('cost_optimized','general_coding','advanced_coding','frontier')`,
+    ),
+    check("scheduler_jobs_version_chk", sql`${table.version} > 0`),
+    check(
+      "scheduler_jobs_timestamps_chk",
+      sql`${table.deadlineAt} > ${table.createdAt} AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const executionLeases = pgTable(
+  "execution_leases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").notNull(),
+    nodeId: uuid("node_id").notNull(),
+    ownerId: text("owner_id").notNull(),
+    tokenDigest: text("token_digest").notNull(),
+    status: text("status").$type<ExecutionLeaseStatus>().default("active").notNull(),
+    acquiredAt: timestamp("acquired_at", { withTimezone: true, mode: "date" }).notNull(),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true, mode: "date" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+    releasedAt: timestamp("released_at", { withTimezone: true, mode: "date" }),
+    version: integer("version").default(1).notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "execution_leases_run_fk",
+      columns: [table.runId],
+      foreignColumns: [runs.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "execution_leases_node_fk",
+      columns: [table.nodeId],
+      foreignColumns: [executionNodes.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("execution_leases_active_run_uidx")
+      .on(table.runId)
+      .where(sql`${table.status} = 'active'`),
+    index("execution_leases_active_node_idx").on(table.nodeId, table.status, table.expiresAt),
+    check(
+      "execution_leases_status_chk",
+      sql`${table.status} IN ('active','released','expired')`,
+    ),
+    check(
+      "execution_leases_identity_chk",
+      sql`char_length(btrim(${table.ownerId})) BETWEEN 1 AND 200 AND ${table.tokenDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "execution_leases_lifecycle_chk",
+      sql`${table.expiresAt} > ${table.acquiredAt} AND ${table.heartbeatAt} >= ${table.acquiredAt} AND ((${table.status} = 'active' AND ${table.releasedAt} IS NULL) OR (${table.status} <> 'active' AND ${table.releasedAt} IS NOT NULL))`,
+    ),
+    check("execution_leases_version_chk", sql`${table.version} > 0`),
+  ],
+);
+
+export const externalEventInbox = pgTable(
+  "external_event_inbox",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    jobId: uuid("job_id").notNull(),
+    runId: uuid("run_id").notNull(),
+    schemaVersion: text("schema_version").notNull(),
+    source: text("source").default("autodev").notNull(),
+    sourceEventId: text("source_event_id").notNull(),
+    sourceEventDigest: text("source_event_digest").notNull(),
+    externalRunId: text("external_run_id").notNull(),
+    externalTaskId: text("external_task_id").notNull(),
+    sourceSequence: integer("source_sequence").notNull(),
+    phase: text("phase").notNull(),
+    externalStatus: text("external_status").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    processingStatus: text("processing_status")
+      .$type<ExternalEventProcessingStatus>().default("pending").notNull(),
+    failureReason: text("failure_reason"),
+    receivedAt: timestamp("received_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    foreignKey({
+      name: "external_event_inbox_job_fk",
+      columns: [table.jobId],
+      foreignColumns: [schedulerJobs.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "external_event_inbox_run_fk",
+      columns: [table.runId],
+      foreignColumns: [runs.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("external_event_inbox_source_event_uidx").on(
+      table.source, table.sourceEventId,
+    ),
+    uniqueIndex("external_event_inbox_run_sequence_uidx").on(
+      table.source, table.externalRunId, table.sourceSequence,
+    ),
+    index("external_event_inbox_pending_idx").on(
+      table.processingStatus, table.receivedAt,
+    ),
+    check(
+      "external_event_inbox_schema_chk",
+      sql`${table.schemaVersion} = 'autodev.run-event.v1'`,
+    ),
+    check(
+      "external_event_inbox_digest_chk",
+      sql`${table.sourceEventDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "external_event_inbox_sequence_chk",
+      sql`${table.sourceSequence} > 0`,
+    ),
+    check(
+      "external_event_inbox_status_chk",
+      sql`${table.processingStatus} IN ('pending','applied','duplicate','gap','terminal_ignored','failed')`,
+    ),
+    check(
+      "external_event_inbox_lifecycle_chk",
+      sql`(${table.processingStatus} IN ('pending','gap') AND ${table.processedAt} IS NULL) OR (${table.processingStatus} NOT IN ('pending','gap') AND ${table.processedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const executionControls = pgTable(
+  "execution_controls",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id"),
+    projectId: uuid("project_id"),
+    scopeType: text("scope_type").notNull(),
+    scopeKey: text("scope_key").notNull(),
+    state: text("state").$type<ExecutionControlState>().default("active").notNull(),
+    consecutiveFailures: integer("consecutive_failures").default(0).notNull(),
+    circuitOpenUntil: timestamp("circuit_open_until", { withTimezone: true, mode: "date" }),
+    reason: text("reason").notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "execution_controls_project_fk",
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("execution_controls_scope_uidx").on(table.scopeType, table.scopeKey),
+    check(
+      "execution_controls_scope_chk",
+      sql`(${table.scopeType} = 'global' AND ${table.scopeKey} = 'global' AND ${table.organizationId} IS NULL AND ${table.projectId} IS NULL) OR (${table.scopeType} = 'project' AND ${table.organizationId} IS NOT NULL AND ${table.projectId} IS NOT NULL AND ${table.scopeKey} = ${table.projectId}::text)`,
+    ),
+    check(
+      "execution_controls_state_chk",
+      sql`${table.state} IN ('active','paused','draining','stopped')`,
+    ),
+    check(
+      "execution_controls_failure_chk",
+      sql`${table.consecutiveFailures} >= 0`,
+    ),
+    check(
+      "execution_controls_reason_chk",
+      sql`char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`,
+    ),
+    check("execution_controls_version_chk", sql`${table.version} > 0`),
+    check(
+      "execution_controls_timestamps_chk",
+      sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const executionCommandReceipts = pgTable(
+  "execution_command_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: text("actor_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    requestId: text("request_id").notNull(),
+    reason: text("reason").notNull(),
+    scopeType: text("scope_type").notNull(),
+    scopeKey: text("scope_key").notNull(),
+    operation: text("operation").notNull(),
+    receipt: jsonb("receipt").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("execution_command_receipts_actor_key_uidx").on(
+      table.actorId, table.idempotencyKey,
+    ),
+    check(
+      "execution_command_receipts_identity_chk",
+      sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.idempotencyKey})) BETWEEN 1 AND 200 AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000 AND ${table.requestHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "execution_command_receipts_scope_chk",
+      sql`${table.scopeType} IN ('global','project') AND char_length(btrim(${table.scopeKey})) BETWEEN 1 AND 200`,
+    ),
+    check(
+      "execution_command_receipts_operation_chk",
+      sql`${table.operation} IN ('start','pause','drain','resume','retry','stop')`,
     ),
   ],
 );
@@ -1696,6 +2080,18 @@ export type AuditEvent = typeof auditEvents.$inferSelect;
 export type NewAuditEvent = typeof auditEvents.$inferInsert;
 export type OutboxEvent = typeof outboxEvents.$inferSelect;
 export type NewOutboxEvent = typeof outboxEvents.$inferInsert;
+export type SchedulerJobRecord = typeof schedulerJobs.$inferSelect;
+export type NewSchedulerJobRecord = typeof schedulerJobs.$inferInsert;
+export type ExecutionNode = typeof executionNodes.$inferSelect;
+export type NewExecutionNode = typeof executionNodes.$inferInsert;
+export type ExecutionLease = typeof executionLeases.$inferSelect;
+export type NewExecutionLease = typeof executionLeases.$inferInsert;
+export type ExternalEventInboxRecord = typeof externalEventInbox.$inferSelect;
+export type NewExternalEventInboxRecord = typeof externalEventInbox.$inferInsert;
+export type ExecutionControl = typeof executionControls.$inferSelect;
+export type NewExecutionControl = typeof executionControls.$inferInsert;
+export type ExecutionCommandReceipt = typeof executionCommandReceipts.$inferSelect;
+export type NewExecutionCommandReceipt = typeof executionCommandReceipts.$inferInsert;
 export type IdempotencyRecord = typeof idempotencyRecords.$inferSelect;
 export type NewIdempotencyRecord = typeof idempotencyRecords.$inferInsert;
 

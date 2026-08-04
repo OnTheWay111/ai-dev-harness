@@ -12,7 +12,7 @@ from autodev.database.models import Base, ImportBatch, QueueTask
 from autodev.database.queue_repository import DatabaseQueuePort, DatabaseQueueRepository
 from autodev.database.run_repository import ProjectIdentity
 from autodev.queue_import import build_queue_tasks, validate_import_request
-from tests.test_queue_import import import_payload
+from test_queue_import import import_payload
 
 
 class DatabaseQueueImportTests(unittest.TestCase):

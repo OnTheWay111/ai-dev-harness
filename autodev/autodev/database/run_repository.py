@@ -125,6 +125,7 @@ class DatabaseRunStore:
             or 0
         ) + 1
         payload = deepcopy(dict(event))
+        payload["sequence"] = seq
         row = RunEvent(
             run_pk=run.id,
             seq=seq,

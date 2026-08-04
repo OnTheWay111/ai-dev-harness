@@ -1,0 +1,2 @@
+ALTER TABLE "scheduler_jobs" ADD COLUMN "required_capability" text DEFAULT 'general_coding' NOT NULL;--> statement-breakpoint
+ALTER TABLE "scheduler_jobs" ADD CONSTRAINT "scheduler_jobs_capability_chk" CHECK ("scheduler_jobs"."required_capability" IN ('cost_optimized','general_coding','advanced_coding','frontier'));

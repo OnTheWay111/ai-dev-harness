@@ -1,16 +1,18 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { parse } from "yaml";
+import { parse, stringify } from "yaml";
 
 import { AutoDevQueueImportAdapter } from
   "../app/control-plane/adapters/autodev-queue-import-adapter.ts";
+import { assertAutoDevExecutionContract } from
+  "./execution-gateway-contract.mjs";
 
 const repositorySourcePath = fileURLToPath(new URL("../../../autodev", import.meta.url));
 const sourcePath = process.env.AUTODEV_SOURCE_PATH?.trim() || repositorySourcePath;
@@ -135,6 +137,24 @@ test("P6-06 projects through the real AutoDev atomic HTTP import boundary", {
       { cwd: sourcePath, encoding: "utf8" },
     );
     assert.equal(initialized.status, 0, initialized.stderr);
+    const initializedGit = spawnSync("git", ["init", "-b", "main"], {
+      cwd: project, encoding: "utf8",
+    });
+    assert.equal(initializedGit.status, 0, initializedGit.stderr);
+    const config = parse(await readFile(configPath, "utf8"));
+    for (const capability of [
+      "cost_optimized", "general_coding", "advanced_coding", "frontier",
+    ]) {
+      config.agent.commands[capability] = {
+        kind: "command",
+        command: "/usr/bin/true",
+        args: [],
+        fresh_session_per_task: true,
+        timeout_minutes: 1,
+        permissions: { profile: "autodev_builder", allow: [], deny: [] },
+      };
+    }
+    await writeFile(configPath, stringify(config));
     ({ child, endpoint } = await startServer(python, configPath));
 
     const invalid = importBody(approvedPlan);
@@ -171,8 +191,49 @@ test("P6-06 projects through the real AutoDev atomic HTTP import boundary", {
     assert.equal(queue.tasks.length, 2);
     assert.deepEqual(queue.tasks[1].dependencies, ["H-001"]);
     assert.equal(queue.tasks[0].model_route.capability_tier, "advanced_coding");
+    assert.equal(queue.tasks[0].preferred_builder, "advanced_coding");
     assert.match(queue.tasks[0].development_prompt, /approved P6-06A/);
     assert.equal(queue.imports.length, 1);
+
+    const committed = spawnSync("git", ["add", "."], { cwd: project, encoding: "utf8" });
+    assert.equal(committed.status, 0, committed.stderr);
+    const commit = spawnSync(
+      "git",
+      ["-c", "user.name=AutoDev Test", "-c", "user.email=autodev@example.invalid",
+        "commit", "-m", "fixture"],
+      { cwd: project, encoding: "utf8" },
+    );
+    assert.equal(commit.status, 0, commit.stderr);
+    const dryRun = spawnSync(
+      python,
+      ["-m", "autodev", "run-one", "--project", configPath, "--task", "H-001",
+        "--run-id", "p7-real-smoke", "--dry-run", "--json"],
+      { cwd: sourcePath, encoding: "utf8", env: { ...process.env } },
+    );
+    assert.equal(dryRun.status, 0, dryRun.stderr);
+    assert.equal(JSON.parse(dryRun.stdout).status, "dry_run");
+    const events = (await readFile(
+      path.join(project, ".autodev", "runs", "p7-real-smoke", "events.jsonl"),
+      "utf8",
+    )).trim().split("\n").map((line) => JSON.parse(line));
+    assert.ok(events.some((event) =>
+      event.phase === "dry_run" &&
+      event.extra.preferred_builder === "advanced_coding"));
+
+    const status = spawnSync(
+      python,
+      ["-m", "autodev", "status", "--project", configPath,
+        "--run-id", "p7-real-smoke", "--json"],
+      { cwd: sourcePath, encoding: "utf8" },
+    );
+    assert.equal(status.status, 0, status.stderr);
+    const statusPayload = JSON.parse(status.stdout);
+    assert.equal(statusPayload.run_id, "p7-real-smoke");
+    assertAutoDevExecutionContract({
+      queueTask: queue.tasks[0],
+      status: statusPayload,
+      events,
+    });
   } finally {
     if (child && !child.killed) {
       const exited = new Promise((resolve) => child.once("exit", resolve));
