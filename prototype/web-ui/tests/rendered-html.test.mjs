@@ -34,6 +34,13 @@ test("protects the server-rendered control plane without a Session", async () =>
     response.headers.get("location"),
     "http://localhost/auth/login?returnTo=/",
   );
+  assert.match(
+    response.headers.get("content-security-policy") ?? "",
+    /frame-ancestors 'none'/,
+  );
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("referrer-policy"), "no-referrer");
   assert.equal(await response.text(), "");
 });
 

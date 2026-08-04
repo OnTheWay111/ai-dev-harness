@@ -14,9 +14,18 @@ import {
 import {
   DomainTransitionError,
   goalStatuses,
+  transitionGuards,
 } from "../domain/state-machines.ts";
 import type { GoalStatus, TransitionGuard } from
   "../domain/state-machines.ts";
+import {
+  assertSameOrigin,
+  defaultWriteRateLimiter,
+  readJsonBody,
+  RequestSecurityError,
+  withSecurityHeaders,
+  type RateLimiter,
+} from "../../security/request-security.ts";
 
 interface GoalApplication {
   transition(command: GoalTransitionCommand): Promise<GoalTransitionReceipt>;
@@ -35,6 +44,9 @@ interface GoalRouteScope {
 interface HandlerDependencies {
   service: GoalApplication;
   actorResolver(request: Request): Promise<Actor>;
+  rateLimiter?: RateLimiter;
+  allowedOrigins?: readonly string[];
+  maxBodyBytes?: number;
 }
 
 interface GoalTransitionBody {
@@ -49,6 +61,15 @@ function parseBody(value: unknown): GoalTransitionBody {
     throw new Error("invalid request body");
   }
   const body = value as Record<string, unknown>;
+  const allowedFields = new Set([
+    "expectedVersion",
+    "nextState",
+    "reason",
+    "guards",
+  ]);
+  if (Object.keys(body).some((field) => !allowedFields.has(field))) {
+    throw new Error("unknown request field");
+  }
   if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
     throw new Error("expectedVersion must be a positive integer");
   }
@@ -70,16 +91,25 @@ function parseBody(value: unknown): GoalTransitionBody {
   ) {
     throw new Error("guards are invalid");
   }
+  const guards = (body.guards ?? {}) as Record<string, unknown>;
+  if (
+    Object.entries(guards).some(([guard, enabled]) =>
+      !transitionGuards.includes(guard as TransitionGuard) ||
+      typeof enabled !== "boolean"
+    )
+  ) {
+    throw new Error("guards are invalid");
+  }
   return {
     expectedVersion: Number(body.expectedVersion),
     nextState: body.nextState as GoalStatus,
     reason: typeof body.reason === "string" ? body.reason : "",
-    guards: (body.guards ?? {}) as Partial<Record<TransitionGuard, boolean>>,
+    guards: guards as Partial<Record<TransitionGuard, boolean>>,
   };
 }
 
 function errorResponse(code: string, status: number): Response {
-  return Response.json(
+  return withSecurityHeaders(Response.json(
     {
       error: {
         code,
@@ -92,7 +122,15 @@ function errorResponse(code: string, status: number): Response {
       },
     },
     { status },
-  );
+  ));
+}
+
+function securityErrorResponse(error: RequestSecurityError): Response {
+  const response = errorResponse(error.code, error.status);
+  if (error.retryAfterSeconds) {
+    response.headers.set("retry-after", String(error.retryAfterSeconds));
+  }
+  return response;
 }
 
 export function createGoalTransitionHandler(dependencies: HandlerDependencies) {
@@ -102,21 +140,42 @@ export function createGoalTransitionHandler(dependencies: HandlerDependencies) {
   ): Promise<Response> {
     try {
       if (request.method !== "POST") return errorResponse("not_found", 404);
+      assertSameOrigin(request, dependencies.allowedOrigins);
       const actor = await dependencies.actorResolver(request);
-      const body = parseBody(await request.json());
+      (dependencies.rateLimiter ?? defaultWriteRateLimiter).consume({
+        actorId: actor.actorId,
+        organizationId: scope.organizationId,
+        endpoint: "goal.transition",
+      });
+      const body = parseBody(await readJsonBody(
+        request,
+        dependencies.maxBodyBytes ?? 16 * 1024,
+      ));
       const idempotencyKey = request.headers.get("idempotency-key") ?? "";
-      if (!idempotencyKey) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(idempotencyKey)) {
         throw new CommandValidationError("Idempotency-Key is required");
+      }
+      const suppliedRequestId = request.headers.get("x-request-id");
+      if (
+        suppliedRequestId &&
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(suppliedRequestId)
+      ) {
+        throw new CommandValidationError("X-Request-Id is invalid");
       }
       const receipt = await dependencies.service.transition({
         ...scope,
         actorId: actor.actorId,
-        requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
+        requestId: suppliedRequestId ?? crypto.randomUUID(),
         idempotencyKey,
         ...body,
       });
-      return Response.json({ data: receipt }, { status: 200 });
+      return withSecurityHeaders(
+        Response.json({ data: receipt }, { status: 200 }),
+      );
     } catch (error) {
+      if (error instanceof RequestSecurityError) {
+        return securityErrorResponse(error);
+      }
       if (error instanceof VersionConflictError) {
         return errorResponse("version_conflict", 409);
       }

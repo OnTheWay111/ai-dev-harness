@@ -1,4 +1,10 @@
 import type { OidcService } from "./oidc-service.ts";
+import {
+  assertSameOrigin,
+  defaultWriteRateLimiter,
+  RequestSecurityError,
+  withSecurityHeaders,
+} from "../security/request-security.ts";
 
 export const TRANSACTION_COOKIE = "__Host-harness_oidc_tx";
 export const SESSION_COOKIE = "__Host-harness_session";
@@ -29,7 +35,7 @@ function clearCookie(name: string): string {
 }
 
 function authenticationFailure(): Response {
-  return Response.json({
+  return withSecurityHeaders(Response.json({
     error: {
       code: "authentication_failed",
       message: "Authentication could not be completed",
@@ -37,7 +43,7 @@ function authenticationFailure(): Response {
       preservedState: "Existing application data was not changed",
       nextAction: "Start a new sign-in attempt",
     },
-  }, { status: 400 });
+  }, { status: 400 }));
 }
 
 export async function handleOidcLogin(
@@ -48,7 +54,7 @@ export async function handleOidcLogin(
   try {
     const returnTo = new URL(request.url).searchParams.get("returnTo");
     const started = await service.begin(returnTo);
-    return new Response(null, {
+    return withSecurityHeaders(new Response(null, {
       status: 302,
       headers: {
         location: started.authorizationUrl,
@@ -59,7 +65,7 @@ export async function handleOidcLogin(
           10 * 60,
         ),
       },
-    });
+    }));
   } catch {
     return authenticationFailure();
   }
@@ -86,7 +92,7 @@ export async function handleOidcCallback(
       secureCookie(SESSION_COOKIE, completed.sessionCookie, 8 * 60 * 60),
     );
     headers.append("set-cookie", clearCookie(TRANSACTION_COOKIE));
-    return new Response(null, { status: 303, headers });
+    return withSecurityHeaders(new Response(null, { status: 303, headers }));
   } catch {
     const response = authenticationFailure();
     response.headers.append("set-cookie", clearCookie(TRANSACTION_COOKIE));
@@ -94,16 +100,51 @@ export async function handleOidcCallback(
   }
 }
 
-export async function handleOidcLogout(request: Request): Promise<Response> {
-  if (request.method !== "POST") return new Response(null, { status: 405 });
-  return new Response(null, {
-    status: 303,
-    headers: {
-      location: "/",
-      "cache-control": "no-store",
-      "set-cookie": clearCookie(SESSION_COOKIE),
-    },
-  });
+export async function handleOidcLogout(
+  request: Request,
+  service?: OidcService,
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return withSecurityHeaders(new Response(null, { status: 405 }));
+  }
+  try {
+    assertSameOrigin(request);
+    const declaredLength = Number(request.headers.get("content-length") ?? "0");
+    if (declaredLength > 0 || request.body) {
+      throw new RequestSecurityError("validation_failed", 400);
+    }
+    const principal = service
+      ? await readRequestPrincipal(request, service)
+      : null;
+    defaultWriteRateLimiter.consume({
+      actorId: principal?.actorId ?? "anonymous",
+      organizationId: "session",
+      endpoint: "auth.logout",
+    });
+    return withSecurityHeaders(new Response(null, {
+      status: 303,
+      headers: {
+        location: "/",
+        "cache-control": "no-store",
+        "set-cookie": clearCookie(SESSION_COOKIE),
+      },
+    }));
+  } catch (error) {
+    const securityError = error instanceof RequestSecurityError
+      ? error
+      : new RequestSecurityError("csrf_rejected", 403);
+    const response = Response.json({
+      error: {
+        code: securityError.code,
+        message: "Logout request was rejected",
+        preservedState: "The current session was not changed",
+      },
+    }, { status: securityError.status });
+    if (securityError.retryAfterSeconds) {
+      response.headers.set("retry-after", String(securityError.retryAfterSeconds));
+    }
+    return withSecurityHeaders(response);
+  }
 }
 
 export async function handleOidcSession(
@@ -113,14 +154,14 @@ export async function handleOidcSession(
   if (request.method !== "GET") return new Response(null, { status: 405 });
   const principal = await readRequestPrincipal(request, service);
   if (!principal) {
-    return Response.json({
+    return withSecurityHeaders(Response.json({
       error: {
         code: "unauthenticated",
         message: "A valid session is required",
       },
-    }, { status: 401, headers: { "cache-control": "no-store" } });
+    }, { status: 401, headers: { "cache-control": "no-store" } }));
   }
-  return Response.json({ data: principal }, {
+  return withSecurityHeaders(Response.json({ data: principal }, {
     headers: { "cache-control": "private, no-store" },
-  });
+  }));
 }

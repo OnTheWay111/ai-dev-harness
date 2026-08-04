@@ -28,6 +28,7 @@ test("maps HTTP input and authenticated actor into one application command", asy
     new Request("https://control.invalid/goals/goal-1/transition", {
       method: "POST",
       headers: {
+        origin: "https://control.invalid",
         "content-type": "application/json",
         "x-request-id": "req-1",
         "idempotency-key": "idem-1",
@@ -71,6 +72,7 @@ test("maps version conflict without exposing persistence details", async () => {
     new Request("https://control.invalid/goals/goal-1/transition", {
       method: "POST",
       headers: {
+        origin: "https://control.invalid",
         "content-type": "application/json",
         "idempotency-key": "idem-1",
       },
@@ -98,7 +100,10 @@ test("fails closed when Idempotency-Key is missing", async () => {
   const response = await handler(
     new Request("https://control.invalid/goals/goal-1/transition", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        origin: "https://control.invalid",
+        "content-type": "application/json",
+      },
       body: JSON.stringify({
         expectedVersion: 1,
         nextState: "clarifying",
@@ -125,6 +130,7 @@ test("maps Idempotency-Key reuse to a stable conflict", async () => {
     new Request("https://control.invalid/goals/goal-1/transition", {
       method: "POST",
       headers: {
+        origin: "https://control.invalid",
         "content-type": "application/json",
         "idempotency-key": "already-used",
       },

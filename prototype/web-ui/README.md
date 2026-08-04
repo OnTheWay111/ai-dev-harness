@@ -203,6 +203,8 @@ documented in
 OIDC actor visibility, SQL-scoped task/summary reads, and cache isolation are
 documented in
 [`../../docs/visibility-scoped-reads.md`](../../docs/visibility-scoped-reads.md).
+CSRF/同源校验、严格请求 Schema、大小上限、限流、安全响应头和稳定错误响应记录在
+[`../../docs/web-security-baseline.md`](../../docs/web-security-baseline.md)。
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls

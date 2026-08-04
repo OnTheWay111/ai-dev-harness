@@ -19,6 +19,8 @@ import {
 } from "../../../auth/visibility-scope.ts";
 import { readRequestPrincipal } from "../../../auth/oidc-http.ts";
 import { getOidcService } from "../../../auth/oidc-runtime.ts";
+import { withSecurityHeaders } from
+  "../../../security/request-security.ts";
 
 const taskFilters = new Set<TaskFilter>([
   "all",
@@ -49,7 +51,7 @@ function validationError(
     },
     requestId: requestIdValue,
   };
-  return Response.json(body, { status: 400 });
+  return withSecurityHeaders(Response.json(body, { status: 400 }));
 }
 
 function internalError(requestIdValue: string): Response {
@@ -63,7 +65,7 @@ function internalError(requestIdValue: string): Response {
     },
     requestId: requestIdValue,
   };
-  return Response.json(body, { status: 500 });
+  return withSecurityHeaders(Response.json(body, { status: 500 }));
 }
 
 function accessError(
@@ -80,10 +82,10 @@ function accessError(
     },
     requestId: requestIdValue,
   };
-  return Response.json(body, {
+  return withSecurityHeaders(Response.json(body, {
     status,
     headers: { "cache-control": "private, no-store" },
-  });
+  }));
 }
 
 function parseQuery(url: URL, id: string): WorkbenchQuery | Response {
@@ -167,7 +169,7 @@ export async function handleWorkbenchRequest(
     const headers = responseHeaders(etag, workbenchRepository.kind);
 
     if (request.headers.get("if-none-match") === etag) {
-      return new Response(null, { status: 304, headers });
+      return withSecurityHeaders(new Response(null, { status: 304, headers }));
     }
 
     const body: WorkbenchResponse = {
@@ -175,7 +177,7 @@ export async function handleWorkbenchRequest(
       page: result.page,
       requestId: id,
     };
-    return Response.json(body, { headers });
+    return withSecurityHeaders(Response.json(body, { headers }));
   } catch (error) {
     if (error instanceof WorkbenchRepositoryError) {
       return validationError(id, error.message, error.field);

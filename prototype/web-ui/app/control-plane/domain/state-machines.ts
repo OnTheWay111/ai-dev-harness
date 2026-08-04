@@ -39,18 +39,20 @@ export const runStatuses = [
 ] as const;
 export type RunStatus = (typeof runStatuses)[number];
 
-export type TransitionGuard =
-  | "acceptanceVerified"
-  | "allIssuesCompleted"
-  | "approvalRecorded"
-  | "artifactDigestVerified"
-  | "clarificationsResolved"
-  | "completionEvidence"
-  | "dependenciesSatisfied"
-  | "issuesApproved"
-  | "reasonProvided"
-  | "replacementExists"
-  | "specApproved";
+export const transitionGuards = [
+  "acceptanceVerified",
+  "allIssuesCompleted",
+  "approvalRecorded",
+  "artifactDigestVerified",
+  "clarificationsResolved",
+  "completionEvidence",
+  "dependenciesSatisfied",
+  "issuesApproved",
+  "reasonProvided",
+  "replacementExists",
+  "specApproved",
+] as const;
+export type TransitionGuard = (typeof transitionGuards)[number];
 
 export interface StateTransition<State extends string> {
   from: State;

@@ -1,6 +1,7 @@
 import {
   checkWorkbenchReadiness,
 } from "../../workbench/server/workbench-readiness.ts";
+import { withSecurityHeaders } from "../../security/request-security.ts";
 
 function requestId(): string {
   return `req_${crypto.randomUUID()}`;
@@ -10,16 +11,16 @@ export async function GET(): Promise<Response> {
   const readiness = await checkWorkbenchReadiness(process.env);
   const headers = { "cache-control": "no-store" };
   if (readiness.ready) {
-    return Response.json(
+    return withSecurityHeaders(Response.json(
       {
         status: "ready",
         source: readiness.source,
         checks: readiness.checks,
       },
       { status: 200, headers },
-    );
+    ));
   }
-  return Response.json(
+  return withSecurityHeaders(Response.json(
     {
       status: "not_ready",
       source: readiness.source,
@@ -31,5 +32,5 @@ export async function GET(): Promise<Response> {
       requestId: requestId(),
     },
     { status: 503, headers },
-  );
+  ));
 }

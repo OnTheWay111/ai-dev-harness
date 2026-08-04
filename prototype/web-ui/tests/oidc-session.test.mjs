@@ -258,7 +258,10 @@ test("HTTP handlers set hardened cookies and clear the session on POST logout", 
   );
   assert.equal(getLogout.status, 405);
   const logout = await handleOidcLogout(
-    new Request("https://harness.example.test/auth/logout", { method: "POST" }),
+    new Request("https://harness.example.test/auth/logout", {
+      method: "POST",
+      headers: { origin: "https://harness.example.test" },
+    }),
   );
   assert.equal(logout.status, 303);
   assert.match(logout.headers.get("set-cookie"), /__Host-harness_session=;.*Max-Age=0/);
