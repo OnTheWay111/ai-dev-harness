@@ -200,7 +200,7 @@ SHA 将 P1-02 标记为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P1-03** 写入测试投影，验证 `WORKBENCH_DATA_SOURCE=postgres` 下 SSR 和 API。
+- [x] **P1-03** 写入测试投影，验证 `WORKBENCH_DATA_SOURCE=postgres` 下 SSR 和 API。（已完成：2026-08-04；实现提交：ai-dev-harness@3f62e9ad7852a835c5b45cb61d5dafdc5a7585d2）
 
 <details>
 <summary>快捷复制开发提示词 P1-03 · gpt-5.6-terra(均衡) · medium(中等)</summary>
