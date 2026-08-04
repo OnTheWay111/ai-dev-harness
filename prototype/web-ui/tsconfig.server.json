@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "app/workbench/contracts.ts",
+    "app/workbench/server/**/*.ts",
+    "db/postgres-schema.ts",
+    "drizzle-postgres.config.ts",
+    "scripts/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

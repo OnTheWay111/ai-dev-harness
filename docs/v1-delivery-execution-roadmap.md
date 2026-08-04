@@ -42,44 +42,45 @@ OIDC 提供方确定后单独排期。
 
 1. 工作区固定为 `/Users/onthewayli/harness/ai-dev-harness`。先查找并完整阅读适用的
    `AGENTS.md`、本路线图、关联设计/契约和目标代码；以仓库现状为准，不假设聊天背景。
-2. 根仓库与 Web UI 是两个独立 Git 仓库，归属关系固定如下。Git 操作不得依赖当前目录；禁止使用
-   裸 `git status`、`git commit`、`git push origin main`，一律使用仓库绝对路径和 `git -C`。
+2. 项目前期采用单一 Git 仓库；`prototype/web-ui` 是根仓库内的普通目录，禁止创建嵌套 `.git`、
+   子模块或独立子仓库。Git 操作不得依赖当前目录；禁止使用裸 `git status`、`git commit`、
+   `git push origin main`，一律使用根仓库绝对路径和 `git -C`。
 
    | 仓库 | 绝对路径 | 负责内容 |
    |---|---|---|
-   | 根仓库 | `/Users/onthewayli/harness/ai-dev-harness` | 根目录文件、`docs/`、路线图进度提交 |
-   | Web UI | `/Users/onthewayli/harness/ai-dev-harness/prototype/web-ui` | Web 应用、数据库代码、迁移和 Web 测试 |
+   | 统一根仓库 | `/Users/onthewayli/harness/ai-dev-harness` | 根目录、`docs/`、`prototype/web-ui/`、数据库代码、迁移、测试和路线图进度提交 |
 
-3. 开始修改前，按目标文件确定“实现仓库”。对每个将产生提交的仓库分别执行以下预检；命令中的路径
-   必须写成上表的绝对路径，不能用 `.`、相对路径或仅靠 `cd` 后的当前目录。
+3. 开始修改前，对统一根仓库执行以下预检；命令中的路径必须写成上表的绝对路径，不能用 `.`、
+   相对路径或仅靠 `cd` 后的当前目录。同时执行 `node scripts/check-single-git-repository.mjs`，发现
+   任何嵌套 Git 元数据都必须停止。
 
    ```bash
-   git -C /绝对/仓库路径 rev-parse --show-toplevel
-   git -C /绝对/仓库路径 status --short --branch
-   git -C /绝对/仓库路径 remote get-url origin
-   git -C /绝对/仓库路径 fetch origin main
-   git -C /绝对/仓库路径 rev-list --left-right --count origin/main...main
+   git -C /Users/onthewayli/harness/ai-dev-harness rev-parse --show-toplevel
+   git -C /Users/onthewayli/harness/ai-dev-harness status --short --branch
+   git -C /Users/onthewayli/harness/ai-dev-harness remote get-url origin
+   git -C /Users/onthewayli/harness/ai-dev-harness fetch origin main
+   git -C /Users/onthewayli/harness/ai-dev-harness rev-list --left-right --count origin/main...main
    ```
 
    `rev-parse` 结果必须等于预期绝对路径，当前分支必须为 `main`，`origin` 必须存在；开始实现前
-   `rev-list` 的左右计数必须均为 `0`。任何其他结果都先停止并报告；不得把用户已有提交或另一个
+   `rev-list` 的左右计数必须均为 `0`。任何其他结果都先停止并报告；不得把用户已有提交或外部
    仓库的历史顺带 push。
 
 4. 只修改、暂存本环节文件，不覆盖、暂存或清理用户已有改动。先写失败测试或明确可复现的失败检查，
    再实现最小闭环；执行相关单测、集成测试、类型检查、Lint 和构建。涉及外部服务时必须验证真实集成，
    不能只用 Mock 宣称完成。
 
-5. 测试全部通过后，在实现仓库的 `main` 提交。暂存、检查、提交和 push 的每条命令都必须带同一个
-   绝对 `git -C` 路径；多仓库改动必须逐仓库分别提交、push 和记录 SHA。
+5. 测试全部通过后，在统一根仓库的 `main` 提交。暂存、检查、提交和 push 的每条命令都必须带
+   根仓库绝对 `git -C` 路径。
 
    ```bash
-   git -C /绝对/实现仓库路径 add -- <本环节文件...>
-   git -C /绝对/实现仓库路径 diff --cached --name-only
-   git -C /绝对/实现仓库路径 commit -m "<说明性提交信息>"
-   git -C /绝对/实现仓库路径 push origin HEAD:main
-   git -C /绝对/实现仓库路径 fetch origin main
-   test "$(git -C /绝对/实现仓库路径 rev-parse HEAD)" = \
-     "$(git -C /绝对/实现仓库路径 rev-parse origin/main)"
+   git -C /Users/onthewayli/harness/ai-dev-harness add -- <本环节文件...>
+   git -C /Users/onthewayli/harness/ai-dev-harness diff --cached --name-only
+   git -C /Users/onthewayli/harness/ai-dev-harness commit -m "<说明性提交信息>"
+   git -C /Users/onthewayli/harness/ai-dev-harness push origin HEAD:main
+   git -C /Users/onthewayli/harness/ai-dev-harness fetch origin main
+   test "$(git -C /Users/onthewayli/harness/ai-dev-harness rev-parse HEAD)" = \
+     "$(git -C /Users/onthewayli/harness/ai-dev-harness rev-parse origin/main)"
    ```
 
    push 命令退出码为零且本地 `HEAD` 等于更新后的 `origin/main`，才算实现推送成功。禁止 force-push；
@@ -101,7 +102,7 @@ OIDC 提供方确定后单独排期。
    ```
 
 7. 只有实现、测试、实现提交与远端 SHA 校验、路线图标记、路线图提交与远端 SHA 校验全部成功，才能
-   宣布该环节“已完成”。最终报告必须列出测试结果、各仓库提交 SHA、push/校验结果、已知限制和下一项编号。
+   宣布该环节“已完成”。最终报告必须列出测试结果、根仓库提交 SHA、push/校验结果、已知限制和下一项编号。
 
 ### 2.2 快捷复制提示词
 
@@ -113,7 +114,7 @@ OIDC 提供方确定后单独排期。
 
 Codex、GitHub 等支持代码块复制的 Markdown 渲染器会自动显示复制按钮；纯文本编辑器仍可手动
 选择代码块内容。提示词默认折叠，以便优先浏览阶段、任务和完成状态。每条提示词都重复包含 Git
-目录安全提醒；实际命令仍以第 2.1 的仓库归属、绝对 `git -C`、push 和远端 SHA 校验模板为准。
+目录安全提醒；实际命令仍以第 2.1 的单仓库归属、绝对 `git -C`、push 和远端 SHA 校验模板为准。
 
 ### 2.3 模型与推理强度
 
@@ -137,7 +138,7 @@ Codex、GitHub 等支持代码块复制的 Markdown 渲染器会自动显示复�
 - [x] 实现 `auto | demo | postgres` 数据源选择和生产失败关闭策略。
 - [x] 完成生产构建、Lint、类型检查和 16 项自动化测试。
 
-当前代码基线：
+单仓库合并前的历史代码基线：
 
 ```text
 prototype/web-ui commit 5ae099c
