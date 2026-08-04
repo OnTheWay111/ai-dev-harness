@@ -1,0 +1,179 @@
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { spawn, spawnSync } from "node:child_process";
+import test from "node:test";
+
+import { parse } from "yaml";
+
+import { AutoDevQueueImportAdapter } from
+  "../app/control-plane/adapters/autodev-queue-import-adapter.ts";
+
+const sourcePath = process.env.AUTODEV_SOURCE_PATH?.trim() ?? "";
+
+const approvedPlan = {
+  id: "00000000-0000-4000-8000-000000000610",
+  organizationId: "00000000-0000-4000-8000-000000000601",
+  projectId: "00000000-0000-4000-8000-000000000602",
+  goalId: "00000000-0000-4000-8000-000000000603",
+  status: "approved",
+  digest: "6".repeat(64),
+  issues: [
+    {
+      key: "P6-06A", title: "Atomic importer", goal: "Persist a complete plan",
+      developmentPrompt: "Implement the complete approved P6-06A atomic import contract and run npm test successfully.",
+      acceptance: [{ criterionRef: "AC-01", statement: "No partial tasks remain" }],
+      verify: ["npm test"],
+      completionEvidence: [{ kind: "test", description: "integration passes", required: true }],
+      dependencyCandidates: [], expectedFiles: ["autodev/queue_import.py"],
+    },
+    {
+      key: "P6-06B", title: "HTTP boundary", goal: "Expose the importer safely",
+      developmentPrompt: "Implement the approved P6-06B authenticated HTTP contract after P6-06A and run npm test.",
+      acceptance: [{ criterionRef: "AC-02", statement: "Return an exact receipt" }],
+      verify: ["npm test"],
+      completionEvidence: [{ kind: "test", description: "HTTP integration passes", required: true }],
+      dependencyCandidates: ["P6-06A"], expectedFiles: ["autodev/queue_import_http.py"],
+    },
+  ],
+  modelRecommendations: [
+    { issueKey: "P6-06A", capabilityTier: "advanced_coding", reasoningEffort: "high", policyRevision: "model-router.v1" },
+    { issueKey: "P6-06B", capabilityTier: "frontier", reasoningEffort: "highest", policyRevision: "model-router.v1" },
+  ],
+  waves: [
+    { number: 1, issueKeys: ["P6-06A"] },
+    { number: 2, issueKeys: ["P6-06B"] },
+  ],
+};
+
+function importBody(plan) {
+  const routes = new Map(plan.modelRecommendations.map((route) => [route.issueKey, route]));
+  return {
+    schemaVersion: "autodev-queue-import.v1",
+    atomic: true,
+    issuePlanId: plan.id,
+    planDigest: plan.digest,
+    tasks: plan.issues.map((issue) => {
+      const route = routes.get(issue.key);
+      return {
+        issueKey: issue.key, title: issue.title, goal: issue.goal,
+        developmentPrompt: issue.developmentPrompt, acceptance: issue.acceptance,
+        verify: issue.verify, completionEvidence: issue.completionEvidence,
+        dependencies: issue.dependencyCandidates, expectedFiles: issue.expectedFiles,
+        wave: plan.waves.find(({ issueKeys }) => issueKeys.includes(issue.key)).number,
+        capabilityTier: route.capabilityTier, reasoningEffort: route.reasoningEffort,
+        routingPolicyRevision: route.policyRevision,
+      };
+    }),
+  };
+}
+
+async function startServer(python, configPath) {
+  const child = spawn(
+    python,
+    ["-m", "autodev", "queue-import-server", "--project", configPath, "--port", "0"],
+    {
+      cwd: sourcePath,
+      env: { ...process.env, AUTODEV_QUEUE_IMPORT_TOKEN: "integration-secret" },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  let stdout = "";
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const endpoint = await new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      if (!child.killed) child.kill("SIGTERM");
+      reject(error);
+    };
+    const timeout = setTimeout(
+      () => fail(new Error(`AutoDev server timeout: ${stderr}`)),
+      10_000,
+    );
+    child.once("exit", (code) => {
+      clearTimeout(timeout);
+      fail(new Error(`AutoDev server exited ${code}: ${stderr}`));
+    });
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      const match = stdout.match(/(http:\/\/127\.0\.0\.1:\d+)/);
+      if (match && !settled) {
+        settled = true;
+        clearTimeout(timeout);
+        resolve(`${match[1]}/api/v1/queue/import`);
+      }
+    });
+  });
+  return { child, endpoint };
+}
+
+test("P6-06 projects through the real AutoDev atomic HTTP import boundary", {
+  skip: sourcePath ? false : "set AUTODEV_SOURCE_PATH to the authorized AutoDev source tree",
+  timeout: 30_000,
+}, async () => {
+  const python = path.join(sourcePath, ".venv", "bin", "python");
+  const project = await mkdtemp(path.join(tmpdir(), "p6-06-autodev-"));
+  const configPath = path.join(project, ".autodev", "project.yaml");
+  const queuePath = path.join(project, "tasks", "agent_task_queue.yaml");
+  let child;
+  let endpoint;
+  try {
+    const initialized = spawnSync(
+      python,
+      ["-m", "autodev", "init", "--repo", project, "--project-id", "p6-06-integration"],
+      { cwd: sourcePath, encoding: "utf8" },
+    );
+    assert.equal(initialized.status, 0, initialized.stderr);
+    ({ child, endpoint } = await startServer(python, configPath));
+
+    const invalid = importBody(approvedPlan);
+    invalid.tasks[1].capabilityTier = "silent_downgrade";
+    const rejected = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer integration-secret", "content-type": "application/json",
+        "idempotency-key": "invalid-batch", "x-request-id": "invalid-request",
+      },
+      body: JSON.stringify(invalid),
+    });
+    assert.equal(rejected.status, 400);
+    assert.equal(parse(await readFile(queuePath, "utf8")).tasks.length, 0);
+
+    const adapter = new AutoDevQueueImportAdapter({
+      endpoint,
+      token: "integration-secret",
+      clock: () => new Date("2026-08-04T00:00:00.000Z"),
+    });
+    const first = await adapter.importApprovedPlan({
+      plan: approvedPlan, requestId: "request-1", idempotencyKey: "projection-1",
+    });
+    const replay = await adapter.importApprovedPlan({
+      plan: approvedPlan, requestId: "request-2", idempotencyKey: "projection-2",
+    });
+    assert.equal(first.importId, replay.importId);
+    assert.deepEqual(first.tasks, [
+      { issueKey: "P6-06A", externalTaskId: "H-001" },
+      { issueKey: "P6-06B", externalTaskId: "H-002" },
+    ]);
+
+    const queue = parse(await readFile(queuePath, "utf8"));
+    assert.equal(queue.tasks.length, 2);
+    assert.deepEqual(queue.tasks[1].dependencies, ["H-001"]);
+    assert.equal(queue.tasks[0].model_route.capability_tier, "advanced_coding");
+    assert.match(queue.tasks[0].development_prompt, /approved P6-06A/);
+    assert.equal(queue.imports.length, 1);
+  } finally {
+    if (child && !child.killed) {
+      const exited = new Promise((resolve) => child.once("exit", resolve));
+      child.kill("SIGTERM");
+      await exited;
+    }
+    await rm(project, { recursive: true, force: true });
+  }
+});
