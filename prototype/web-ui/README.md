@@ -212,6 +212,9 @@ decisions, API/UI timeline, and concurrency rules are documented in
 The strict Proposal/PRD bundle, immutable content-addressed Artifact Store,
 SpecRevision generation API, and controlled Planner smoke test are documented
 in [`../../docs/spec-artifacts.md`](../../docs/spec-artifacts.md).
+Helpful exceptions, scope-change requests, immutable approval history, and the
+default removal of Speculative elements are documented in
+[`../../docs/spec-approvals.md`](../../docs/spec-approvals.md).
 The versioned deterministic S/M/L/XL and risk policy, factor explanations,
 required Artifacts, approvers, and persistence contract are documented in
 [`../../docs/deterministic-classification.md`](../../docs/deterministic-classification.md).

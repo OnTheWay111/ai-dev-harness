@@ -2711,6 +2711,64 @@ kbd {
   overflow-wrap: anywhere;
 }
 
+.spec-approval-panel {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.spec-approval-panel fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.spec-approval-panel fieldset label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.spec-approval-panel fieldset label span,
+.spec-approval-panel fieldset label small {
+  display: block;
+}
+
+.spec-approval-panel fieldset label small {
+  color: var(--ink-500);
+}
+
+.scope-change-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.goal-form-field select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--ink-950);
+  font: inherit;
+}
+
+.approval-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.form-warning {
+  color: var(--amber-700);
+  font-weight: 650;
+}
+
 .goal-contract-form {
   display: grid;
   gap: 24px;

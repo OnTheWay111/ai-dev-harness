@@ -17,6 +17,12 @@ import type {
   SpecGenerationReceipt,
   SpecRevisionViewTimeline,
 } from "../control-plane/application/spec-generation-service";
+import type {
+  ScopeChange,
+  SpecApprovalDecision,
+  SpecApprovalReceipt,
+  SpecApprovalTimeline,
+} from "../control-plane/domain/spec-approval";
 
 export interface GoalWorkspaceScope {
   organizationId: string;
@@ -218,6 +224,46 @@ export const goalWorkspaceApi = {
         credentials: "same-origin",
         headers: writeHeaders(),
         body: JSON.stringify({ ...scope, expectedGoalVersion, reason }),
+      },
+    ));
+  },
+
+  async approvalTimeline(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+    specRevisionId: string,
+  ): Promise<SpecApprovalTimeline> {
+    const query = new URLSearchParams({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+    });
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/specs/${encodeURIComponent(specRevisionId)}/approvals?${query}`,
+      { credentials: "same-origin", cache: "no-store" },
+    ));
+  },
+
+  async decideSpec(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+    specRevisionId: string,
+    input: {
+      expectedVersion: number;
+      reason: string;
+      policyRevision: string;
+      decision: SpecApprovalDecision;
+      affectedElementIds: readonly string[];
+      helpfulExceptionElementIds: readonly string[];
+      scopeChanges: readonly ScopeChange[];
+    },
+  ): Promise<SpecApprovalReceipt> {
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/specs/${encodeURIComponent(specRevisionId)}/approvals`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: writeHeaders(),
+        body: JSON.stringify({ ...scope, ...input }),
       },
     ));
   },

@@ -166,9 +166,15 @@ An immutable, reasoned disposition of a versioned planning subject.
 | `status` | `proposed`, `approved`, `rejected`, or `superseded` |
 | `subject_type`, `subject_id`, `subject_version` | Exact planning subject being decided |
 | `outcome`, `actor_id`, `reason` | Bounded result, server-derived human actor, and rationale |
+| `request_id`, `policy_revision` | Correlation ID and exact policy evaluated by the decision |
+| `affected_item_ids` | Bounded identities explicitly covered by the decision |
+| `decision_payload` | Helpful exceptions, scope changes, retained items, and removed items |
 | `created_at` | Immutable creation time |
 
-Decision revisions are append-only and cannot be updated or deleted.
+Decision revisions are append-only and cannot be updated or deleted. Spec
+approval decisions never trust a client-supplied actor: the actor is derived
+from the authenticated server context and copied into the immutable decision,
+Audit event, and Outbox event in the same transaction.
 
 ## `classification_policy_revisions`
 

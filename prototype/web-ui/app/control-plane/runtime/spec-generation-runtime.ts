@@ -34,7 +34,7 @@ function getArtifacts(): ArtifactStore {
   return artifacts;
 }
 
-function getRepository(): SpecRevisionRepository {
+export function getSpecRevisionRepository(): SpecRevisionRepository {
   if (repository) return repository;
   repository = usesDemoGoalWorkspace()
     ? new MemorySpecRevisionRepository()
@@ -59,7 +59,7 @@ export function getSpecGenerationService(): SpecGenerationService {
       ? new DemoSpecPlannerAdapter()
       : new CodexPlannerAdapter({ model: process.env.CODEX_PLANNER_MODEL?.trim() }),
     artifacts: getArtifacts(),
-    repository: getRepository(),
+    repository: getSpecRevisionRepository(),
     goals: getGoalWorkspaceRepository(),
     authorizer: getAuthorizer(),
     plannerConfiguration: {

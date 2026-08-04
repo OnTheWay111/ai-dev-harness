@@ -10,6 +10,11 @@ import type { ClassificationTimeline } from
   "../../control-plane/domain/classification";
 import type { SpecRevisionViewTimeline } from
   "../../control-plane/application/spec-generation-service";
+import type {
+  ScopeChange,
+  SpecApprovalDecision,
+  SpecApprovalTimeline,
+} from "../../control-plane/domain/spec-approval";
 import {
   goalWorkspaceApi,
   GoalWorkspaceApiError,
@@ -22,6 +27,7 @@ import {
 } from "../goal-workspace-draft";
 import { StatusPill, Stepper } from "./ui";
 import { OverdesignReviewPanel } from "./overdesign-review-panel";
+import { SpecApprovalPanel } from "./spec-approval-panel";
 
 const emptyDraft: GoalContractDraft = {
   title: "",
@@ -78,6 +84,16 @@ export function ClarifyView({
     policies: [], classifications: [],
   });
   const [specs, setSpecs] = useState<SpecRevisionViewTimeline>({ revisions: [] });
+  const [approvals, setApprovals] = useState<SpecApprovalTimeline>({ decisions: [] });
+  const [approvalReason, setApprovalReason] = useState(
+    "Approve the minimum execution contract",
+  );
+  const [helpfulExceptions, setHelpfulExceptions] = useState<readonly string[]>([]);
+  const [scopeChange, setScopeChange] = useState<ScopeChange>({
+    operation: "add",
+    kind: "requirement",
+    value: "",
+  });
   const storageKey = useMemo(() => goalDraftStorageKey(scope), [scope]);
   const lastGoalKey = `${storageKey}:last-goal`;
 
@@ -107,6 +123,14 @@ export function ClarifyView({
           setTimeline(history);
           setClassifications(classificationHistory);
           setSpecs(specHistory);
+          const latest = specHistory.revisions.at(-1);
+          if (latest) {
+            setApprovals(await goalWorkspaceApi.approvalTimeline(
+              scope,
+              loaded.id,
+              latest.specRevision.id,
+            ));
+          }
         }
       } catch {
         window.localStorage.removeItem(lastGoalKey);
@@ -252,12 +276,58 @@ export function ClarifyView({
           : "Regenerate the Proposal and PRD after review",
       );
       setSpecs(await goalWorkspaceApi.specTimeline(scope, goal.id));
+      setApprovals({ decisions: [] });
       notify("已生成不可变 Proposal/PRD 修订与过度设计评审");
     } catch (caught) {
       const message = caught instanceof GoalWorkspaceApiError &&
           caught.code === "version_conflict"
         ? "Goal 版本已变化，请刷新后重新生成规格。"
         : "规格生成失败；既有不可变修订保持不变。";
+      setError(message);
+      notify(message);
+    } finally { setPlanning(false); }
+  }
+
+  async function decideSpec(decision: SpecApprovalDecision) {
+    if (!goal || !latestSpec) return;
+    setPlanning(true);
+    setError("");
+    try {
+      await goalWorkspaceApi.decideSpec(
+        scope,
+        goal.id,
+        latestSpec.specRevision.id,
+        {
+          expectedVersion: latestSpec.specRevision.version,
+          reason: approvalReason,
+          policyRevision: latestSpec.specRevision.overdesignPolicyRevision,
+          decision,
+          affectedElementIds: latestSpec.specRevision.overdesignReview.items
+            .map(({ elementId }) => elementId),
+          helpfulExceptionElementIds: decision === "approve"
+            ? helpfulExceptions
+            : [],
+          scopeChanges: decision === "request_changes" && scopeChange.value.trim()
+            ? [{ ...scopeChange, value: scopeChange.value.trim() }]
+            : [],
+        },
+      );
+      const nextSpecs = await goalWorkspaceApi.specTimeline(scope, goal.id);
+      setSpecs(nextSpecs);
+      const next = nextSpecs.revisions.at(-1);
+      if (next) {
+        setApprovals(await goalWorkspaceApi.approvalTimeline(
+          scope,
+          goal.id,
+          next.specRevision.id,
+        ));
+      }
+      notify(`人工决定 ${decision} 已审计保存`);
+    } catch (caught) {
+      const message = caught instanceof GoalWorkspaceApiError &&
+          caught.code === "version_conflict"
+        ? "审批对象已产生新版本；你的理由仍保留，请刷新后重试。"
+        : "审批未提交；你的理由和范围修改仍保留。";
       setError(message);
       notify(message);
     } finally { setPlanning(false); }
@@ -481,6 +551,18 @@ export function ClarifyView({
                     Revision {latestSpec.specRevision.revision} · digest {latestSpec.specRevision.artifactDigest.slice(0, 12)} · Goal v{latestSpec.specRevision.sourceGoalVersion}
                   </p>
                   <OverdesignReviewPanel review={latestSpec.specRevision.overdesignReview} />
+                  <SpecApprovalPanel
+                    specRevision={latestSpec.specRevision}
+                    timeline={approvals}
+                    busy={planning}
+                    reason={approvalReason}
+                    setReason={setApprovalReason}
+                    helpfulExceptions={helpfulExceptions}
+                    setHelpfulExceptions={setHelpfulExceptions}
+                    scopeChange={scopeChange}
+                    setScopeChange={setScopeChange}
+                    onDecision={decideSpec}
+                  />
                 </>
               ) : (
                 <p>当前尚无规格修订。Planner 只会生成草稿，不能自动批准。</p>

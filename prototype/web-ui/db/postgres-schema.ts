@@ -623,6 +623,15 @@ export const decisions = pgTable(
     outcome: text("outcome").notNull(),
     actorId: text("actor_id").notNull(),
     reason: text("reason").notNull(),
+    requestId: text("request_id").default("legacy-migration").notNull(),
+    policyRevision: text("policy_revision").default("legacy-policy").notNull(),
+    affectedItemIds: jsonb("affected_item_ids").$type<string[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    decisionPayload: jsonb("decision_payload")
+      .$type<Readonly<Record<string, unknown>>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
     createdAt: timestamp("created_at", {
       withTimezone: true,
       mode: "date",
@@ -683,7 +692,7 @@ export const decisions = pgTable(
     check("decisions_subject_version_chk", sql`${table.subjectVersion} > 0`),
     check(
       "decisions_content_chk",
-      sql`char_length(btrim(${table.outcome})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`,
+      sql`char_length(btrim(${table.outcome})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.policyRevision})) BETWEEN 1 AND 100`,
     ),
   ],
 );

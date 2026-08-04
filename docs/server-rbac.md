@@ -15,6 +15,9 @@ and cross-Project bindings are denied by default.
 | `goal.read` | yes | yes | yes | yes | yes |
 | `goal.write` | yes | yes | yes | no | no |
 | `goal.approve` | yes | no | yes | no | no |
+| `spec.read` | yes | yes | yes | yes | yes |
+| `spec.generate` | yes | yes | yes | no | no |
+| `spec.approve` | yes | no | yes | no | no |
 | `issue.approve` | yes | no | yes | no | no |
 | `run.operate` | yes | yes | no | yes | no |
 | `evidence.read` | yes | yes | yes | yes | yes |

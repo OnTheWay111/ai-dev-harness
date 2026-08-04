@@ -99,6 +99,10 @@ test("defines immutable clarification and decision revision chains", () => {
     "outcome",
     "actor_id",
     "reason",
+    "request_id",
+    "policy_revision",
+    "affected_item_ids",
+    "decision_payload",
     "created_at",
   ]);
   assert.deepEqual(names(clarifications).foreignKeys, [

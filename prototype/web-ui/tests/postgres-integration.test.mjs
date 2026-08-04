@@ -52,6 +52,10 @@ import { MemoryArtifactStore } from
   "../app/control-plane/adapters/memory-artifact-store.ts";
 import { SpecGenerationService } from
   "../app/control-plane/application/spec-generation-service.ts";
+import { PostgresSpecApprovalRepository } from
+  "../app/control-plane/adapters/postgres-spec-approval-repository.ts";
+import { SpecApprovalService } from
+  "../app/control-plane/application/spec-approval-service.ts";
 import {
   IdempotencyConflictError,
 } from "../app/control-plane/domain/errors.ts";
@@ -174,7 +178,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 12);
+  assert.equal(migrations.length, 13);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -401,9 +405,10 @@ integrationTest(
     await pool.query(
       `INSERT INTO goals
          (id, organization_id, project_id, title, problem_statement,
-          desired_outcome, status)
+          desired_outcome, constraints, status)
        VALUES ($1,$2,$3,'Immutable spec','Specs can be overwritten',
-               'Every revision is content addressed','planning')`,
+               'Every revision is content addressed','["Zero downtime"]'::jsonb,
+               'planning')`,
       [goalId, organizationId, projectId],
     );
     await pool.query(
@@ -430,7 +435,7 @@ integrationTest(
           acceptanceCriterionRefs: [criterionId],
         }],
         nonGoals: ["Issue compilation"],
-        constraints: [],
+        constraints: ["Zero downtime"],
       },
       architecture: {
         summary: "Use content-addressed artifacts.",
@@ -458,6 +463,16 @@ integrationTest(
         estimatedCost: "medium",
         removalImpact: "Revisions could be overwritten.",
         evidence: ["REQ-1"],
+      }, {
+        id: "EL-2",
+        title: "Safe rollout",
+        kind: "migration",
+        description: "Drain active work before rollout.",
+        acceptanceCriterionRefs: [],
+        constraintRefs: ["Zero downtime"],
+        estimatedCost: "low",
+        removalImpact: "Rollout may interrupt work.",
+        evidence: ["ADR-1"],
       }],
     };
     const artifacts = new MemoryArtifactStore();
@@ -495,6 +510,46 @@ integrationTest(
     assert.equal(row.rows[0].artifact_digest, generated.artifact.digest);
     assert.equal(row.rows[0].planner_configuration.schemaVersion, "spec-bundle.v1");
     assert.ok(row.rows[0].generated_at);
+
+    const approvals = new SpecApprovalService({
+      repository: new PostgresSpecApprovalRepository(pool),
+      authorizer: { async authorize() {} },
+    });
+    const common = {
+      organizationId,
+      projectId,
+      goalId,
+      specRevisionId: generated.specRevision.id,
+      actorId: "integration-approver",
+      reason: "Review exact immutable content",
+      requestId: "integration-spec-approval",
+      policyRevision: generated.specRevision.overdesignPolicyRevision,
+      affectedElementIds: ["EL-1", "EL-2"],
+      helpfulExceptionElementIds: [],
+      scopeChanges: [],
+    };
+    const submitted = await approvals.decide({
+      ...common,
+      expectedVersion: 1,
+      idempotencyKey: `submit-${suffix}`,
+      decision: "submit_for_review",
+    });
+    assert.equal(submitted.specRevision.status, "in_review");
+    const approved = await approvals.decide({
+      ...common,
+      expectedVersion: 2,
+      idempotencyKey: `approve-${suffix}`,
+      decision: "approve",
+      helpfulExceptionElementIds: ["EL-2"],
+    });
+    assert.equal(approved.specRevision.status, "approved");
+    assert.deepEqual(approved.retainedElementIds, ["EL-1", "EL-2"]);
+    assert.equal((await approvals.timeline({
+      organizationId,
+      projectId,
+      goalId,
+      actorId: "integration-viewer",
+    })).decisions.length, 2);
   },
 );
 
