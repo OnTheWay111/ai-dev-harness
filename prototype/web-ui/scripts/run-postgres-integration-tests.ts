@@ -102,7 +102,9 @@ async function runIntegrationTest(url: string): Promise<number> {
       [
         "--experimental-strip-types",
         "--test",
+        "--test-concurrency=1",
         "tests/postgres-integration.test.mjs",
+        "tests/security-regression-postgres.test.mjs",
       ],
       {
         cwd: new URL("..", import.meta.url),

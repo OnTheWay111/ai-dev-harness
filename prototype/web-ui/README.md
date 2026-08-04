@@ -205,6 +205,8 @@ documented in
 [`../../docs/visibility-scoped-reads.md`](../../docs/visibility-scoped-reads.md).
 CSRF/同源校验、严格请求 Schema、大小上限、限流、安全响应头和稳定错误响应记录在
 [`../../docs/web-security-baseline.md`](../../docs/web-security-baseline.md)。
+真实 PostgreSQL 的匿名、越权、跨项目数量、重复审批、跨用户幂等和 Audit 防篡改覆盖见
+[`../../docs/security-regression-matrix.md`](../../docs/security-regression-matrix.md)。
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls
