@@ -1,13 +1,13 @@
 # Control-plane data dictionary
 
-P2-01 and P2-02 introduce the authoritative PostgreSQL write-model foundation.
+P2-01 through P2-03 introduce the authoritative PostgreSQL write-model foundation.
 These tables record business facts; `workbench_snapshots` and
 `workbench_tasks` remain replaceable projections derived from them.
 
 The current scope contains Organization, Project, Repository, Goal,
-AcceptanceCriterion, Clarification, Decision, SpecRevision, Issue, and
-IssueDependency. Execution, audit, idempotency, and outbox records belong to
-the next P2 delivery.
+AcceptanceCriterion, Clarification, Decision, SpecRevision, Issue,
+IssueDependency, Run, Evidence, AuditEvent, OutboxEvent, and
+IdempotencyRecord.
 
 ## Shared rules
 
@@ -27,10 +27,15 @@ the next P2 delivery.
   earlier rows.
 - SpecRevision and Issue keep content revisions distinct from their optimistic
   state-machine `version`.
+- Large content is never stored on Evidence, AuditEvent, or idempotency rows;
+  they carry credential-free references and SHA-256 digests.
+- AuditEvent and Evidence rows are append-only. OutboxEvent and
+  IdempotencyRecord have deliberately mutable delivery/command status.
 
 See [ADR 0001](adr/0001-explicit-organization-keys.md) for the Organization-key
 trade-off and [ADR 0002](adr/0002-append-only-planning-history.md) for the
-append-only planning-history decision.
+append-only planning-history decision. [ADR 0003](adr/0003-reference-large-artifacts.md)
+records the external-artifact boundary.
 
 ## `organizations`
 
@@ -186,3 +191,88 @@ endpoint can cross a Goal boundary. Self-edges and duplicates are rejected.
 The domain edge projection is the input seam for the deterministic DAG
 validator delivered later; the database intentionally does not attempt a
 recursive cycle check.
+
+## `runs`
+
+One numbered execution attempt for a particular Issue revision.
+
+| Column | Meaning |
+|---|---|
+| `id` | Run identity |
+| `organization_id`, `project_id`, `goal_id`, `issue_id` | Complete Issue hierarchy |
+| `attempt` | Positive, Issue-local attempt number |
+| `status` | `queued`, `running`, `succeeded`, `failed`, or `cancelled` |
+| `request_id` | Correlation identifier, never a Secret |
+| `version` | Positive optimistic state-machine version |
+| `started_at`, `finished_at` | State-consistent execution timestamps |
+| `created_at`, `updated_at` | Ordered lifecycle timestamps |
+
+The Issue/attempt tuple is unique. Status checks require timestamps appropriate
+to queued, running, terminal, and cancelled attempts.
+
+## `evidence`
+
+Immutable metadata for a Run artifact.
+
+| Column | Meaning |
+|---|---|
+| `id` | Evidence identity |
+| `organization_id`, `project_id`, `goal_id`, `issue_id`, `run_id` | Complete Run hierarchy |
+| `kind` | `artifact`, `log`, `test`, `review`, `commit`, or `push` |
+| `artifact_ref`, `digest` | Credential-free immutable reference and SHA-256 digest |
+| `media_type`, `size_bytes` | Artifact representation metadata |
+| `retention_until` | Earliest policy expiry time |
+| `created_at` | Immutable creation time |
+
+PostgreSQL rejects updates and deletes. The same digest and kind is unique per
+Run; artifact content is never stored in this table.
+
+## `audit_events`
+
+An immutable account of a control-plane mutation.
+
+| Column | Meaning |
+|---|---|
+| `id` | Event identity |
+| `organization_id`, `project_id`, `goal_id` | Hierarchical scope; Project and Goal are optional together |
+| `actor_id` | Stable actor reference pending the P3 identity model |
+| `action` | Audited action code |
+| `entity_type`, `entity_id`, `entity_version` | Exact versioned subject |
+| `reason`, `request_id` | Human/system rationale and request correlation |
+| `details_ref`, `details_digest` | Optional external detail artifact |
+| `retention_until`, `created_at` | Retention boundary and immutable event time |
+
+Update and delete triggers prevent an application from rewriting audit history.
+
+## `outbox_events`
+
+A durable event awaiting dispatch after its aggregate transaction commits.
+
+| Column | Meaning |
+|---|---|
+| `id`, `organization_id` | Event identity and ownership boundary |
+| `aggregate_type`, `aggregate_id`, `aggregate_version` | Exact source aggregate version |
+| `event_type`, `deduplication_key`, `payload` | Dispatch contract and small structured payload |
+| `status` | `pending`, `published`, or `failed` |
+| `attempts`, `available_at`, `published_at`, `last_error_ref` | Retry and delivery metadata |
+| `created_at`, `updated_at` | Ordered lifecycle timestamps |
+
+The Organization/deduplication key and aggregate-version/event tuple are both
+unique. P2 only records events; no asynchronous side effect is started.
+
+## `idempotency_records`
+
+A command receipt scoped by Organization, actor, endpoint, and Idempotency-Key.
+
+| Column | Meaning |
+|---|---|
+| `id`, `organization_id` | Record identity and ownership boundary |
+| `actor_id`, `endpoint`, `key` | Idempotency scope |
+| `request_hash` | SHA-256 of the canonical command input |
+| `status` | `in_progress`, `completed`, or `failed` |
+| `response_status`, `response_ref`, `response_digest` | Replayable external response receipt after completion |
+| `expires_at` | Expiry time, indexed for policy cleanup |
+| `created_at`, `updated_at` | Ordered lifecycle timestamps |
+
+The same key may be reused by another actor or endpoint but not inside an
+existing scope. In-progress rows cannot masquerade as completed responses.

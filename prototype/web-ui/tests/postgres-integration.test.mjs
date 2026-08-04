@@ -49,7 +49,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 3);
+  assert.equal(migrations.length, 4);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -67,14 +67,19 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
     tables.rows.map((row) => row.table_name),
     [
       "acceptance_criteria",
+      "audit_events",
       "clarifications",
       "decisions",
+      "evidence",
       "goals",
+      "idempotency_records",
       "issue_dependencies",
       "issues",
       "organizations",
+      "outbox_events",
       "projects",
       "repositories",
+      "runs",
       "spec_revisions",
       "workbench_snapshots",
       "workbench_tasks",
@@ -423,6 +428,170 @@ integrationTest(
         /append-only/i,
       );
       await client.query("ROLLBACK TO SAVEPOINT immutable_decision");
+    } finally {
+      await client.query("ROLLBACK").catch(() => undefined);
+      client.release();
+    }
+  },
+);
+
+integrationTest(
+  "enforces evidence, audit, Outbox, and idempotency invariants",
+  async () => {
+    const client = await pool.connect();
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const goalId = crypto.randomUUID();
+    const specRevisionId = crypto.randomUUID();
+    const issueId = crypto.randomUUID();
+    const runId = crypto.randomUUID();
+    const evidenceId = crypto.randomUUID();
+    const auditEventId = crypto.randomUUID();
+    const digest = "b".repeat(64);
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO organizations (id, slug, name)
+         VALUES ($1, $2, 'Reliability Organization')`,
+        [organizationId, `reliability-${process.pid}`],
+      );
+      await client.query(
+        `INSERT INTO projects (id, organization_id, slug, name)
+         VALUES ($1, $2, $3, 'Reliability Project')`,
+        [projectId, organizationId, `reliability-${process.pid}`],
+      );
+      await client.query(
+        `INSERT INTO goals
+           (id, organization_id, project_id, title,
+            problem_statement, desired_outcome)
+         VALUES ($1, $2, $3, 'Reliable writes',
+                 'Events need durable evidence', 'Trace every write')`,
+        [goalId, organizationId, projectId],
+      );
+      await client.query(
+        `INSERT INTO spec_revisions
+           (id, organization_id, project_id, goal_id, revision,
+            source_goal_version, artifact_ref, artifact_digest)
+         VALUES ($1, $2, $3, $4, 1, 1, 'artifact://spec/reliable', $5)`,
+        [specRevisionId, organizationId, projectId, goalId, digest],
+      );
+      await client.query(
+        `INSERT INTO issues
+           (id, organization_id, project_id, goal_id, spec_revision_id,
+            issue_key, revision, title, body_ref, body_digest)
+         VALUES ($1, $2, $3, $4, $5, 'RELIABLE-1', 1,
+                 'Reliable issue', 'artifact://issue/reliable', $6)`,
+        [issueId, organizationId, projectId, goalId, specRevisionId, digest],
+      );
+      await client.query(
+        `INSERT INTO runs
+           (id, organization_id, project_id, goal_id, issue_id,
+            attempt, request_id)
+         VALUES ($1, $2, $3, $4, $5, 1, 'req-reliability')`,
+        [runId, organizationId, projectId, goalId, issueId],
+      );
+      await client.query("SAVEPOINT duplicate_attempt");
+      await assert.rejects(
+        () =>
+          client.query(
+            `INSERT INTO runs
+               (organization_id, project_id, goal_id, issue_id,
+                attempt, request_id)
+             VALUES ($1, $2, $3, $4, 1, 'req-duplicate')`,
+            [organizationId, projectId, goalId, issueId],
+          ),
+        /unique constraint/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT duplicate_attempt");
+
+      await client.query(
+        `INSERT INTO evidence
+           (id, organization_id, project_id, goal_id, issue_id, run_id,
+            kind, artifact_ref, digest, media_type, size_bytes,
+            retention_until)
+         VALUES ($1, $2, $3, $4, $5, $6, 'test',
+                 'artifact://evidence/test', $7, 'application/json', 128,
+                 '2030-01-01T00:00:00Z')`,
+        [evidenceId, organizationId, projectId, goalId, issueId, runId, digest],
+      );
+      await client.query("SAVEPOINT immutable_evidence");
+      await assert.rejects(
+        () =>
+          client.query("UPDATE evidence SET size_bytes = 129 WHERE id = $1", [
+            evidenceId,
+          ]),
+        /append-only/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT immutable_evidence");
+
+      await client.query(
+        `INSERT INTO audit_events
+           (id, organization_id, project_id, goal_id, actor_id, action,
+            entity_type, entity_id, entity_version, reason, request_id,
+            retention_until)
+         VALUES ($1, $2, $3, $4, 'actor-1', 'run.queued', 'run', $5, 1,
+                 'Start approved work', 'req-reliability',
+                 '2030-01-01T00:00:00Z')`,
+        [auditEventId, organizationId, projectId, goalId, runId],
+      );
+      await client.query("SAVEPOINT immutable_audit");
+      await assert.rejects(
+        () =>
+          client.query("DELETE FROM audit_events WHERE id = $1", [auditEventId]),
+        /append-only/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT immutable_audit");
+
+      await client.query(
+        `INSERT INTO outbox_events
+           (organization_id, aggregate_type, aggregate_id,
+            aggregate_version, event_type, deduplication_key, payload)
+         VALUES ($1, 'run', $2, 1, 'run.queued', 'run-queued-once',
+                 '{"status":"queued"}'::jsonb)`,
+        [organizationId, runId],
+      );
+      await client.query("SAVEPOINT duplicate_outbox");
+      await assert.rejects(
+        () =>
+          client.query(
+            `INSERT INTO outbox_events
+               (organization_id, aggregate_type, aggregate_id,
+                aggregate_version, event_type, deduplication_key, payload)
+             VALUES ($1, 'run', $2, 1, 'run.queued', 'run-queued-once', '{}')`,
+            [organizationId, runId],
+          ),
+        /unique constraint/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT duplicate_outbox");
+
+      await client.query(
+        `INSERT INTO idempotency_records
+           (organization_id, actor_id, endpoint, key, request_hash, expires_at)
+         VALUES ($1, 'actor-1', '/goals/actions', 'idem-1', $2,
+                 '2030-01-01T00:00:00Z')`,
+        [organizationId, digest],
+      );
+      await client.query("SAVEPOINT duplicate_idempotency");
+      await assert.rejects(
+        () =>
+          client.query(
+            `INSERT INTO idempotency_records
+               (organization_id, actor_id, endpoint, key,
+                request_hash, expires_at)
+             VALUES ($1, 'actor-1', '/goals/actions', 'idem-1', $2,
+                     '2030-01-01T00:00:00Z')`,
+            [organizationId, digest],
+          ),
+        /unique constraint/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT duplicate_idempotency");
+      await client.query(
+        `INSERT INTO idempotency_records
+           (organization_id, actor_id, endpoint, key, request_hash, expires_at)
+         VALUES ($1, 'actor-2', '/goals/actions', 'idem-1', $2,
+                 '2030-01-01T00:00:00Z')`,
+        [organizationId, digest],
+      );
     } finally {
       await client.query("ROLLBACK").catch(() => undefined);
       client.release();

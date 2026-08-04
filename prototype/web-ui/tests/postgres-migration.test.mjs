@@ -22,6 +22,8 @@ const authoritativeSchemaHash =
   "4a02f956e011b984374624c410f5e5b3bd4f41d7aaddcac182861d669906c54f";
 const planningSchemaHash =
   "2e8678e68b8c0ba131beec25f95a12f88ea98d1a5ba58fa6843c14fa5df777cc";
+const reliabilitySchemaHash =
+  "136ef382cdcd7c31813dbb660d38e519f452a1addd03b78288c04aa4c7fef2bf";
 
 function validObservation() {
   return {
@@ -73,7 +75,7 @@ function receiptMigrations() {
 test("loads the committed Drizzle migration and hashes its exact bytes", () => {
   const migrations = loadPostgresMigrations(migrationsDirectory);
 
-  assert.equal(migrations.length, 3);
+  assert.equal(migrations.length, 4);
   assert.equal(migrations[0].tag, "0000_tan_mikhail_rasputin");
   assert.equal(migrations[0].createdAt, 1785742303861);
   assert.equal(migrations[0].hash, expectedHash);
@@ -86,6 +88,10 @@ test("loads the committed Drizzle migration and hashes its exact bytes", () => {
   assert.equal(migrations[2].createdAt, 1785828293991);
   assert.equal(migrations[2].hash, planningSchemaHash);
   assert.equal(migrations[2].statements.length, 23);
+  assert.equal(migrations[3].tag, "0003_absurd_stark_industries");
+  assert.equal(migrations[3].createdAt, 1785828695192);
+  assert.equal(migrations[3].hash, reliabilitySchemaHash);
+  assert.equal(migrations[3].statements.length, 24);
 });
 
 test("builds an atomic, locked, idempotent migration batch", () => {

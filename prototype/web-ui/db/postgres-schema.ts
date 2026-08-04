@@ -68,6 +68,35 @@ export const issueStatuses = [
 ] as const;
 export type IssueStatus = (typeof issueStatuses)[number];
 
+export const runStatuses = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+] as const;
+export type RunStatus = (typeof runStatuses)[number];
+
+export const evidenceKinds = [
+  "artifact",
+  "log",
+  "test",
+  "review",
+  "commit",
+  "push",
+] as const;
+export type EvidenceKind = (typeof evidenceKinds)[number];
+
+export const outboxStatuses = ["pending", "published", "failed"] as const;
+export type OutboxStatus = (typeof outboxStatuses)[number];
+
+export const idempotencyStatuses = [
+  "in_progress",
+  "completed",
+  "failed",
+] as const;
+export type IdempotencyStatus = (typeof idempotencyStatuses)[number];
+
 export const organizations = pgTable(
   "organizations",
   {
@@ -769,6 +798,382 @@ export const issueDependencies = pgTable(
   ],
 );
 
+export const runs = pgTable(
+  "runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    attempt: integer("attempt").notNull(),
+    status: text("status").$type<RunStatus>().default("queued").notNull(),
+    requestId: text("request_id").notNull(),
+    version: integer("version").default(1).notNull(),
+    startedAt: timestamp("started_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    finishedAt: timestamp("finished_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "runs_issue_goal_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.issueId,
+      ],
+      foreignColumns: [
+        issues.organizationId,
+        issues.projectId,
+        issues.goalId,
+        issues.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    unique("runs_issue_id_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.issueId,
+      table.id,
+    ),
+    uniqueIndex("runs_issue_attempt_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.issueId,
+      table.attempt,
+    ),
+    index("runs_status_updated_idx").on(
+      table.organizationId,
+      table.status,
+      table.updatedAt,
+    ),
+    check("runs_attempt_positive_chk", sql`${table.attempt} > 0`),
+    check(
+      "runs_status_chk",
+      sql`${table.status} IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')`,
+    ),
+    check(
+      "runs_lifecycle_chk",
+      sql`(${table.status} = 'queued' AND ${table.startedAt} IS NULL AND ${table.finishedAt} IS NULL) OR (${table.status} = 'running' AND ${table.startedAt} IS NOT NULL AND ${table.finishedAt} IS NULL) OR (${table.status} IN ('succeeded', 'failed') AND ${table.startedAt} IS NOT NULL AND ${table.finishedAt} >= ${table.startedAt}) OR (${table.status} = 'cancelled' AND ${table.finishedAt} IS NOT NULL AND (${table.startedAt} IS NULL OR ${table.finishedAt} >= ${table.startedAt}))`,
+    ),
+    check(
+      "runs_identity_version_chk",
+      sql`char_length(btrim(${table.requestId})) BETWEEN 1 AND 200 AND ${table.version} > 0`,
+    ),
+    check(
+      "runs_timestamps_order_chk",
+      sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const evidence = pgTable(
+  "evidence",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    runId: uuid("run_id").notNull(),
+    kind: text("kind").$type<EvidenceKind>().notNull(),
+    artifactRef: text("artifact_ref").notNull(),
+    digest: text("digest").notNull(),
+    mediaType: text("media_type").notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    retentionUntil: timestamp("retention_until", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "evidence_run_issue_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.issueId,
+        table.runId,
+      ],
+      foreignColumns: [
+        runs.organizationId,
+        runs.projectId,
+        runs.goalId,
+        runs.issueId,
+        runs.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("evidence_run_kind_digest_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.runId,
+      table.kind,
+      table.digest,
+    ),
+    index("evidence_retention_idx").on(
+      table.organizationId,
+      table.retentionUntil,
+    ),
+    check(
+      "evidence_kind_chk",
+      sql`${table.kind} IN ('artifact', 'log', 'test', 'review', 'commit', 'push')`,
+    ),
+    check("evidence_digest_chk", sql`${table.digest} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "evidence_metadata_chk",
+      sql`char_length(btrim(${table.artifactRef})) BETWEEN 1 AND 1000 AND char_length(btrim(${table.mediaType})) BETWEEN 1 AND 200 AND ${table.sizeBytes} >= 0 AND ${table.retentionUntil} > ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id"),
+    goalId: uuid("goal_id"),
+    actorId: text("actor_id").notNull(),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: uuid("entity_id").notNull(),
+    entityVersion: integer("entity_version").notNull(),
+    reason: text("reason").notNull(),
+    requestId: text("request_id").notNull(),
+    detailsRef: text("details_ref"),
+    detailsDigest: text("details_digest"),
+    retentionUntil: timestamp("retention_until", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "audit_events_project_organization_fk",
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "audit_events_goal_organization_fk",
+      columns: [table.organizationId, table.projectId, table.goalId],
+      foreignColumns: [goals.organizationId, goals.projectId, goals.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    index("audit_events_organization_created_idx").on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    index("audit_events_entity_idx").on(
+      table.organizationId,
+      table.entityType,
+      table.entityId,
+      table.entityVersion,
+    ),
+    check(
+      "audit_events_scope_chk",
+      sql`${table.goalId} IS NULL OR ${table.projectId} IS NOT NULL`,
+    ),
+    check(
+      "audit_events_identity_chk",
+      sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.action})) BETWEEN 1 AND 200 AND char_length(btrim(${table.entityType})) BETWEEN 1 AND 100 AND ${table.entityVersion} > 0 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200`,
+    ),
+    check(
+      "audit_events_details_chk",
+      sql`((${table.detailsRef} IS NULL AND ${table.detailsDigest} IS NULL) OR (char_length(btrim(${table.detailsRef})) BETWEEN 1 AND 1000 AND ${table.detailsDigest} ~ '^[0-9a-f]{64}$')) AND ${table.retentionUntil} > ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const outboxEvents = pgTable(
+  "outbox_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    aggregateType: text("aggregate_type").notNull(),
+    aggregateId: uuid("aggregate_id").notNull(),
+    aggregateVersion: integer("aggregate_version").notNull(),
+    eventType: text("event_type").notNull(),
+    deduplicationKey: text("deduplication_key").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: text("status").$type<OutboxStatus>().default("pending").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    availableAt: timestamp("available_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    publishedAt: timestamp("published_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    lastErrorRef: text("last_error_ref"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "outbox_events_organization_fk",
+      columns: [table.organizationId],
+      foreignColumns: [organizations.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("outbox_events_organization_dedupe_uidx").on(
+      table.organizationId,
+      table.deduplicationKey,
+    ),
+    uniqueIndex("outbox_events_aggregate_version_uidx").on(
+      table.organizationId,
+      table.aggregateType,
+      table.aggregateId,
+      table.aggregateVersion,
+      table.eventType,
+    ),
+    index("outbox_events_dispatch_idx").on(
+      table.status,
+      table.availableAt,
+      table.createdAt,
+    ),
+    check(
+      "outbox_events_status_chk",
+      sql`${table.status} IN ('pending', 'published', 'failed')`,
+    ),
+    check(
+      "outbox_events_state_chk",
+      sql`${table.aggregateVersion} > 0 AND ${table.attempts} >= 0 AND ((${table.status} = 'published' AND ${table.publishedAt} IS NOT NULL) OR (${table.status} <> 'published' AND ${table.publishedAt} IS NULL))`,
+    ),
+    check(
+      "outbox_events_identity_chk",
+      sql`char_length(btrim(${table.aggregateType})) BETWEEN 1 AND 100 AND char_length(btrim(${table.eventType})) BETWEEN 1 AND 200 AND char_length(btrim(${table.deduplicationKey})) BETWEEN 1 AND 300 AND (${table.lastErrorRef} IS NULL OR char_length(btrim(${table.lastErrorRef})) BETWEEN 1 AND 1000)`,
+    ),
+    check(
+      "outbox_events_timestamps_order_chk",
+      sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const idempotencyRecords = pgTable(
+  "idempotency_records",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    actorId: text("actor_id").notNull(),
+    endpoint: text("endpoint").notNull(),
+    key: text("key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    status: text("status")
+      .$type<IdempotencyStatus>()
+      .default("in_progress")
+      .notNull(),
+    responseStatus: integer("response_status"),
+    responseRef: text("response_ref"),
+    responseDigest: text("response_digest"),
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "idempotency_records_organization_fk",
+      columns: [table.organizationId],
+      foreignColumns: [organizations.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("idempotency_records_scope_key_uidx").on(
+      table.organizationId,
+      table.actorId,
+      table.endpoint,
+      table.key,
+    ),
+    index("idempotency_records_expiry_idx").on(
+      table.organizationId,
+      table.expiresAt,
+    ),
+    check(
+      "idempotency_records_status_chk",
+      sql`${table.status} IN ('in_progress', 'completed', 'failed')`,
+    ),
+    check(
+      "idempotency_records_identity_chk",
+      sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.endpoint})) BETWEEN 1 AND 300 AND char_length(${table.key}) BETWEEN 1 AND 200 AND ${table.requestHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "idempotency_records_response_chk",
+      sql`(${table.status} = 'in_progress' AND ${table.responseStatus} IS NULL AND ${table.responseRef} IS NULL AND ${table.responseDigest} IS NULL) OR (${table.status} IN ('completed', 'failed') AND ${table.responseStatus} BETWEEN 100 AND 599 AND char_length(btrim(${table.responseRef})) BETWEEN 1 AND 1000 AND ${table.responseDigest} ~ '^[0-9a-f]{64}$')`,
+    ),
+    check(
+      "idempotency_records_expiry_chk",
+      sql`${table.expiresAt} > ${table.createdAt} AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 export type Project = typeof projects.$inferSelect;
@@ -789,6 +1194,16 @@ export type Issue = typeof issues.$inferSelect;
 export type NewIssue = typeof issues.$inferInsert;
 export type IssueDependency = typeof issueDependencies.$inferSelect;
 export type NewIssueDependency = typeof issueDependencies.$inferInsert;
+export type Run = typeof runs.$inferSelect;
+export type NewRun = typeof runs.$inferInsert;
+export type Evidence = typeof evidence.$inferSelect;
+export type NewEvidence = typeof evidence.$inferInsert;
+export type AuditEvent = typeof auditEvents.$inferSelect;
+export type NewAuditEvent = typeof auditEvents.$inferInsert;
+export type OutboxEvent = typeof outboxEvents.$inferSelect;
+export type NewOutboxEvent = typeof outboxEvents.$inferInsert;
+export type IdempotencyRecord = typeof idempotencyRecords.$inferSelect;
+export type NewIdempotencyRecord = typeof idempotencyRecords.$inferInsert;
 
 export const workbenchSnapshots = pgTable("workbench_snapshots", {
   scopeId: text("scope_id").primaryKey(),

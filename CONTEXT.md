@@ -46,6 +46,18 @@ _Avoid_: Task, queue item
 A directed prerequisite edge between two Issue revisions inside the same Goal.
 _Avoid_: Cross-Goal link, ordering hint
 
+**Run**:
+One numbered execution attempt for a particular Issue revision.
+_Avoid_: Worker, job
+
+**Evidence**:
+Immutable metadata identifying an artifact that proves something about a Run; the artifact content lives outside the control-plane database.
+_Avoid_: Log blob, mutable attachment
+
+**Audit Event**:
+An immutable account of who made a control-plane change, when, why, and against which entity version.
+_Avoid_: Application log, history row
+
 **Workbench Projection**:
 A derived operational view of Goals and later execution entities; it is never a business fact source.
 _Avoid_: Task table, control-plane state
