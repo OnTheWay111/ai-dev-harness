@@ -680,7 +680,7 @@ P5-02 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P5-03** 实现 Helpful 例外、范围修改和拒绝理由的人工审批。
+- [x] **P5-03** 实现 Helpful 例外、范围修改和拒绝理由的人工审批。（已完成：2026-08-04；实现提交：ai-dev-harness@49f707423fc36e4adf887d2fd86d712af959a9ec）
 
 <details>
 <summary>快捷复制开发提示词 P5-03 · gpt-5.6-sol(深度) · high(高)</summary>
