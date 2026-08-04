@@ -4,6 +4,9 @@ import type {
   RunStatus,
   SpecRevisionStatus,
 } from "../domain/state-machines";
+import { VersionConflictError } from "../domain/errors.ts";
+
+export { VersionConflictError } from "../domain/errors.ts";
 
 interface QueryResult<Row> {
   rows: Row[];
@@ -11,7 +14,7 @@ interface QueryResult<Row> {
 }
 
 export interface SqlExecutor {
-  query<Row extends Record<string, unknown>>(
+  query<Row extends object>(
     text: string,
     values: readonly unknown[],
   ): Promise<QueryResult<Row>>;
@@ -49,13 +52,6 @@ export type PersistedStateTransition =
 export interface PersistedState {
   state: string;
   version: number;
-}
-
-export class VersionConflictError extends Error {
-  constructor() {
-    super("The entity version changed before the transition was persisted");
-    this.name = "VersionConflictError";
-  }
 }
 
 const goalUpdate = `

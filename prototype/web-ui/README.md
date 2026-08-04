@@ -183,6 +183,9 @@ Authoritative control-plane entities are defined in
 separately from the replaceable workbench projection.
 Goal, SpecRevision, Issue, and Run lifecycle rules are listed in
 [`../../docs/control-plane-state-machines.md`](../../docs/control-plane-state-machines.md).
+The Goal write-module interface, Repository seam, adapters, and HTTP mapping are
+documented in
+[`../../docs/control-plane-write-architecture.md`](../../docs/control-plane-write-architecture.md).
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls

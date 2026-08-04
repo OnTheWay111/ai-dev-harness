@@ -22,6 +22,10 @@ import {
   PostgresVersionedStateStore,
   VersionConflictError,
 } from "../app/control-plane/adapters/postgres-versioned-state-store.ts";
+import {
+  PostgresGoalRepository,
+} from "../app/control-plane/adapters/postgres-goal-repository.ts";
+import { assertGoalRepositoryContract } from "./goal-repository-contract.mjs";
 
 const databaseUrl = process.env.POSTGRES_INTEGRATION_DATABASE_URL;
 const integrationTest = databaseUrl ? test : test.skip;
@@ -781,6 +785,58 @@ integrationTest(
     } finally {
       await client.query("ROLLBACK").catch(() => undefined);
       client.release();
+    }
+  },
+);
+
+integrationTest(
+  "matches the in-memory GoalRepository contract with PostgreSQL",
+  async () => {
+    const goal = {
+      id: crypto.randomUUID(),
+      organizationId: crypto.randomUUID(),
+      projectId: crypto.randomUUID(),
+      title: "Repository contract",
+      status: "draft",
+      version: 1,
+    };
+    const repository = new PostgresGoalRepository(pool);
+    try {
+      await pool.query(
+        `INSERT INTO organizations (id, slug, name)
+         VALUES ($1, $2, 'Repository Contract Organization')`,
+        [goal.organizationId, `repository-contract-${process.pid}`],
+      );
+      await pool.query(
+        `INSERT INTO projects (id, organization_id, slug, name)
+         VALUES ($1, $2, $3, 'Repository Contract Project')`,
+        [goal.projectId, goal.organizationId, `repository-contract-${process.pid}`],
+      );
+      await pool.query(
+        `INSERT INTO goals
+           (id, organization_id, project_id, title,
+            problem_statement, desired_outcome)
+         VALUES ($1, $2, $3, $4, 'Hide persistence', 'One stable interface')`,
+        [goal.id, goal.organizationId, goal.projectId, goal.title],
+      );
+      await assertGoalRepositoryContract({
+        repository,
+        goal,
+        eventCount: async (eventId) =>
+          Number((await pool.query(
+            "SELECT count(*)::int AS count FROM outbox_events WHERE id = $1",
+            [eventId],
+          )).rows[0].count),
+      });
+    } finally {
+      await pool.query("DELETE FROM outbox_events WHERE organization_id = $1", [
+        goal.organizationId,
+      ]);
+      await pool.query("DELETE FROM goals WHERE id = $1", [goal.id]);
+      await pool.query("DELETE FROM projects WHERE id = $1", [goal.projectId]);
+      await pool.query("DELETE FROM organizations WHERE id = $1", [
+        goal.organizationId,
+      ]);
     }
   },
 );
