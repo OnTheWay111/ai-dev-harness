@@ -89,6 +89,17 @@ export const idempotencyStatuses = [
 ] as const;
 export type IdempotencyStatus = (typeof idempotencyStatuses)[number];
 
+export const issuePlanStatuses = [
+  "draft",
+  "approved",
+  "rejected",
+  "superseded",
+] as const;
+export type IssuePlanStatus = (typeof issuePlanStatuses)[number];
+
+export const queueProjectionStatuses = ["completed", "failed"] as const;
+export type QueueProjectionStatus = (typeof queueProjectionStatuses)[number];
+
 export const organizations = pgTable(
   "organizations",
   {
@@ -897,6 +908,204 @@ export const specRevisions = pgTable(
       "spec_revisions_timestamps_order_chk",
       sql`${table.updatedAt} >= ${table.createdAt}`,
     ),
+  ],
+);
+
+export const issuePlanRevisions = pgTable(
+  "issue_plan_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    specRevisionId: uuid("spec_revision_id").notNull(),
+    revision: integer("revision").notNull(),
+    previousPlanId: uuid("previous_plan_id"),
+    status: text("status").$type<IssuePlanStatus>().default("draft").notNull(),
+    sourceSpecVersion: integer("source_spec_version").notNull(),
+    sourceSpecDigest: text("source_spec_digest").notNull(),
+    planData: jsonb("plan_data")
+      .$type<import("../app/control-plane/domain/issue-plan.ts").IssuePlan>()
+      .notNull(),
+    digest: text("digest").notNull(),
+    plannerRunId: text("planner_run_id").notNull(),
+    plannerConfiguration: jsonb("planner_configuration")
+      .$type<import("../app/control-plane/domain/issue-plan.ts").IssuePlannerConfiguration>()
+      .notNull(),
+    compilerPolicyRevision: text("compiler_policy_revision").notNull(),
+    conflictPolicyRevision: text("conflict_policy_revision").notNull(),
+    modelRouterPolicyRevision: text("model_router_policy_revision").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true, mode: "date" })
+      .notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "issue_plan_revisions_spec_revision_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.specRevisionId,
+      ],
+      foreignColumns: [
+        specRevisions.organizationId, specRevisions.projectId,
+        specRevisions.goalId, specRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("issue_plan_revisions_goal_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    foreignKey({
+      name: "issue_plan_revisions_previous_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.previousPlanId,
+      ],
+      foreignColumns: [
+        table.organizationId, table.projectId, table.goalId, table.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("issue_plan_revisions_goal_revision_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.revision,
+    ),
+    check(
+      "issue_plan_revisions_chain_chk",
+      sql`${table.revision} > 0 AND ((${table.revision} = 1 AND ${table.previousPlanId} IS NULL) OR (${table.revision} > 1 AND ${table.previousPlanId} IS NOT NULL))`,
+    ),
+    check("issue_plan_revisions_status_chk", sql`${table.status} IN ('draft','approved','rejected','superseded')`),
+    check("issue_plan_revisions_source_chk", sql`${table.sourceSpecVersion} > 0 AND ${table.sourceSpecDigest} ~ '^[0-9a-f]{64}$'`),
+    check("issue_plan_revisions_digest_chk", sql`${table.digest} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "issue_plan_revisions_metadata_chk",
+      sql`char_length(btrim(${table.plannerRunId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.compilerPolicyRevision})) BETWEEN 1 AND 100 AND char_length(btrim(${table.conflictPolicyRevision})) BETWEEN 1 AND 100 AND char_length(btrim(${table.modelRouterPolicyRevision})) BETWEEN 1 AND 100`,
+    ),
+    check("issue_plan_revisions_version_positive_chk", sql`${table.version} > 0`),
+    check("issue_plan_revisions_timestamps_order_chk", sql`${table.generatedAt} >= ${table.createdAt} AND ${table.updatedAt} >= ${table.createdAt}`),
+  ],
+);
+
+export const modelRecommendations = pgTable(
+  "model_recommendations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issuePlanId: uuid("issue_plan_id").notNull(),
+    issueKey: text("issue_key").notNull(),
+    capabilityTier: text("capability_tier")
+      .$type<import("../app/control-plane/domain/model-router.ts").CapabilityTier>()
+      .notNull(),
+    reasoningEffort: text("reasoning_effort")
+      .$type<import("../app/control-plane/domain/model-router.ts").ReasoningEffort>()
+      .notNull(),
+    factors: jsonb("factors")
+      .$type<import("../app/control-plane/domain/model-router.ts").ModelRoutingFactors>()
+      .notNull(),
+    reasons: jsonb("reasons").$type<string[]>().notNull(),
+    override: jsonb("override")
+      .$type<import("../app/control-plane/domain/model-router.ts").ModelRouteOverride | null>(),
+    policyRevision: text("policy_revision").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "model_recommendations_plan_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.issuePlanId],
+      foreignColumns: [
+        issuePlanRevisions.organizationId, issuePlanRevisions.projectId,
+        issuePlanRevisions.goalId, issuePlanRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("model_recommendations_plan_issue_uidx").on(
+      table.organizationId, table.projectId, table.goalId,
+      table.issuePlanId, table.issueKey,
+    ),
+    check("model_recommendations_issue_key_chk", sql`char_length(${table.issueKey}) BETWEEN 1 AND 64 AND ${table.issueKey} ~ '^[A-Z][A-Z0-9-]*$'`),
+    check("model_recommendations_capability_chk", sql`${table.capabilityTier} IN ('cost_optimized','general_coding','advanced_coding','frontier')`),
+    check("model_recommendations_effort_chk", sql`${table.reasoningEffort} IN ('low','medium','high','highest')`),
+    check("model_recommendations_policy_chk", sql`char_length(btrim(${table.policyRevision})) BETWEEN 1 AND 100`),
+  ],
+);
+
+export const executionWaves = pgTable(
+  "execution_waves",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issuePlanId: uuid("issue_plan_id").notNull(),
+    waveNumber: integer("wave_number").notNull(),
+    issueKeys: jsonb("issue_keys").$type<string[]>().notNull(),
+    reasons: jsonb("reasons").$type<string[]>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "execution_waves_plan_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.issuePlanId],
+      foreignColumns: [
+        issuePlanRevisions.organizationId, issuePlanRevisions.projectId,
+        issuePlanRevisions.goalId, issuePlanRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("execution_waves_plan_number_uidx").on(
+      table.organizationId, table.projectId, table.goalId,
+      table.issuePlanId, table.waveNumber,
+    ),
+    check("execution_waves_number_chk", sql`${table.waveNumber} > 0`),
+    check("execution_waves_issue_keys_chk", sql`jsonb_typeof(${table.issueKeys}) = 'array' AND jsonb_array_length(${table.issueKeys}) > 0`),
+    check("execution_waves_reasons_chk", sql`jsonb_typeof(${table.reasons}) = 'array'`),
+  ],
+);
+
+export const queueProjections = pgTable(
+  "queue_projections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issuePlanId: uuid("issue_plan_id").notNull(),
+    planDigest: text("plan_digest").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestId: text("request_id").notNull(),
+    externalImportId: text("external_import_id").notNull(),
+    status: text("status").$type<QueueProjectionStatus>().notNull(),
+    receipt: jsonb("receipt")
+      .$type<import("../app/control-plane/ports/queue-projection-port.ts").QueueProjectionReceipt>()
+      .notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "queue_projections_plan_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.issuePlanId],
+      foreignColumns: [
+        issuePlanRevisions.organizationId, issuePlanRevisions.projectId,
+        issuePlanRevisions.goalId, issuePlanRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("queue_projections_idempotency_uidx").on(
+      table.organizationId, table.idempotencyKey,
+    ),
+    uniqueIndex("queue_projections_plan_digest_uidx").on(
+      table.organizationId, table.projectId, table.goalId,
+      table.issuePlanId, table.planDigest,
+    ),
+    check("queue_projections_digest_chk", sql`${table.planDigest} ~ '^[0-9a-f]{64}$'`),
+    check("queue_projections_status_chk", sql`${table.status} IN ('completed','failed')`),
+    check("queue_projections_identity_chk", sql`char_length(btrim(${table.idempotencyKey})) BETWEEN 1 AND 200 AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.externalImportId})) BETWEEN 1 AND 200`),
+    check("queue_projections_version_positive_chk", sql`${table.version} > 0`),
+    check("queue_projections_timestamps_order_chk", sql`${table.updatedAt} >= ${table.createdAt}`),
   ],
 );
 

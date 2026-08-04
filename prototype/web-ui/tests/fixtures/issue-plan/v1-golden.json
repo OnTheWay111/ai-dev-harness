@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "issue-plan-draft.v1",
+  "issues": [
+    {
+      "key": "DEV-01",
+      "title": "Persist the approved goal contract",
+      "goal": "Create an auditable planning control plane",
+      "requirementRefs": ["REQ-01"],
+      "acceptance": [
+        {
+          "criterionRef": "AC-01",
+          "statement": "The contract is stored with its source revision"
+        }
+      ],
+      "nonGoals": ["Do not add a second execution engine"],
+      "dependencyCandidates": [],
+      "expectedFiles": ["app/control-plane/domain/issue-plan.ts"],
+      "conflictResources": {
+        "directories": [],
+        "publicInterfaces": ["issue-plan.v1"],
+        "databaseObjects": ["issue_plan_revisions"],
+        "sharedConfigurations": [],
+        "landingOrder": []
+      },
+      "developmentPrompt": "Work in /workspace/repository. Goal: Create an auditable planning control plane. Issue: Persist the approved goal contract. Implement REQ-01 and prove AC-01: The contract is stored with its source revision. Preserve the non-goal: Do not add a second execution engine. Change app/control-plane/domain/issue-plan.ts. Run npm test. Return the required completion evidence.",
+      "verify": ["npm test"],
+      "completionEvidence": [
+        {
+          "kind": "test",
+          "description": "Passing issue plan contract tests",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "DEV-02",
+      "title": "Expose issue plan approval",
+      "goal": "Create an auditable planning control plane",
+      "requirementRefs": ["REQ-02"],
+      "acceptance": [
+        {
+          "criterionRef": "AC-02",
+          "statement": "An approver can approve an exact plan revision"
+        }
+      ],
+      "nonGoals": ["Do not bypass server authorization"],
+      "dependencyCandidates": ["DEV-01"],
+      "expectedFiles": ["app/control-plane/http/issue-plan-handler.ts"],
+      "conflictResources": {
+        "directories": [],
+        "publicInterfaces": ["issue-plan.v1"],
+        "databaseObjects": [],
+        "sharedConfigurations": [],
+        "landingOrder": []
+      },
+      "developmentPrompt": "Work in /workspace/repository. Goal: Create an auditable planning control plane. Issue: Expose issue plan approval. Implement REQ-02 after DEV-01 and prove AC-02: An approver can approve an exact plan revision. Preserve the non-goal: Do not bypass server authorization. Change app/control-plane/http/issue-plan-handler.ts. Run npm test. Return the required completion evidence.",
+      "verify": ["npm test"],
+      "completionEvidence": [
+        {
+          "kind": "test",
+          "description": "Passing approval HTTP tests",
+          "required": true
+        },
+        {
+          "kind": "audit",
+          "description": "Approval receipt bound to the plan revision",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

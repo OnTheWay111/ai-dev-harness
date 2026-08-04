@@ -122,6 +122,7 @@ test("client artifact scan blocks connection, Secret, and server-driver markers"
       ["@neondatabase/serverless", "server database driver"],
       ["pg-protocol", "server database driver"],
       ["OIDC_COOKIE_SECRET", "OIDC server Secret name"],
+      ["AUTODEV_QUEUE_IMPORT_TOKEN", "AutoDev server Secret name"],
       ["refresh_token", "OIDC token material"],
     ]) {
       await writeFile(join(directory, "assets", "unsafe.js"), contents);

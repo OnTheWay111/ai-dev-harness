@@ -3233,6 +3233,49 @@ kbd {
   border-collapse: collapse;
 }
 
+.issue-table input,
+.issue-table textarea,
+.issue-table select,
+.approval-actions input {
+  width: 100%;
+  min-width: 8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+}
+
+.issue-table textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.issue-table input:focus-visible,
+.issue-table textarea:focus-visible,
+.issue-table select:focus-visible,
+.approval-actions input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--blue) 28%, transparent);
+  outline-offset: 1px;
+}
+
+.error-banner {
+  margin: 0 0 1rem;
+  border: 1px solid color-mix(in srgb, #c2410c 35%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #ffedd5 75%, var(--surface));
+  color: #9a3412;
+  padding: 0.8rem 1rem;
+}
+
+.empty-state {
+  max-width: 48rem;
+  margin: 4rem auto;
+  padding: 2rem;
+  text-align: center;
+}
+
 .issue-table th {
   padding: 10px 16px;
   color: var(--ink-500);

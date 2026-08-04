@@ -20,6 +20,7 @@ import {
   GoalWorkspaceApiError,
   type GoalWorkspaceScope,
 } from "../goal-workspace-api";
+import type { IssuePlanContext } from "./issues-view";
 import {
   goalDraftStorageKey,
   restoreGoalDraft,
@@ -65,7 +66,7 @@ export function ClarifyView({
   notify,
 }: {
   scope: GoalWorkspaceScope;
-  onContinue: () => void;
+  onContinue: (context: IssuePlanContext) => void;
   notify: (message: string) => void;
 }) {
   const [draft, setDraft] = useState<GoalContractDraft>(emptyDraft);
@@ -724,9 +725,13 @@ export function ClarifyView({
         <button
           className="primary-button"
           disabled={!goal}
-          onClick={() => goal && onContinue()}
+          onClick={() => goal && latestSpec?.specRevision.status === "approved" && onContinue({
+            goalId: goal.id,
+            specRevisionId: latestSpec.specRevision.id,
+            specRevisionVersion: latestSpec.specRevision.version,
+          })}
         >
-          进入澄清<span>→</span>
+          进入 Issue 编译<span>→</span>
         </button>
       </div>
     </div>

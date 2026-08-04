@@ -56,6 +56,18 @@ import { PostgresSpecApprovalRepository } from
   "../app/control-plane/adapters/postgres-spec-approval-repository.ts";
 import { SpecApprovalService } from
   "../app/control-plane/application/spec-approval-service.ts";
+import { DemoIssuePlannerAdapter } from
+  "../app/control-plane/adapters/demo-issue-planner-adapter.ts";
+import { PostgresIssuePlanRepository } from
+  "../app/control-plane/adapters/postgres-issue-plan-repository.ts";
+import { PostgresQueueProjectionRepository } from
+  "../app/control-plane/adapters/postgres-queue-projection-repository.ts";
+import { IssuePlanGenerationService } from
+  "../app/control-plane/application/issue-plan-generation-service.ts";
+import { IssuePlanService } from
+  "../app/control-plane/application/issue-plan-service.ts";
+import { QueueProjectionService } from
+  "../app/control-plane/application/queue-projection-service.ts";
 import {
   IdempotencyConflictError,
 } from "../app/control-plane/domain/errors.ts";
@@ -178,7 +190,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 14);
+  assert.equal(migrations.length, 15);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -203,13 +215,17 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
       "classifications",
       "decisions",
       "evidence",
+      "execution_waves",
       "goals",
       "idempotency_records",
       "issue_dependencies",
+      "issue_plan_revisions",
       "issues",
+      "model_recommendations",
       "organizations",
       "outbox_events",
       "projects",
+      "queue_projections",
       "repositories",
       "role_bindings",
       "runs",
@@ -548,6 +564,88 @@ integrationTest(
       specRevisionId: generated.specRevision.id,
       actorId: "integration-viewer",
     })).decisions.length, 2);
+
+    const issuePlanRepository = new PostgresIssuePlanRepository(pool);
+    const issuePlans = new IssuePlanService({
+      repository: issuePlanRepository,
+      authorizer: { async authorize() {} },
+    });
+    const issuePlanGeneration = new IssuePlanGenerationService({
+      goals: new PostgresGoalWorkspaceRepository(pool),
+      specifications: new PostgresSpecApprovalRepository(pool),
+      artifacts,
+      planner: new DemoIssuePlannerAdapter(),
+      plans: issuePlans,
+      authorizer: { async authorize() {} },
+    });
+    const generatedPlan = await issuePlanGeneration.generate({
+      organizationId,
+      projectId,
+      goalId,
+      specRevisionId: generated.specRevision.id,
+      expectedSpecVersion: approved.result.specRevision.version,
+      actorId: "issue-planner",
+    });
+    assert.equal(generatedPlan.plan.compilation.valid, true);
+    const approvedPlan = await issuePlans.approve({
+      scope: { organizationId, projectId, goalId },
+      target: { type: "issue_plan", id: generatedPlan.plan.id },
+      expectedVersion: 1,
+      actorId: "integration-approver",
+      reason: "Approve the exact Issue DAG and routes",
+      requestId: "integration-issue-approval",
+      idempotencyKey: `issue-approve-${suffix}`,
+      policyRevision: "issue-plan-approval.v1",
+      decision: "approve",
+      affectedItemIds: generatedPlan.plan.issues.map(({ key }) => key),
+      payload: {},
+    });
+    assert.equal(approvedPlan.result.plan.status, "approved");
+    const normalized = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM model_recommendations WHERE issue_plan_id=$1) AS routes,
+         (SELECT count(*)::int FROM execution_waves WHERE issue_plan_id=$1) AS waves`,
+      [generatedPlan.plan.id],
+    );
+    assert.deepEqual(normalized.rows[0], {
+      routes: generatedPlan.plan.issues.length,
+      waves: generatedPlan.plan.waves.length,
+    });
+
+    let imports = 0;
+    const queue = new QueueProjectionService({
+      repository: new PostgresQueueProjectionRepository(pool),
+      adapter: {
+        async importApprovedPlan(input) {
+          imports += 1;
+          return {
+            importId: `import-${suffix}`,
+            atomic: true,
+            organizationId,
+            projectId,
+            goalId,
+            issuePlanId: input.plan.id,
+            planDigest: input.plan.digest,
+            requestId: input.requestId,
+            idempotencyKey: input.idempotencyKey,
+            projectedAt: new Date().toISOString(),
+            tasks: input.plan.issues.map(({ key }) => ({
+              issueKey: key,
+              externalTaskId: `external-${key}`,
+            })),
+          };
+        },
+      },
+    });
+    const projectionCommand = {
+      plan: approvedPlan.result.plan,
+      actorId: "integration-approver",
+      requestId: "integration-queue-projection",
+      idempotencyKey: `queue-projection-${suffix}`,
+    };
+    const projected = await queue.project(projectionCommand);
+    assert.deepEqual(await queue.project(projectionCommand), projected);
+    assert.equal(imports, 1);
   },
 );
 

@@ -154,7 +154,9 @@ export class CodexPlannerAdapter implements PlannerPort {
     };
     try {
       const packet = buildPlannerContextPacket(request.goal);
-      const context = JSON.stringify(packet);
+      const context = JSON.stringify(request.purpose === "issue_plan"
+        ? { goal: packet, approvedSpecification: request.approvedSpecification }
+        : packet);
       if (Buffer.byteLength(context) > this.maxContextBytes) {
         throw new PlannerExecutionError("planner_budget_exceeded");
       }
@@ -187,6 +189,8 @@ export class CodexPlannerAdapter implements PlannerPort {
         stdin: [
           request.purpose === "specification"
             ? "You are the Specification Planner. Produce Proposal, PRD, architecture, migration, rollback, and traceable solution-element drafts."
+            : request.purpose === "issue_plan"
+            ? "You are the Issue Planner. Convert only the supplied approved specification into self-contained Issue development contracts. Include traceability, dependencies, expected resources, verification, and completion evidence. Do not include concrete model names."
             : "You are the Goal Planner. Analyze only the supplied Goal context.",
           "Return a JSON draft matching the output schema.",
           "Do not approve business decisions and do not inspect any repository.",

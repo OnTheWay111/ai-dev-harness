@@ -1,4 +1,5 @@
 import type { GoalContract } from "../domain/goal-contract.ts";
+import type { SpecBundle } from "../domain/spec-artifact.ts";
 
 export interface GoalPlannerContextPacket {
   contractVersion: "goal-context.v1";
@@ -33,7 +34,8 @@ export type PlannerOutputSchema = Readonly<Record<string, unknown>>;
 export interface PlannerRequest {
   goal: GoalContract;
   outputSchema: PlannerOutputSchema;
-  purpose?: "clarification" | "specification";
+  purpose?: "clarification" | "specification" | "issue_plan";
+  approvedSpecification?: SpecBundle;
 }
 
 export interface PlannerDraft<T = unknown> {

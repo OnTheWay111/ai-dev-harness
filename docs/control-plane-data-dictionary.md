@@ -7,7 +7,8 @@ These tables record business facts; `workbench_snapshots` and
 The current scope contains Organization, Project, Repository, Goal,
 AcceptanceCriterion, ClarificationRound, Clarification, Decision,
 ClassificationPolicyRevision, Classification, SpecRevision, Issue,
-IssueDependency, Run, Evidence, AuditEvent, OutboxEvent, and
+IssuePlanRevision, ModelRecommendation, ExecutionWave, IssueDependency,
+QueueProjection, Run, Evidence, AuditEvent, OutboxEvent, and
 IdempotencyRecord.
 
 ## Shared rules
@@ -249,6 +250,43 @@ endpoint can cross a Goal boundary. Self-edges and duplicates are rejected.
 The domain edge projection is the input seam for the deterministic DAG
 validator delivered later; the database intentionally does not attempt a
 recursive cycle check.
+
+## `issue_plan_revisions`
+
+An immutable content revision that binds the complete Issue contracts, source
+SpecRevision, deterministic compiler result, conflict analysis, Execution
+Waves, and model recommendations. `plan_data` contains the versioned
+`issue-plan.v1` aggregate; its SHA-256 `digest` excludes revision identity and
+timestamps so retries of one approved contract remain stable. Status and
+optimistic `version` are updated only through the Issue-plan approval service.
+
+The source SpecRevision composite foreign key includes Organization, Project,
+and Goal. Revision chains use `previous_plan_id`; `(Goal, revision)` is unique.
+Approval always targets the latest row and records the exact digest, actor,
+reason, request ID, expected version, and policy revision.
+
+## `model_recommendations`
+
+One deterministic recommendation per Issue key and Issue-plan revision. It
+stores only `cost_optimized | general_coding | advanced_coding | frontier` and
+`low | medium | high | highest`, plus evaluated factors, reasons, policy
+revision, and an optional human override receipt. Concrete model names,
+accounts, and credentials are deliberately absent.
+
+## `execution_waves`
+
+Stable, numbered groups of dependency-ready and resource-compatible Issue
+keys. The row stores the scheduler's human-readable reasons. Dependencies and
+conflicts are facts of the parent plan; Waves are a deterministic compilation
+of those facts and cannot be edited independently.
+
+## `queue_projections`
+
+An immutable receipt for one formally supported atomic external queue import.
+It binds the Issue-plan ID and digest to an external import ID and every
+external task ID. Organization-scoped idempotency keys and a plan/digest unique
+constraint prevent duplicate projections. Failed external requests do not
+create completed receipts; retries use the same external idempotency key.
 
 ## `runs`
 

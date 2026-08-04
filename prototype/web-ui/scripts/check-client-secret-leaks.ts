@@ -37,6 +37,10 @@ const leakRules: LeakRule[] = [
     pattern: /\b(?:OIDC_CLIENT_SECRET|OIDC_COOKIE_SECRET)\b/,
   },
   {
+    label: "AutoDev server Secret name",
+    pattern: /\bAUTODEV_QUEUE_IMPORT_TOKEN\b/,
+  },
+  {
     label: "OIDC token material",
     pattern: /\b(?:access_token|refresh_token|id_token)\b/,
   },

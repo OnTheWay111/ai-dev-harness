@@ -7,7 +7,7 @@ import { WorkbenchApiError, workbenchApi } from "../workbench-api";
 import type { GoalWorkspaceScope } from "../goal-workspace-api";
 import { Sidebar, Topbar } from "./app-shell";
 import { ClarifyView } from "./clarify-view";
-import { IssuesView } from "./issues-view";
+import { IssuesView, type IssuePlanContext } from "./issues-view";
 import { OverviewView } from "./overview-view";
 import { RunCenterView } from "./run-center-view";
 import { SchedulerView } from "./scheduler-view";
@@ -23,6 +23,7 @@ export function WorkbenchApp({
   const [view, setView] = useState<View>("overview");
   const [toast, setToast] = useState("");
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [issuePlanContext, setIssuePlanContext] = useState<IssuePlanContext | null>(null);
 
   const notify = useCallback((message: string) => {
     setToast(message);
@@ -65,14 +66,22 @@ export function WorkbenchApp({
         {view === "clarify" && (
           <ClarifyView
             scope={goalWorkspaceScope}
-            onContinue={() => {
-              notify("Goal revision 3 已锁定，正在进入方案审批");
+            onContinue={(context) => {
+              setIssuePlanContext(context);
+              notify("已批准规格已锁定，正在生成 Issue 开发合同");
               setView("issues");
             }}
             notify={notify}
           />
         )}
-        {view === "issues" && <IssuesView onApprove={() => setView("run")} notify={notify} />}
+        {view === "issues" && (
+          <IssuesView
+            scope={goalWorkspaceScope}
+            context={issuePlanContext}
+            onApprove={() => setView("run")}
+            notify={notify}
+          />
+        )}
         {view === "run" && <RunCenterView onVerify={() => setView("verify")} notify={notify} />}
         {view === "verify" && <VerifyView notify={notify} />}
       </div>

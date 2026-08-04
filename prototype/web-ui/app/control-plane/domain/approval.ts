@@ -1,4 +1,4 @@
-export const approvalTargetTypes = ["spec_revision"] as const;
+export const approvalTargetTypes = ["spec_revision", "issue_plan"] as const;
 export type ApprovalTargetType = (typeof approvalTargetTypes)[number];
 
 export interface ApprovalScope {
