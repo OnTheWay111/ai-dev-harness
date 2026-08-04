@@ -154,6 +154,11 @@ async function main(): Promise<number> {
     const notModified = await fetchWorker(worker, "/api/v1/workbench", {
       "if-none-match": etag ?? "",
     });
+    const readinessResponse = await fetchWorker(worker, "/health/ready");
+    const readiness = await readinessResponse.json() as {
+      source?: string;
+      checks?: { configuration?: string; database?: string };
+    };
 
     evidence = {
       source: allResponse.headers.get("x-workbench-source") ?? "",
@@ -169,6 +174,10 @@ async function main(): Promise<number> {
       runningTotal: Number(running.page?.total),
       etagReturned: Boolean(etag),
       notModifiedStatus: notModified.status,
+      readinessStatus: readinessResponse.status,
+      readinessSource: readiness.source ?? "",
+      readinessConfiguration: readiness.checks?.configuration ?? "",
+      readinessDatabase: readiness.checks?.database ?? "",
     };
   } catch (error) {
     const reason =

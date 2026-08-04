@@ -70,6 +70,20 @@ export function readWorkbenchRepositoryConfig(
   if (environmentVariables.HARNESS_DEPLOYMENT_ENV !== undefined) {
     return resolveWorkbenchDeploymentConfig(environmentVariables);
   }
+  if (
+    environmentVariables.NODE_ENV === "production" &&
+    environmentVariables.WORKBENCH_DATA_SOURCE?.trim() !== "postgres"
+  ) {
+    throw new Error(
+      "Production runtime requires WORKBENCH_DATA_SOURCE=postgres",
+    );
+  }
+  if (
+    environmentVariables.NODE_ENV === "production" &&
+    !environmentVariables.DATABASE_URL?.trim()
+  ) {
+    throw new Error("Production runtime requires DATABASE_URL");
+  }
   return {
     mode: readDataSourceMode(
       environmentVariables.WORKBENCH_DATA_SOURCE,

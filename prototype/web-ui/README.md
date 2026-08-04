@@ -173,6 +173,8 @@ The reproducible real-database SSR/API evidence is recorded in
 [`docs/p1-03-development-postgres-verification.md`](docs/p1-03-development-postgres-verification.md).
 Temporary local/CI PostgreSQL lifecycle and transaction coverage are documented
 in [`docs/postgres-integration-tests.md`](docs/postgres-integration-tests.md).
+Production/pre-production fail-closed rules and the `/health/ready` contract are
+documented in [`docs/readiness.md`](docs/readiness.md).
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls

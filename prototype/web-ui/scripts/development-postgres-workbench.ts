@@ -9,6 +9,10 @@ export interface DevelopmentPostgresEvidence {
   runningTotal: number;
   etagReturned: boolean;
   notModifiedStatus: number;
+  readinessStatus: number;
+  readinessSource: string;
+  readinessConfiguration: string;
+  readinessDatabase: string;
   cleanupSnapshotCount: number;
   cleanupTaskCount: number;
 }
@@ -53,6 +57,14 @@ export function validateDevelopmentPostgresEvidence(
   }
   if (!evidence.etagReturned || evidence.notModifiedStatus !== 304) {
     throw new Error("P1-03 ETag revalidation mismatch");
+  }
+  if (
+    evidence.readinessStatus !== 200 ||
+    evidence.readinessSource !== "postgres" ||
+    evidence.readinessConfiguration !== "pass" ||
+    evidence.readinessDatabase !== "pass"
+  ) {
+    throw new Error("P1-05 development PostgreSQL readiness mismatch");
   }
   if (
     evidence.cleanupSnapshotCount !== 0 ||

@@ -3,9 +3,14 @@ import type {
   TaskFilter,
   WorkbenchQuery,
   WorkbenchResponse,
-} from "../../../workbench/contracts";
-import { WorkbenchRepositoryError } from "../../../workbench/server/workbench-repository";
-import { getWorkbenchRepository } from "../../../workbench/server/workbench-repository-factory";
+} from "../../../workbench/contracts.ts";
+import {
+  type WorkbenchReadRepository,
+  WorkbenchRepositoryError,
+} from "../../../workbench/server/workbench-repository.ts";
+import {
+  getWorkbenchRepository,
+} from "../../../workbench/server/workbench-repository-factory.ts";
 
 const taskFilters = new Set<TaskFilter>([
   "all",
@@ -99,14 +104,17 @@ function responseHeaders(etag: string, source: string): HeadersInit {
   };
 }
 
-export async function GET(request: Request): Promise<Response> {
+export async function handleWorkbenchRequest(
+  request: Request,
+  repositoryProvider: () => WorkbenchReadRepository = getWorkbenchRepository,
+): Promise<Response> {
   const id = requestId();
   const url = new URL(request.url);
   const query = parseQuery(url, id);
   if (query instanceof Response) return query;
 
   try {
-    const workbenchRepository = getWorkbenchRepository();
+    const workbenchRepository = repositoryProvider();
     const result = await workbenchRepository.getWorkbench(query);
     const etag = `"workbench-${result.data.revision}-${queryHash(url.searchParams.toString())}"`;
     const headers = responseHeaders(etag, workbenchRepository.kind);
@@ -121,7 +129,11 @@ export async function GET(request: Request): Promise<Response> {
     if (error instanceof WorkbenchRepositoryError) {
       return validationError(id, error.message, error.field);
     }
-    console.error("Failed to load workbench", { requestId: id, error });
+    console.error("Failed to load workbench", { requestId: id });
     return internalError(id);
   }
+}
+
+export async function GET(request: Request): Promise<Response> {
+  return await handleWorkbenchRequest(request);
 }

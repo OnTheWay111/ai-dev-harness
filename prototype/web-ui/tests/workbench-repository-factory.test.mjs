@@ -43,3 +43,39 @@ test("keeps local auto/demo behavior when no deployment environment is set", () 
     { mode: "auto", databaseUrl: undefined, scopeId: "local" },
   );
 });
+
+test("requires an explicit PostgreSQL source in a production runtime", () => {
+  for (const mode of [undefined, "auto", "demo"]) {
+    assert.throws(
+      () =>
+        readWorkbenchRepositoryConfig({
+          NODE_ENV: "production",
+          WORKBENCH_DATA_SOURCE: mode,
+          DATABASE_URL: "postgresql://example.test/workbench",
+        }),
+      /production.*WORKBENCH_DATA_SOURCE=postgres/i,
+    );
+  }
+
+  assert.deepEqual(
+    readWorkbenchRepositoryConfig({
+      NODE_ENV: "production",
+      WORKBENCH_DATA_SOURCE: "postgres",
+      WORKBENCH_SCOPE_ID: "production",
+      DATABASE_URL: "postgresql://example.test/workbench",
+    }),
+    {
+      mode: "postgres",
+      databaseUrl: "postgresql://example.test/workbench",
+      scopeId: "production",
+    },
+  );
+  assert.throws(
+    () =>
+      readWorkbenchRepositoryConfig({
+        NODE_ENV: "production",
+        WORKBENCH_DATA_SOURCE: "postgres",
+      }),
+    /production.*DATABASE_URL/i,
+  );
+});

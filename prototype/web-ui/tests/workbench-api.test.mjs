@@ -93,3 +93,20 @@ test("returns 304 for a matching ETag and a structured validation error", async 
   assert.equal(error.error.impact, "工作台数据未加载");
   assert.match(error.requestId, /^req_/);
 });
+
+test("readiness fails closed and stays sanitized without PostgreSQL", async () => {
+  const response = await requestWorkbench("/health/ready");
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const body = await response.json();
+  assert.deepEqual(body.checks, {
+    configuration: "fail",
+    database: "skipped",
+  });
+  assert.equal(body.error.code, "service_unavailable");
+  assert.match(body.requestId, /^req_/);
+  assert.doesNotMatch(
+    JSON.stringify(body),
+    /DATABASE_URL|AI_DEV_HARNESS_|postgres(?:ql)?:\/\//i,
+  );
+});

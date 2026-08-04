@@ -25,6 +25,10 @@ function validEvidence() {
     runningTotal: 1,
     etagReturned: true,
     notModifiedStatus: 304,
+    readinessStatus: 200,
+    readinessSource: "postgres",
+    readinessConfiguration: "pass",
+    readinessDatabase: "pass",
     cleanupSnapshotCount: 0,
     cleanupTaskCount: 0,
   };
@@ -42,6 +46,7 @@ test("rejects source, revision, pagination, cache, or cleanup drift", () => {
     { ssrRevision: 102 },
     { attentionPageSizes: [2, 1] },
     { notModifiedStatus: 200 },
+    { readinessDatabase: "fail" },
     { cleanupTaskCount: 1 },
   ]) {
     assert.throws(
@@ -50,7 +55,7 @@ test("rejects source, revision, pagination, cache, or cleanup drift", () => {
           ...validEvidence(),
           ...change,
         }),
-      /P1-03/,
+      /P1-0[35]/,
     );
   }
 });
