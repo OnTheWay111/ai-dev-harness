@@ -88,6 +88,15 @@ test("keeps every environment template credential-free and correctly mapped", ()
       WORKBENCH_DATA_SOURCE: "postgres",
       WORKBENCH_SCOPE_ID: environment,
       DATABASE_URL: "",
+      OIDC_ISSUER: "https://idp.example.invalid",
+      OIDC_CLIENT_ID: "",
+      OIDC_CLIENT_SECRET: "",
+      OIDC_REDIRECT_URI:
+        `https://${environment}.example.invalid/auth/callback`,
+      OIDC_COOKIE_SECRET: "",
+      OIDC_ALLOWED_RETURN_TO_PATHS: "/,/goals",
+      OIDC_SESSION_TTL_SECONDS: "28800",
+      OIDC_TRANSACTION_TTL_SECONDS: "600",
     });
 
     const migration = readEnvironmentTemplate(environment, "migration");

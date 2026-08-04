@@ -32,6 +32,14 @@ const leakRules: LeakRule[] = [
     pattern:
       /@neondatabase\/serverless|drizzle-orm\/(?:neon-http|node-postgres|pg-core)|\b(?:pg-protocol|pg-pool|createNeonWorkbenchDatabase|NeonWorkbenchReadStore)\b/,
   },
+  {
+    label: "OIDC server Secret name",
+    pattern: /\b(?:OIDC_CLIENT_SECRET|OIDC_COOKIE_SECRET)\b/,
+  },
+  {
+    label: "OIDC token material",
+    pattern: /\b(?:access_token|refresh_token|id_token)\b/,
+  },
 ];
 
 async function artifactFiles(directory: string): Promise<string[]> {

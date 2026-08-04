@@ -94,6 +94,14 @@ or enforce explicit server-side membership or allowlist checks.
 Use SIWC for account pages, user-specific dashboards, saved records, and write
 actions tied to the current ChatGPT user. Leave public content anonymous.
 
+## Production OIDC/SSO
+
+The control-plane session uses provider-neutral OIDC Authorization Code + PKCE,
+independently of the optional hosting integration above. Configuration,
+server-only Secret handling, routes, Cookie policy, rotation, and fake IdP
+verification are documented in
+[`../../docs/oidc-sso.md`](../../docs/oidc-sso.md).
+
 ## Useful Commands
 
 - `npm run dev`: start local development
