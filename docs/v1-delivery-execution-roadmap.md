@@ -468,7 +468,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P3-03** 所有查询和统计按 Organization/Project/Goal 可见范围过滤。
+- [x] **P3-03** 所有查询和统计按 Organization/Project/Goal 可见范围过滤。（已完成：2026-08-04；实现提交：ai-dev-harness@a36800cc99abed2fac261f12680f6d2f4b595ed4）
 
 <details>
 <summary>快捷复制开发提示词 P3-03 · gpt-5.6-sol(深度) · high(高)</summary>
