@@ -1125,7 +1125,7 @@ P8-05 为 `[x]（已完成）`并提交、push 路线图。
 
 目标：每个 Issue 都有不可变、可追溯的完成证据。
 
-- [ ] **P9-01** 接入对象存储，数据库只保存 digest、类型、大小、位置和保留策略。
+- [x] **P9-01** 接入对象存储，数据库只保存 digest、类型、大小、位置和保留策略。（已完成：2026-08-05；实现提交：ai-dev-harness@0f23bccbae80d588ba74a487cc76c2d9b44d2a74）
 
 <details>
 <summary>快捷复制开发提示词 P9-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
@@ -1145,7 +1145,7 @@ digest 校验、不可变 key、媒体类型、大小、创建者、租户 scope
 
 </details>
 
-- [ ] **P9-02** 上传并脱敏 Prompt、运行日志、测试输出、构建结果和失败证据。
+- [x] **P9-02** 上传并脱敏 Prompt、运行日志、测试输出、构建结果和失败证据。（已完成：2026-08-05；实现提交：ai-dev-harness@0f23bccbae80d588ba74a487cc76c2d9b44d2a74）
 
 <details>
 <summary>快捷复制开发提示词 P9-02 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -1165,7 +1165,7 @@ commit/push `main`，再标记 P9-02 为 `[x]（已完成）`并提交、push �
 
 </details>
 
-- [ ] **P9-03** 保存独立 Review 结论、Reviewer 身份、模型配置和所依据的 Commit。
+- [x] **P9-03** 保存独立 Review 结论、Reviewer 身份、模型配置和所依据的 Commit。（已完成：2026-08-05；实现提交：ai-dev-harness@0f23bccbae80d588ba74a487cc76c2d9b44d2a74）
 
 <details>
 <summary>快捷复制开发提示词 P9-03 · gpt-5.6-terra(均衡) · medium(中等)</summary>
@@ -1185,7 +1185,7 @@ reasoning effort、输入 artifact digest、目标 Commit、时间和运行 ID�
 
 </details>
 
-- [ ] **P9-04** 实现 `push_disabled | push_branch | push_and_open_pr` 项目策略和最小权限凭证。
+- [x] **P9-04** 实现 `push_disabled | push_branch | push_and_open_pr` 项目策略和最小权限凭证。（已完成：2026-08-05；实现提交：ai-dev-harness@0f23bccbae80d588ba74a487cc76c2d9b44d2a74）
 
 <details>
 <summary>快捷复制开发提示词 P9-04 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -1205,7 +1205,7 @@ P9-04 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P9-05** 串联 Commit、Push receipt、PR、Landing 与 AuditEvent，禁止直接合并保护分支。
+- [x] **P9-05** 串联 Commit、Push receipt、PR、Landing 与 AuditEvent，禁止直接合并保护分支。（已完成：2026-08-05；实现提交：ai-dev-harness@0f23bccbae80d588ba74a487cc76c2d9b44d2a74）
 
 <details>
 <summary>快捷复制开发提示词 P9-05 · gpt-5.6-sol(深度) · high(高)</summary>
