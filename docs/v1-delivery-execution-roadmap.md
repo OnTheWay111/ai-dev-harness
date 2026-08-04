@@ -554,7 +554,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P4-02** 实现 Codex Planner 只读适配器，每次使用全新会话和最小上下文包。
+- [x] **P4-02** 实现 Codex Planner 只读适配器，每次使用全新会话和最小上下文包。（已完成：2026-08-04；实现提交：ai-dev-harness@48c3610feddef880b44cd5e61845cbb907fbd424）
 
 <details>
 <summary>快捷复制开发提示词 P4-02 · gpt-5.6-sol(深度) · high(高)</summary>
