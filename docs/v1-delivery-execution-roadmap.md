@@ -322,7 +322,7 @@ push 路线图。
 
 </details>
 
-- [ ] **P2-02** 定义 Clarification、Decision、SpecRevision、Issue、IssueDependency 状态模型。
+- [x] **P2-02** 定义 Clarification、Decision、SpecRevision、Issue、IssueDependency 状态模型。（已完成：2026-08-04；实现提交：ai-dev-harness@a76c0e64054d6b878637126d3337df97ef301a5c）
 
 <details>
 <summary>快捷复制开发提示词 P2-02 · gpt-5.6-terra(均衡) · medium(中等)</summary>
