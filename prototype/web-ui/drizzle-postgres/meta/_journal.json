@@ -36,6 +36,13 @@
       "when": 1785829152925,
       "tag": "0004_lethal_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785832369382,
+      "tag": "0005_previous_puppet_master",
+      "breakpoints": true
     }
   ]
 }

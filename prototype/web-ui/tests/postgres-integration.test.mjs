@@ -31,6 +31,13 @@ import {
 import {
   IdempotencyConflictError,
 } from "../app/control-plane/domain/errors.ts";
+import {
+  PostgresRoleBindingRepository,
+} from "../app/auth/postgres-role-binding-repository.ts";
+import { PolicyEvaluator } from "../app/auth/rbac-policy.ts";
+import {
+  RoleBindingApplicationService,
+} from "../app/auth/role-binding-service.ts";
 import { assertGoalRepositoryContract } from "./goal-repository-contract.mjs";
 
 const databaseUrl = process.env.POSTGRES_INTEGRATION_DATABASE_URL;
@@ -125,7 +132,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 5);
+  assert.equal(migrations.length, 6);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -155,6 +162,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
       "outbox_events",
       "projects",
       "repositories",
+      "role_bindings",
       "runs",
       "spec_revisions",
       "workbench_snapshots",
@@ -1059,6 +1067,96 @@ integrationTest(
       audits: 1,
       outbox: 0,
       idempotency: 0,
+    });
+  },
+);
+
+integrationTest(
+  "evaluates scoped PostgreSQL roles and audits assignment and revocation",
+  async () => {
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const ownerBindingId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO organizations (id, slug, name)
+       VALUES ($1, $2, 'RBAC integration organization')`,
+      [organizationId, `rbac-org-${process.pid}`],
+    );
+    await pool.query(
+      `INSERT INTO projects (id, organization_id, slug, name)
+       VALUES ($1, $2, $3, 'RBAC integration project')`,
+      [projectId, organizationId, `rbac-project-${process.pid}`],
+    );
+    await pool.query(
+      `INSERT INTO role_bindings
+         (id, organization_id, actor_id, role, assigned_by_actor_id,
+          reason, request_id)
+       VALUES ($1, $2, 'owner', 'organization_owner', 'bootstrap',
+               'Bootstrap the first Owner', 'bootstrap-request')`,
+      [ownerBindingId, organizationId],
+    );
+    const repository = new PostgresRoleBindingRepository(pool);
+    const policy = new PolicyEvaluator(repository);
+    const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    const service = new RoleBindingApplicationService({
+      repository,
+      policy,
+      clock: () => new Date(),
+      idGenerator: () => {
+        const id = ids.shift();
+        assert.ok(id);
+        return id;
+      },
+    });
+    const assigned = await service.assign({
+      actorId: "owner",
+      organizationId,
+      projectId,
+      targetActorId: "viewer",
+      role: "viewer",
+      reason: "Read this project",
+      requestId: "rbac-assign",
+    });
+    assert.equal((await policy.decide({
+      actorId: "viewer",
+      organizationId,
+      projectId,
+      permission: "goal.read",
+    })).allowed, true);
+    assert.equal((await policy.decide({
+      actorId: "viewer",
+      organizationId,
+      projectId,
+      permission: "goal.write",
+    })).allowed, false);
+    await service.revoke({
+      actorId: "owner",
+      organizationId,
+      bindingId: assigned.id,
+      reason: "Project access ended",
+      requestId: "rbac-revoke",
+    });
+    assert.equal((await policy.decide({
+      actorId: "viewer",
+      organizationId,
+      projectId,
+      permission: "goal.read",
+    })).allowed, false);
+    const persisted = await pool.query(
+      `SELECT rb.version, rb.revoked_at IS NOT NULL AS revoked,
+              count(ae.id)::int AS audit_count,
+              array_agg(ae.action ORDER BY ae.entity_version) AS actions
+         FROM role_bindings rb
+         JOIN audit_events ae ON ae.entity_id = rb.id
+        WHERE rb.id = $1
+        GROUP BY rb.version, rb.revoked_at`,
+      [assigned.id],
+    );
+    assert.deepEqual(persisted.rows[0], {
+      version: 2,
+      revoked: true,
+      audit_count: 2,
+      actions: ["role_binding.assigned", "role_binding.revoked"],
     });
   },
 );

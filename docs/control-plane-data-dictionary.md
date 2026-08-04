@@ -248,6 +248,27 @@ An immutable account of a control-plane mutation.
 
 Update and delete triggers prevent an application from rewriting audit history.
 
+`actor_id` is the opaque, stable P3 OIDC actor identifier. It does not contain
+an access, refresh, or ID Token.
+
+## `role_bindings`
+
+A versioned grant connecting one authenticated actor to one Organization or
+Project role.
+
+| Column | Meaning |
+|---|---|
+| `id`, `organization_id`, `project_id` | Grant identity and Organization/optional Project scope |
+| `actor_id`, `role` | Opaque OIDC actor and one of Owner, Project Admin, Approver, Operator, Viewer |
+| `assigned_by_actor_id`, `reason`, `request_id` | Traceable assignment authority and rationale |
+| `version`, `revoked_at` | Optimistic revocation version and inactive timestamp |
+| `created_at`, `updated_at` | Ordered lifecycle timestamps |
+
+Partial unique indexes reject duplicate active Organization and Project grants.
+Composite foreign keys prevent a Project binding from crossing its Organization.
+Role scope checks require Owner at Organization scope and Project Admin at
+Project scope. Role changes also append immutable AuditEvents.
+
 ## `outbox_events`
 
 A durable event awaiting dispatch after its aggregate transaction commits.

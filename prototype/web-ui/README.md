@@ -102,6 +102,10 @@ server-only Secret handling, routes, Cookie policy, rotation, and fake IdP
 verification are documented in
 [`../../docs/oidc-sso.md`](../../docs/oidc-sso.md).
 
+The server-side role matrix, scope inheritance, delegation boundary, default
+deny behavior, and role-change Audit transaction are documented in
+[`../../docs/server-rbac.md`](../../docs/server-rbac.md).
+
 ## Useful Commands
 
 - `npm run dev`: start local development

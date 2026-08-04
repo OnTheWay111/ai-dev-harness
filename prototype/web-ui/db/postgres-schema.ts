@@ -34,6 +34,7 @@ import type {
   RunStatus,
   SpecRevisionStatus,
 } from "../app/control-plane/domain/state-machines.ts";
+import type { Role } from "../app/auth/role-binding-repository.ts";
 
 export {
   goalStatuses,
@@ -178,6 +179,76 @@ export const projects = pgTable(
     check(
       "projects_timestamps_order_chk",
       sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const roleBindings = pgTable(
+  "role_bindings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id"),
+    actorId: text("actor_id").notNull(),
+    role: text("role").$type<Role>().notNull(),
+    assignedByActorId: text("assigned_by_actor_id").notNull(),
+    reason: text("reason").notNull(),
+    requestId: text("request_id").notNull(),
+    version: integer("version").default(1).notNull(),
+    revokedAt: timestamp("revoked_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "role_bindings_organization_fk",
+      columns: [table.organizationId],
+      foreignColumns: [organizations.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "role_bindings_project_organization_fk",
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("role_bindings_active_organization_uidx")
+      .on(table.organizationId, table.actorId, table.role)
+      .where(sql`${table.projectId} IS NULL AND ${table.revokedAt} IS NULL`),
+    uniqueIndex("role_bindings_active_project_uidx")
+      .on(table.organizationId, table.projectId, table.actorId, table.role)
+      .where(sql`${table.projectId} IS NOT NULL AND ${table.revokedAt} IS NULL`),
+    index("role_bindings_actor_scope_idx").on(
+      table.actorId,
+      table.organizationId,
+      table.projectId,
+    ),
+    check(
+      "role_bindings_scope_chk",
+      sql`(${table.role} = 'organization_owner' AND ${table.projectId} IS NULL) OR (${table.role} = 'project_admin' AND ${table.projectId} IS NOT NULL) OR ${table.role} IN ('approver', 'operator', 'viewer')`,
+    ),
+    check(
+      "role_bindings_identity_chk",
+      sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.assignedByActorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200 AND ${table.version} > 0`,
+    ),
+    check(
+      "role_bindings_lifecycle_chk",
+      sql`${table.updatedAt} >= ${table.createdAt} AND (${table.revokedAt} IS NULL OR ${table.revokedAt} >= ${table.createdAt})`,
     ),
   ],
 );
@@ -1174,6 +1245,8 @@ export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
+export type RoleBindingRecord = typeof roleBindings.$inferSelect;
+export type NewRoleBindingRecord = typeof roleBindings.$inferInsert;
 export type Repository = typeof repositories.$inferSelect;
 export type NewRepository = typeof repositories.$inferInsert;
 export type Goal = typeof goals.$inferSelect;
