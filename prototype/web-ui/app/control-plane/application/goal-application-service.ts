@@ -129,6 +129,12 @@ export class GoalApplicationService {
       projectId: command.projectId,
     });
     if (!goal) throw new GoalNotFoundError();
+    if (goal.version !== command.expectedVersion) {
+      const concurrentReplay = await this.repository.findIdempotentReceipt(
+        idempotencyLookup,
+      );
+      if (concurrentReplay) return concurrentReplay;
+    }
 
     const transition = transitionState({
       machine: goalStateMachine,

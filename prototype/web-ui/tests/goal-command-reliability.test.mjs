@@ -111,3 +111,33 @@ test("a blank Idempotency-Key fails closed before persistence", async () => {
   assert.deepEqual(repository.committedAuditEvents, []);
   assert.deepEqual(repository.idempotencyRecords, []);
 });
+
+test("rechecks the key when a concurrent duplicate commits before Goal load", async () => {
+  const receipt = {
+    goalId: goal.id,
+    previousState: "draft",
+    state: "clarifying",
+    previousVersion: 1,
+    version: 2,
+    eventId: "00000000-0000-4000-8000-000000000209",
+    occurredAt: "2026-08-04T11:00:00.000Z",
+  };
+  let idempotencyReads = 0;
+  const service = new GoalApplicationService({
+    repository: {
+      async findIdempotentReceipt() {
+        idempotencyReads += 1;
+        return idempotencyReads === 1 ? null : receipt;
+      },
+      async get() {
+        return { ...goal, status: "clarifying", version: 2 };
+      },
+      async commitTransition() {
+        throw new Error("a concurrent retry must not commit again");
+      },
+    },
+    authorizer: { async authorize() {} },
+  });
+  assert.deepEqual(await service.transition(command()), receipt);
+  assert.equal(idempotencyReads, 2);
+});
