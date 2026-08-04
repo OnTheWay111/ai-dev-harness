@@ -746,7 +746,7 @@ SpecRevision API。实现 Proposal/PRD 修订列表、结构化差异、审批�
 
 目标：把 Approved PRD 转成可执行、可验证、无上下文依赖的 Issue 合同。
 
-- [ ] **P6-01** 从需求和验收标准生成 Issue 草稿、自包含 Prompt 和完成证据要求。
+- [x] **P6-01** 从需求和验收标准生成 Issue 草稿、自包含 Prompt 和完成证据要求。（已完成：2026-08-04；实现提交：ai-dev-harness@a7e79f12333e126abaac1135aec864131e999f60）
 
 <details>
 <summary>快捷复制开发提示词 P6-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
@@ -766,7 +766,7 @@ requirementRefs、acceptance、nonGoals、依赖候选、expectedFiles、develop
 
 </details>
 
-- [ ] **P6-02** 校验需求覆盖、验收覆盖、孤立 Issue、依赖缺失和 DAG 环路。
+- [x] **P6-02** 校验需求覆盖、验收覆盖、孤立 Issue、依赖缺失和 DAG 环路。（已完成：2026-08-04；实现提交：ai-dev-harness@a7e79f12333e126abaac1135aec864131e999f60）
 
 <details>
 <summary>快捷复制开发提示词 P6-02 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -786,7 +786,7 @@ requirements/acceptance IDs。实现纯确定性 Issue Compiler：双向追溯�
 
 </details>
 
-- [ ] **P6-03** 基于预计文件、公共接口和迁移资源执行冲突分析与 Execution Wave 编排。
+- [x] **P6-03** 基于预计文件、公共接口和迁移资源执行冲突分析与 Execution Wave 编排。（已完成：2026-08-04；实现提交：ai-dev-harness@a7e79f12333e126abaac1135aec864131e999f60）
 
 <details>
 <summary>快捷复制开发提示词 P6-03 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -806,7 +806,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P6-04** 生成模型能力和 reasoning effort 建议，保存路由原因与禁止静默降级规则。
+- [x] **P6-04** 生成模型能力和 reasoning effort 建议，保存路由原因与禁止静默降级规则。（已完成：2026-08-04；实现提交：ai-dev-harness@a7e79f12333e126abaac1135aec864131e999f60）
 
 <details>
 <summary>快捷复制开发提示词 P6-04 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -826,7 +826,7 @@ reasoning effort，不把具体模型/账号写入 Issue；保存输入因子、
 
 </details>
 
-- [ ] **P6-05** 实现 Issue/DAG/模型建议的人工修改、审批和版本冲突处理。
+- [x] **P6-05** 实现 Issue/DAG/模型建议的人工修改、审批和版本冲突处理。（已完成：2026-08-04；实现提交：ai-dev-harness@a7e79f12333e126abaac1135aec864131e999f60）
 
 <details>
 <summary>快捷复制开发提示词 P6-05 · gpt-5.6-terra(均衡) · medium(中等)</summary>
@@ -847,6 +847,8 @@ stale approval 和可访问性测试。通过后按第 2.1 自动 commit/push `m
 </details>
 
 - [ ] **P6-06** 通过正式 AutoDev Import/API 投影 Approved Issue，禁止直接编辑 Queue YAML。
+
+  阻塞（2026-08-04）：已实现失败关闭的 `QueueProjectionPort`、正式原子 HTTP Import 适配器、幂等 receipt 持久化和契约测试；但经验证 AutoDev 0.4.16 仅提供逐任务 `queue propose`，没有受支持的原子 Import/API 或任务级 Builder 能力，且仓库内无扩展授权。为避免半条队列和越权修改，未直接编辑 Queue YAML，P6-06 与 M2 Gate 保持未完成。兼容性证据见 [`autodev-0.4.16-queue-import-compatibility.md`](autodev-0.4.16-queue-import-compatibility.md)。
 
 <details>
 <summary>快捷复制开发提示词 P6-06 · gpt-5.6-sol(深度) · high(高)</summary>
