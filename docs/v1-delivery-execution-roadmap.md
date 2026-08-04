@@ -640,7 +640,7 @@ Production V1 风险边界。定义透明、版本化的确定性分类规则，
 
 目标：得到最小且可批准的执行合同。
 
-- [ ] **P5-01** 生成 Proposal、PRD、架构/迁移/回滚草稿，并保存不可变 Artifact。
+- [x] **P5-01** 生成 Proposal、PRD、架构/迁移/回滚草稿，并保存不可变 Artifact。（已完成：2026-08-04；实现提交：ai-dev-harness@3d14571a426fe05ba784bbfb3f1af389d5d8539d）
 
 <details>
 <summary>快捷复制开发提示词 P5-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
