@@ -342,7 +342,7 @@ P2-01 产物。定义 Clarification、Decision、SpecRevision、Issue、IssueDep
 
 </details>
 
-- [ ] **P2-03** 定义 Run、Evidence、AuditEvent、OutboxEvent 和 IdempotencyRecord 基础表。
+- [x] **P2-03** 定义 Run、Evidence、AuditEvent、OutboxEvent 和 IdempotencyRecord 基础表。（已完成：2026-08-04；实现提交：ai-dev-harness@633731d803f7c78cd75e161fb465b9dc52bb4ee9）
 
 <details>
 <summary>快捷复制开发提示词 P2-03 · gpt-5.6-terra(均衡) · medium(中等)</summary>
