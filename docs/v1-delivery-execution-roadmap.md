@@ -1019,7 +1019,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 目标：让现有首屏成为真实控制面，而不是定时生成的演示读模型。
 
-- [ ] **P8-01** 从 Goal/Issue/Run/Scheduler 事件持续生成 WorkbenchSnapshot 投影。
+- [x] **P8-01** 从 Goal/Issue/Run/Scheduler 事件持续生成 WorkbenchSnapshot 投影。（已完成：2026-08-05；实现提交：ai-dev-harness@0bb13a42c9b305f5ed568134d4a5c42718d32f70）
 
 <details>
 <summary>快捷复制开发提示词 P8-01 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -1039,7 +1039,7 @@ P8-01 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P8-02** 校验六项统计、attention、rank、容量和冲突均来自权威聚合口径。
+- [x] **P8-02** 校验六项统计、attention、rank、容量和冲突均来自权威聚合口径。（已完成：2026-08-05；实现提交：ai-dev-harness@0bb13a42c9b305f5ed568134d4a5c42718d32f70）
 
 <details>
 <summary>快捷复制开发提示词 P8-02 · gpt-5.6-terra(均衡) · medium(中等)</summary>
@@ -1059,7 +1059,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P8-03** 实现任务详情、`POST /tasks/{id}/actions` 和异步 Receipt API。
+- [x] **P8-03** 实现任务详情、`POST /tasks/{id}/actions` 和异步 Receipt API。（已完成：2026-08-05；实现提交：ai-dev-harness@0bb13a42c9b305f5ed568134d4a5c42718d32f70）
 
 <details>
 <summary>快捷复制开发提示词 P8-03 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -1079,7 +1079,7 @@ P8-03 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P8-04** 实现 SSE revision 失效事件、断线重连、跳版本回退和客户端缓存更新。
+- [x] **P8-04** 实现 SSE revision 失效事件、断线重连、跳版本回退和客户端缓存更新。（已完成：2026-08-05；实现提交：ai-dev-harness@0bb13a42c9b305f5ed568134d4a5c42718d32f70）
 
 <details>
 <summary>快捷复制开发提示词 P8-04 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -1099,7 +1099,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P8-05** 补齐加载、空、无权限、冲突、数据库故障和重复操作状态 UI。
+- [x] **P8-05** 补齐加载、空、无权限、冲突、数据库故障和重复操作状态 UI。（已完成：2026-08-05；实现提交：ai-dev-harness@0bb13a42c9b305f5ed568134d4a5c42718d32f70）
 
 <details>
 <summary>快捷复制开发提示词 P8-05 · gpt-5.6-terra(均衡) · medium(中等)</summary>
