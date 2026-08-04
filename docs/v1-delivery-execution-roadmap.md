@@ -574,7 +574,7 @@ P4-02 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P4-03** 使用 JSON Schema 接收已知事实、不确定项和高价值澄清问题。
+- [x] **P4-03** 使用 JSON Schema 接收已知事实、不确定项和高价值澄清问题。（已完成：2026-08-04；实现提交：ai-dev-harness@fe19ae83c05048d0bcfaba3937688c98fc8058e8）
 
 <details>
 <summary>快捷复制开发提示词 P4-03 · gpt-5.6-terra(均衡) · medium(中等)</summary>
