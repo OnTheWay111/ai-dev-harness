@@ -720,7 +720,7 @@ commit/push `main`，再标记 P5-04 为 `[x]（已完成）`并提交、push �
 
 </details>
 
-- [ ] **P5-05** 完成 Proposal/PRD 对比、修订、审批和过期版本冲突 UI/API。
+- [x] **P5-05** 完成 Proposal/PRD 对比、修订、审批和过期版本冲突 UI/API。（已完成：2026-08-04；实现提交：ai-dev-harness@d007e44390bbc7427fc2bf7f0b6412db3320c59a）
 
 <details>
 <summary>快捷复制开发提示词 P5-05 · gpt-5.6-terra(均衡) · medium(中等)</summary>
