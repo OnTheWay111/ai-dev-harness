@@ -179,7 +179,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P1-02** 在开发数据库执行 `drizzle-postgres` 迁移，并记录 migration receipt。
+- [x] **P1-02** 在开发数据库执行 `drizzle-postgres` 迁移，并记录 migration receipt。（已完成：2026-08-04；实现提交：ai-dev-harness@8948cf541695635e7465b936b756120f73a9e098）
 
 <details>
 <summary>快捷复制开发提示词 P1-02 · gpt-5.6-terra(均衡) · medium(中等)</summary>
