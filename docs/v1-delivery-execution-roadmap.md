@@ -301,7 +301,7 @@ commit/push `main`，再标记 P1-06 为 `[x]（已完成）`并提交、push �
 
 目标：建立控制面的权威状态，不再把工作台 JSON 当作业务事实源。
 
-- [ ] **P2-01** 定义 Organization、Project、Repository、Goal、AcceptanceCriterion 数据表和 Schema。
+- [x] **P2-01** 定义 Organization、Project、Repository、Goal、AcceptanceCriterion 数据表和 Schema。（已完成：2026-08-04；实现提交：ai-dev-harness@55cb79a734b21734dd1572ac3f57eb7248847111）
 
 <details>
 <summary>快捷复制开发提示词 P2-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
