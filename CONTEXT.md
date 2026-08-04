@@ -26,6 +26,26 @@ _Avoid_: Task, ticket
 An ordered, independently versioned statement used to judge whether a Goal is satisfied.
 _Avoid_: Checklist item, test case
 
+**Clarification**:
+An append-only revision in a Goal-scoped question thread that records an open question or its answered successor.
+_Avoid_: Mutable Q&A, chat message
+
+**Decision**:
+An append-only, reasoned disposition of a versioned planning subject within one Goal.
+_Avoid_: Approval flag, comment
+
+**Spec Revision**:
+A versioned, artifact-backed proposal for satisfying a Goal; only an explicitly approved revision can source executable work.
+_Avoid_: PRD row, latest spec
+
+**Issue**:
+A versioned unit of planned delivery derived from one Spec Revision and bounded by one Goal.
+_Avoid_: Task, queue item
+
+**Issue Dependency**:
+A directed prerequisite edge between two Issue revisions inside the same Goal.
+_Avoid_: Cross-Goal link, ordering hint
+
 **Workbench Projection**:
 A derived operational view of Goals and later execution entities; it is never a business fact source.
 _Avoid_: Task table, control-plane state

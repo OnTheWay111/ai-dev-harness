@@ -49,7 +49,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 2);
+  assert.equal(migrations.length, 3);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -67,10 +67,15 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
     tables.rows.map((row) => row.table_name),
     [
       "acceptance_criteria",
+      "clarifications",
+      "decisions",
       "goals",
+      "issue_dependencies",
+      "issues",
       "organizations",
       "projects",
       "repositories",
+      "spec_revisions",
       "workbench_snapshots",
       "workbench_tasks",
     ],
@@ -249,6 +254,178 @@ integrationTest(
         "DELETE FROM organizations WHERE id IN ($1, $2)",
         [organizationId, otherOrganizationId],
       );
+    }
+  },
+);
+
+integrationTest(
+  "enforces immutable planning history and Goal-scoped dependencies",
+  async () => {
+    const client = await pool.connect();
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const goalId = crypto.randomUUID();
+    const otherGoalId = crypto.randomUUID();
+    const specRevisionId = crypto.randomUUID();
+    const otherSpecRevisionId = crypto.randomUUID();
+    const firstIssueId = crypto.randomUUID();
+    const secondIssueId = crypto.randomUUID();
+    const otherIssueId = crypto.randomUUID();
+    const clarificationId = crypto.randomUUID();
+    const clarificationThreadId = crypto.randomUUID();
+    const decisionId = crypto.randomUUID();
+    const digest = "a".repeat(64);
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO organizations (id, slug, name)
+         VALUES ($1, $2, 'Planning Organization')`,
+        [organizationId, `planning-${process.pid}`],
+      );
+      await client.query(
+        `INSERT INTO projects (id, organization_id, slug, name)
+         VALUES ($1, $2, $3, 'Planning Project')`,
+        [projectId, organizationId, `planning-${process.pid}`],
+      );
+      await client.query(
+        `INSERT INTO goals
+           (id, organization_id, project_id, title,
+            problem_statement, desired_outcome)
+         VALUES ($1, $3, $4, 'Planning Goal', 'Plan safely', 'A valid plan'),
+                ($2, $3, $4, 'Other Goal', 'Stay isolated', 'No leakage')`,
+        [goalId, otherGoalId, organizationId, projectId],
+      );
+      await client.query(
+        `INSERT INTO spec_revisions
+           (id, organization_id, project_id, goal_id, revision,
+            source_goal_version, artifact_ref, artifact_digest)
+         VALUES ($1, $3, $4, $5, 1, 1, 'artifact://spec/one', $7),
+                ($2, $3, $4, $6, 1, 1, 'artifact://spec/two', $7)`,
+        [
+          specRevisionId,
+          otherSpecRevisionId,
+          organizationId,
+          projectId,
+          goalId,
+          otherGoalId,
+          digest,
+        ],
+      );
+      await client.query(
+        `INSERT INTO issues
+           (id, organization_id, project_id, goal_id, spec_revision_id,
+            issue_key, revision, title, body_ref, body_digest)
+         VALUES ($1, $4, $5, $6, $7, 'PLAN-1', 1,
+                 'First issue', 'artifact://issue/one', $9),
+                ($2, $4, $5, $6, $7, 'PLAN-2', 1,
+                 'Second issue', 'artifact://issue/two', $9),
+                ($3, $4, $5, $8, $10, 'OTHER-1', 1,
+                 'Other issue', 'artifact://issue/other', $9)`,
+        [
+          firstIssueId,
+          secondIssueId,
+          otherIssueId,
+          organizationId,
+          projectId,
+          goalId,
+          specRevisionId,
+          otherGoalId,
+          digest,
+          otherSpecRevisionId,
+        ],
+      );
+      await client.query(
+        `INSERT INTO issue_dependencies
+           (organization_id, project_id, goal_id, issue_id, depends_on_issue_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [organizationId, projectId, goalId, secondIssueId, firstIssueId],
+      );
+      await client.query("SAVEPOINT invalid_dependency");
+      await assert.rejects(
+        () =>
+          client.query(
+            `INSERT INTO issue_dependencies
+               (organization_id, project_id, goal_id, issue_id,
+                depends_on_issue_id)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [organizationId, projectId, goalId, firstIssueId, otherIssueId],
+          ),
+        /foreign key/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT invalid_dependency");
+      await client.query("SAVEPOINT self_dependency");
+      await assert.rejects(
+        () =>
+          client.query(
+            `INSERT INTO issue_dependencies
+               (organization_id, project_id, goal_id, issue_id,
+                depends_on_issue_id)
+             VALUES ($1, $2, $3, $4, $4)`,
+            [organizationId, projectId, goalId, firstIssueId],
+          ),
+        /check constraint/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT self_dependency");
+
+      await client.query(
+        `INSERT INTO clarifications
+           (id, organization_id, project_id, goal_id, thread_id, revision,
+            status, question, source_goal_version)
+         VALUES ($1, $2, $3, $4, $5, 1, 'open',
+                 'Which boundary applies?', 1)`,
+        [
+          clarificationId,
+          organizationId,
+          projectId,
+          goalId,
+          clarificationThreadId,
+        ],
+      );
+      await client.query("SAVEPOINT immutable_clarification");
+      await assert.rejects(
+        () =>
+          client.query(
+            "UPDATE clarifications SET question = 'overwritten' WHERE id = $1",
+            [clarificationId],
+          ),
+        /append-only/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT immutable_clarification");
+      await client.query(
+        `INSERT INTO clarifications
+           (organization_id, project_id, goal_id, thread_id, revision,
+            previous_clarification_id, status, question, answer,
+            source_goal_version)
+         VALUES ($1, $2, $3, $4, 2, $5, 'answered',
+                 'Which boundary applies?', 'The Organization boundary.', 1)`,
+        [organizationId, projectId, goalId, clarificationThreadId, clarificationId],
+      );
+
+      await client.query(
+        `INSERT INTO decisions
+           (id, organization_id, project_id, goal_id, decision_key, revision,
+            status, subject_type, subject_id, subject_version, outcome, reason)
+         VALUES ($1, $2, $3, $4, $5, 1, 'approved', 'issue_plan', $6, 1,
+                 'Use the Goal-scoped dependency graph',
+                 'Cross-Goal dependencies are not allowed')`,
+        [
+          decisionId,
+          organizationId,
+          projectId,
+          goalId,
+          crypto.randomUUID(),
+          specRevisionId,
+        ],
+      );
+      await client.query("SAVEPOINT immutable_decision");
+      await assert.rejects(
+        () => client.query("DELETE FROM decisions WHERE id = $1", [decisionId]),
+        /append-only/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT immutable_decision");
+    } finally {
+      await client.query("ROLLBACK").catch(() => undefined);
+      client.release();
     }
   },
 );

@@ -15,6 +15,13 @@
       "when": 1785827465206,
       "tag": "0001_thin_maginty",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785828293991,
+      "tag": "0002_aspiring_cammi",
+      "breakpoints": true
     }
   ]
 }

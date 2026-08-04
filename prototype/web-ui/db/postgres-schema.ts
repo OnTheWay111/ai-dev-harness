@@ -26,6 +26,48 @@ import type {
 export const repositoryProviders = ["github"] as const;
 export type RepositoryProvider = (typeof repositoryProviders)[number];
 
+export const clarificationStatuses = [
+  "open",
+  "answered",
+  "superseded",
+] as const;
+export type ClarificationStatus = (typeof clarificationStatuses)[number];
+
+export const decisionStatuses = [
+  "proposed",
+  "approved",
+  "rejected",
+  "superseded",
+] as const;
+export type DecisionStatus = (typeof decisionStatuses)[number];
+
+export const decisionSubjectTypes = [
+  "clarification",
+  "spec_revision",
+  "issue_plan",
+] as const;
+export type DecisionSubjectType = (typeof decisionSubjectTypes)[number];
+
+export const specRevisionStatuses = [
+  "draft",
+  "in_review",
+  "approved",
+  "rejected",
+  "superseded",
+] as const;
+export type SpecRevisionStatus = (typeof specRevisionStatuses)[number];
+
+export const issueStatuses = [
+  "draft",
+  "approved",
+  "ready",
+  "in_progress",
+  "blocked",
+  "completed",
+  "cancelled",
+] as const;
+export type IssueStatus = (typeof issueStatuses)[number];
+
 export const organizations = pgTable(
   "organizations",
   {
@@ -307,6 +349,426 @@ export const acceptanceCriteria = pgTable(
   ],
 );
 
+export const clarifications = pgTable(
+  "clarifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    threadId: uuid("thread_id").notNull(),
+    revision: integer("revision").notNull(),
+    previousClarificationId: uuid("previous_clarification_id"),
+    status: text("status").$type<ClarificationStatus>().notNull(),
+    question: text("question").notNull(),
+    answer: text("answer"),
+    sourceGoalVersion: integer("source_goal_version").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "clarifications_goal_organization_fk",
+      columns: [table.organizationId, table.projectId, table.goalId],
+      foreignColumns: [goals.organizationId, goals.projectId, goals.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    unique("clarifications_goal_id_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.id,
+    ),
+    foreignKey({
+      name: "clarifications_previous_revision_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.previousClarificationId,
+      ],
+      foreignColumns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("clarifications_goal_thread_revision_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.threadId,
+      table.revision,
+    ),
+    check(
+      "clarifications_status_chk",
+      sql`${table.status} IN ('open', 'answered', 'superseded')`,
+    ),
+    check(
+      "clarifications_revision_chain_chk",
+      sql`${table.revision} > 0 AND ((${table.revision} = 1 AND ${table.previousClarificationId} IS NULL) OR (${table.revision} > 1 AND ${table.previousClarificationId} IS NOT NULL))`,
+    ),
+    check(
+      "clarifications_content_chk",
+      sql`char_length(btrim(${table.question})) BETWEEN 1 AND 4000 AND ((${table.status} = 'open' AND ${table.answer} IS NULL) OR (${table.status} IN ('answered', 'superseded') AND char_length(btrim(${table.answer})) BETWEEN 1 AND 10000))`,
+    ),
+    check(
+      "clarifications_source_goal_version_chk",
+      sql`${table.sourceGoalVersion} > 0`,
+    ),
+  ],
+);
+
+export const decisions = pgTable(
+  "decisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    decisionKey: uuid("decision_key").notNull(),
+    revision: integer("revision").notNull(),
+    previousDecisionId: uuid("previous_decision_id"),
+    status: text("status").$type<DecisionStatus>().notNull(),
+    subjectType: text("subject_type").$type<DecisionSubjectType>().notNull(),
+    subjectId: uuid("subject_id").notNull(),
+    subjectVersion: integer("subject_version").notNull(),
+    outcome: text("outcome").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "decisions_goal_organization_fk",
+      columns: [table.organizationId, table.projectId, table.goalId],
+      foreignColumns: [goals.organizationId, goals.projectId, goals.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    unique("decisions_goal_id_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.id,
+    ),
+    foreignKey({
+      name: "decisions_previous_revision_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.previousDecisionId,
+      ],
+      foreignColumns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("decisions_goal_key_revision_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.decisionKey,
+      table.revision,
+    ),
+    check(
+      "decisions_status_chk",
+      sql`${table.status} IN ('proposed', 'approved', 'rejected', 'superseded')`,
+    ),
+    check(
+      "decisions_subject_type_chk",
+      sql`${table.subjectType} IN ('clarification', 'spec_revision', 'issue_plan')`,
+    ),
+    check(
+      "decisions_revision_chain_chk",
+      sql`${table.revision} > 0 AND ((${table.revision} = 1 AND ${table.previousDecisionId} IS NULL) OR (${table.revision} > 1 AND ${table.previousDecisionId} IS NOT NULL))`,
+    ),
+    check("decisions_subject_version_chk", sql`${table.subjectVersion} > 0`),
+    check(
+      "decisions_content_chk",
+      sql`char_length(btrim(${table.outcome})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`,
+    ),
+  ],
+);
+
+export const specRevisions = pgTable(
+  "spec_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    revision: integer("revision").notNull(),
+    previousRevisionId: uuid("previous_revision_id"),
+    status: text("status").$type<SpecRevisionStatus>().default("draft").notNull(),
+    sourceGoalVersion: integer("source_goal_version").notNull(),
+    artifactRef: text("artifact_ref").notNull(),
+    artifactDigest: text("artifact_digest").notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "spec_revisions_goal_organization_fk",
+      columns: [table.organizationId, table.projectId, table.goalId],
+      foreignColumns: [goals.organizationId, goals.projectId, goals.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    unique("spec_revisions_goal_id_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.id,
+    ),
+    foreignKey({
+      name: "spec_revisions_previous_revision_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.previousRevisionId,
+      ],
+      foreignColumns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("spec_revisions_goal_revision_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.revision,
+    ),
+    check(
+      "spec_revisions_status_chk",
+      sql`${table.status} IN ('draft', 'in_review', 'approved', 'rejected', 'superseded')`,
+    ),
+    check(
+      "spec_revisions_revision_chain_chk",
+      sql`${table.revision} > 0 AND ((${table.revision} = 1 AND ${table.previousRevisionId} IS NULL) OR (${table.revision} > 1 AND ${table.previousRevisionId} IS NOT NULL))`,
+    ),
+    check(
+      "spec_revisions_artifact_chk",
+      sql`char_length(btrim(${table.artifactRef})) BETWEEN 1 AND 1000 AND ${table.artifactDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "spec_revisions_versions_chk",
+      sql`${table.sourceGoalVersion} > 0 AND ${table.version} > 0`,
+    ),
+    check(
+      "spec_revisions_timestamps_order_chk",
+      sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const issues = pgTable(
+  "issues",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    specRevisionId: uuid("spec_revision_id").notNull(),
+    issueKey: text("issue_key").notNull(),
+    revision: integer("revision").notNull(),
+    previousIssueId: uuid("previous_issue_id"),
+    status: text("status").$type<IssueStatus>().default("draft").notNull(),
+    title: text("title").notNull(),
+    bodyRef: text("body_ref").notNull(),
+    bodyDigest: text("body_digest").notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "issues_spec_revision_goal_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.specRevisionId,
+      ],
+      foreignColumns: [
+        specRevisions.organizationId,
+        specRevisions.projectId,
+        specRevisions.goalId,
+        specRevisions.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    unique("issues_goal_id_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.id,
+    ),
+    foreignKey({
+      name: "issues_previous_revision_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.previousIssueId,
+      ],
+      foreignColumns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("issues_goal_key_revision_uidx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.issueKey,
+      table.revision,
+    ),
+    check(
+      "issues_status_chk",
+      sql`${table.status} IN ('draft', 'approved', 'ready', 'in_progress', 'blocked', 'completed', 'cancelled')`,
+    ),
+    check(
+      "issues_revision_chain_chk",
+      sql`${table.revision} > 0 AND ((${table.revision} = 1 AND ${table.previousIssueId} IS NULL) OR (${table.revision} > 1 AND ${table.previousIssueId} IS NOT NULL))`,
+    ),
+    check(
+      "issues_identity_chk",
+      sql`char_length(${table.issueKey}) BETWEEN 1 AND 64 AND ${table.issueKey} ~ '^[A-Z][A-Z0-9-]*$' AND char_length(btrim(${table.title})) BETWEEN 1 AND 300`,
+    ),
+    check(
+      "issues_artifact_chk",
+      sql`char_length(btrim(${table.bodyRef})) BETWEEN 1 AND 1000 AND ${table.bodyDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check("issues_version_positive_chk", sql`${table.version} > 0`),
+    check(
+      "issues_timestamps_order_chk",
+      sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const issueDependencies = pgTable(
+  "issue_dependencies",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    dependsOnIssueId: uuid("depends_on_issue_id").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "issue_dependencies_pk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.issueId,
+        table.dependsOnIssueId,
+      ],
+    }),
+    foreignKey({
+      name: "issue_dependencies_issue_goal_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.issueId,
+      ],
+      foreignColumns: [
+        issues.organizationId,
+        issues.projectId,
+        issues.goalId,
+        issues.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    foreignKey({
+      name: "issue_dependencies_depends_on_goal_fk",
+      columns: [
+        table.organizationId,
+        table.projectId,
+        table.goalId,
+        table.dependsOnIssueId,
+      ],
+      foreignColumns: [
+        issues.organizationId,
+        issues.projectId,
+        issues.goalId,
+        issues.id,
+      ],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    index("issue_dependencies_depends_on_idx").on(
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+      table.dependsOnIssueId,
+    ),
+    check(
+      "issue_dependencies_not_self_chk",
+      sql`${table.issueId} <> ${table.dependsOnIssueId}`,
+    ),
+  ],
+);
+
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 export type Project = typeof projects.$inferSelect;
@@ -317,6 +779,16 @@ export type Goal = typeof goals.$inferSelect;
 export type NewGoal = typeof goals.$inferInsert;
 export type AcceptanceCriterion = typeof acceptanceCriteria.$inferSelect;
 export type NewAcceptanceCriterion = typeof acceptanceCriteria.$inferInsert;
+export type Clarification = typeof clarifications.$inferSelect;
+export type NewClarification = typeof clarifications.$inferInsert;
+export type Decision = typeof decisions.$inferSelect;
+export type NewDecision = typeof decisions.$inferInsert;
+export type SpecRevision = typeof specRevisions.$inferSelect;
+export type NewSpecRevision = typeof specRevisions.$inferInsert;
+export type Issue = typeof issues.$inferSelect;
+export type NewIssue = typeof issues.$inferInsert;
+export type IssueDependency = typeof issueDependencies.$inferSelect;
+export type NewIssueDependency = typeof issueDependencies.$inferInsert;
 
 export const workbenchSnapshots = pgTable("workbench_snapshots", {
   scopeId: text("scope_id").primaryKey(),
