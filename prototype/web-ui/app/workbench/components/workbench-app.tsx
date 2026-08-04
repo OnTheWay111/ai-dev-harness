@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { View, WorkbenchSnapshot } from "../contracts";
 import { WorkbenchApiError, workbenchApi } from "../workbench-api";
+import type { GoalWorkspaceScope } from "../goal-workspace-api";
 import { Sidebar, Topbar } from "./app-shell";
 import { ClarifyView } from "./clarify-view";
 import { IssuesView } from "./issues-view";
@@ -14,8 +15,10 @@ import { VerifyView } from "./verify-view";
 
 export function WorkbenchApp({
   initialSnapshot,
+  goalWorkspaceScope,
 }: {
   initialSnapshot: WorkbenchSnapshot;
+  goalWorkspaceScope: GoalWorkspaceScope;
 }) {
   const [view, setView] = useState<View>("overview");
   const [toast, setToast] = useState("");
@@ -61,6 +64,7 @@ export function WorkbenchApp({
         {view === "scheduler" && <SchedulerView notify={notify} />}
         {view === "clarify" && (
           <ClarifyView
+            scope={goalWorkspaceScope}
             onContinue={() => {
               notify("Goal revision 3 已锁定，正在进入方案审批");
               setView("issues");

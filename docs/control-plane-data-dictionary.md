@@ -94,6 +94,7 @@ The authoritative Goal contract core for one Project.
 | `title` | Concise Goal name |
 | `problem_statement` | Problem the Goal exists to address |
 | `desired_outcome` | Observable result the Goal seeks |
+| `non_goals`, `constraints` | Bounded JSON string arrays defining explicit scope boundaries |
 | `status` | `draft`, `clarifying`, `planning`, `approved`, `executing`, `verifying`, `completed`, or `cancelled` |
 | `version` | Positive optimistic-lock version |
 | `created_at`, `updated_at` | Ordered lifecycle timestamps |

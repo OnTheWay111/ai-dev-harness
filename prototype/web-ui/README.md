@@ -197,6 +197,9 @@ Authoritative control-plane entities are defined in
 separately from the replaceable workbench projection.
 Goal, SpecRevision, Issue, and Run lifecycle rules are listed in
 [`../../docs/control-plane-state-machines.md`](../../docs/control-plane-state-machines.md).
+The versioned Goal Contract fields, CRUD API, authorization transaction, and
+browser draft-recovery boundary are documented in
+[`../../docs/goal-workspace.md`](../../docs/goal-workspace.md).
 The Goal write-module interface, Repository seam, adapters, and HTTP mapping are
 documented in
 [`../../docs/control-plane-write-architecture.md`](../../docs/control-plane-write-architecture.md).

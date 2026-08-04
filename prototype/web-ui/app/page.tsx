@@ -6,6 +6,8 @@ import {
 import { getOidcService } from "./auth/oidc-runtime";
 import { readRequestPrincipal } from "./auth/oidc-http";
 import { hasVisibleProjects } from "./auth/visibility-scope";
+import { resolveDefaultGoalWorkspaceScope } from
+  "./control-plane/runtime/goal-workspace-runtime";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -27,9 +29,18 @@ export default async function Home() {
     return <main>当前账号没有可见项目，请联系组织管理员分配角色。</main>;
   }
   const workbenchRepository = getWorkbenchRepository();
+  const goalWorkspaceScope = await resolveDefaultGoalWorkspaceScope(visibility);
+  if (!goalWorkspaceScope) {
+    return <main>当前账号没有可用于 Goal Workspace 的项目。</main>;
+  }
   const { data } = await workbenchRepository.getWorkbench(
     visibility,
     { limit: 50 },
   );
-  return <WorkbenchApp initialSnapshot={data} />;
+  return (
+    <WorkbenchApp
+      initialSnapshot={data}
+      goalWorkspaceScope={goalWorkspaceScope}
+    />
+  );
 }

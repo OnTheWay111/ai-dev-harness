@@ -1137,7 +1137,7 @@ kbd {
 .priority-label {
   flex: 0 0 auto;
   padding: 2px 5px;
-  color: var(--ink-700);
+  color: var(--ink-650);
   font-size: 12px;
   line-height: 1.2;
   border: 1px solid var(--line);
@@ -2652,6 +2652,60 @@ kbd {
 
 .contract-panel {
   padding-bottom: 7px;
+}
+
+.goal-contract-form {
+  display: grid;
+  gap: 24px;
+}
+
+.goal-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.goal-form-field {
+  display: grid;
+  gap: 8px;
+  color: var(--ink-650);
+  font-weight: 700;
+}
+
+.goal-form-field input,
+.goal-form-field textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--ink-950);
+  padding: 12px 14px;
+  font: inherit;
+  font-weight: 500;
+}
+
+.goal-form-field textarea {
+  min-height: 128px;
+  resize: vertical;
+}
+
+.goal-form-field small {
+  color: var(--ink-500);
+  font-weight: 500;
+}
+
+.goal-form-wide {
+  grid-column: 1 / -1;
+}
+
+.goal-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.form-error {
+  color: #b42318;
+  font-weight: 700;
 }
 
 .criteria-list {

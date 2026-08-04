@@ -333,6 +333,12 @@ export const goals = pgTable(
     title: text("title").notNull(),
     problemStatement: text("problem_statement").notNull(),
     desiredOutcome: text("desired_outcome").notNull(),
+    nonGoals: jsonb("non_goals").$type<string[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    constraints: jsonb("constraints").$type<string[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
     status: text("status").$type<GoalStatus>().default("draft").notNull(),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at", {
@@ -372,6 +378,10 @@ export const goals = pgTable(
     check(
       "goals_outcome_length_chk",
       sql`char_length(btrim(${table.desiredOutcome})) BETWEEN 1 AND 10000`,
+    ),
+    check(
+      "goals_contract_lists_chk",
+      sql`jsonb_typeof(${table.nonGoals}) = 'array' AND jsonb_array_length(${table.nonGoals}) <= 50 AND jsonb_typeof(${table.constraints}) = 'array' AND jsonb_array_length(${table.constraints}) <= 50`,
     ),
     check(
       "goals_status_chk",

@@ -1,0 +1,3 @@
+ALTER TABLE "goals" ADD COLUMN "non_goals" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "goals" ADD COLUMN "constraints" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "goals" ADD CONSTRAINT "goals_contract_lists_chk" CHECK (jsonb_typeof("goals"."non_goals") = 'array' AND jsonb_array_length("goals"."non_goals") <= 50 AND jsonb_typeof("goals"."constraints") = 'array' AND jsonb_array_length("goals"."constraints") <= 50);

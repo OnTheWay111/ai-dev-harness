@@ -29,6 +29,12 @@ import {
   GoalApplicationService,
 } from "../app/control-plane/application/goal-application-service.ts";
 import {
+  GoalWorkspaceService,
+} from "../app/control-plane/application/goal-workspace-service.ts";
+import {
+  PostgresGoalWorkspaceRepository,
+} from "../app/control-plane/adapters/postgres-goal-workspace-repository.ts";
+import {
   IdempotencyConflictError,
 } from "../app/control-plane/domain/errors.ts";
 import {
@@ -150,7 +156,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 7);
+  assert.equal(migrations.length, 8);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -188,6 +194,89 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
     ],
   );
 });
+
+integrationTest(
+  "creates and edits a complete Goal Contract in one audited PostgreSQL transaction",
+  async () => {
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const suffix = `${process.pid}-${crypto.randomUUID().slice(0, 8)}`;
+    await pool.query(
+      `INSERT INTO organizations (id, slug, name) VALUES ($1, $2, $3)`,
+      [organizationId, `p4-org-${suffix}`, "P4 Goal Workspace"],
+    );
+    await pool.query(
+      `INSERT INTO projects (id, organization_id, slug, name)
+       VALUES ($1, $2, $3, $4)`,
+      [projectId, organizationId, `p4-project-${suffix}`, "P4 Project"],
+    );
+    const repository = new PostgresGoalWorkspaceRepository(pool);
+    const service = new GoalWorkspaceService({
+      repository,
+      authorizer: { async authorize() {} },
+    });
+    const createCommand = {
+      organizationId,
+      projectId,
+      actorId: "p4-actor",
+      requestId: "p4-create-request",
+      idempotencyKey: "p4-create-key",
+      reason: "Create a durable contract",
+      draft: {
+        title: "Persist Goal Contracts",
+        problemStatement: "The Goal Workspace needs authoritative storage.",
+        desiredOutcome: "Create and edit a complete contract transactionally.",
+        acceptanceCriteria: ["The contract survives a read", "Stale writes fail"],
+        nonGoals: ["Model approval"],
+        constraints: ["Use server-side RBAC"],
+      },
+    };
+    const created = await service.create(createCommand);
+    assert.deepEqual(await service.create(createCommand), created);
+    assert.deepEqual(
+      await service.get({
+        organizationId,
+        projectId,
+        goalId: created.goal.id,
+        actorId: "p4-actor",
+      }),
+      created.goal,
+    );
+
+    const updated = await service.update({
+      ...createCommand,
+      goalId: created.goal.id,
+      requestId: "p4-update-request",
+      idempotencyKey: "p4-update-key",
+      expectedVersion: 1,
+      reason: "Make verification explicit",
+      draft: {
+        ...createCommand.draft,
+        acceptanceCriteria: ["The contract survives a PostgreSQL read"],
+      },
+    });
+    assert.equal(updated.goal.version, 2);
+    assert.deepEqual(updated.goal.nonGoals, ["Model approval"]);
+    await assert.rejects(
+      () => service.update({
+        ...createCommand,
+        goalId: created.goal.id,
+        requestId: "p4-stale-request",
+        idempotencyKey: "p4-stale-key",
+        expectedVersion: 1,
+      }),
+      /version/i,
+    );
+    const evidence = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM audit_events WHERE goal_id = $1) AS audits,
+         (SELECT count(*)::int FROM outbox_events WHERE aggregate_id = $1) AS events,
+         (SELECT count(*)::int FROM acceptance_criteria WHERE goal_id = $1) AS criteria`,
+      [created.goal.id],
+    );
+    assert.deepEqual(evidence.rows[0], { audits: 2, events: 2, criteria: 1 });
+  },
+);
 
 integrationTest(
   "enforces Organization, version, and acceptance constraints",
@@ -713,7 +802,7 @@ integrationTest(
     const issueId = crypto.randomUUID();
     const runId = crypto.randomUUID();
     const digest = "c".repeat(64);
-    const occurredAt = new Date("2026-08-04T09:30:00.000Z");
+    const occurredAt = new Date(Date.now() + 60_000);
     try {
       await client.query("BEGIN");
       await client.query(
