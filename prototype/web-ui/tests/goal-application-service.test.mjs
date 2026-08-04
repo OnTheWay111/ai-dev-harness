@@ -25,6 +25,7 @@ function command(overrides = {}) {
     goalId: goal.id,
     actorId: "actor-1",
     requestId: "req-1",
+    idempotencyKey: "idem-1",
     expectedVersion: 1,
     nextState: "clarifying",
     reason: "Begin clarification",
@@ -87,6 +88,9 @@ test("authorization failure occurs before repository access", async () => {
         reads += 1;
         return goal;
       },
+      async findIdempotentReceipt() {
+        return null;
+      },
       async commitTransition() {
         throw new Error("must not commit");
       },
@@ -132,9 +136,59 @@ test("the memory adapter rejects stale versions without committing the event", a
       occurredAt: "2026-08-04T10:00:00.000Z",
       payload: {},
     },
+    audit: {
+      id: "00000000-0000-4000-8000-000000000106",
+      organizationId: goal.organizationId,
+      projectId: goal.projectId,
+      goalId: goal.id,
+      actorId: "actor-1",
+      action: "goal.state_changed",
+      entityType: "goal",
+      entityId: goal.id,
+      entityVersion: 2,
+      reason: "Begin clarification",
+      requestId: "req-1",
+      createdAt: "2026-08-04T10:00:00.000Z",
+    },
+    idempotency: {
+      organizationId: goal.organizationId,
+      actorId: "actor-1",
+      endpoint: "goal.transition",
+      key: "idem-direct",
+      requestHash: "a".repeat(64),
+      responseDigest: "b".repeat(64),
+      expiresAt: new Date("2026-08-05T10:00:00.000Z"),
+    },
+    receipt: {
+      goalId: goal.id,
+      previousState: "draft",
+      state: "clarifying",
+      previousVersion: 1,
+      version: 2,
+      eventId: "00000000-0000-4000-8000-000000000105",
+      occurredAt: "2026-08-04T10:00:00.000Z",
+    },
   };
   await repository.commitTransition(input);
-  await assert.rejects(() => repository.commitTransition(input), /version/i);
+  await assert.rejects(
+    () =>
+      repository.commitTransition({
+        ...input,
+        event: {
+          ...input.event,
+          id: "00000000-0000-4000-8000-000000000107",
+        },
+        audit: {
+          ...input.audit,
+          id: "00000000-0000-4000-8000-000000000108",
+        },
+        idempotency: {
+          ...input.idempotency,
+          key: "idem-stale",
+        },
+      }),
+    /version/i,
+  );
   assert.equal(repository.committedEvents.length, 1);
 });
 

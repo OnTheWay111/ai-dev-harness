@@ -23,15 +23,69 @@ export interface GoalStateChangedEvent {
   payload: Readonly<Record<string, unknown>>;
 }
 
+export interface GoalAuditEvent {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  goalId: string;
+  actorId: string;
+  action: "goal.state_changed";
+  entityType: "goal";
+  entityId: string;
+  entityVersion: number;
+  reason: string;
+  requestId: string;
+  createdAt: string;
+}
+
+export interface GoalTransitionReceipt {
+  goalId: string;
+  previousState: GoalStatus;
+  state: GoalStatus;
+  previousVersion: number;
+  version: number;
+  eventId: string;
+  occurredAt: string;
+}
+
+export interface GoalCommandIdempotency {
+  organizationId: string;
+  actorId: string;
+  endpoint: "goal.transition";
+  key: string;
+  requestHash: string;
+  responseDigest: string;
+  expiresAt: Date;
+}
+
+export interface GoalIdempotencyLookup {
+  organizationId: string;
+  actorId: string;
+  endpoint: "goal.transition";
+  key: string;
+  requestHash: string;
+}
+
 export interface CommitGoalTransition {
   current: GoalAggregate;
   expectedVersion: number;
   nextState: GoalStatus;
   occurredAt: Date;
   event: GoalStateChangedEvent;
+  audit: GoalAuditEvent;
+  idempotency: GoalCommandIdempotency;
+  receipt: GoalTransitionReceipt;
+}
+
+export interface GoalCommitResult {
+  goal: GoalAggregate;
+  receipt: GoalTransitionReceipt;
 }
 
 export interface GoalRepository {
   get(scope: GoalScope): Promise<GoalAggregate | null>;
-  commitTransition(command: CommitGoalTransition): Promise<GoalAggregate>;
+  findIdempotentReceipt(
+    lookup: GoalIdempotencyLookup,
+  ): Promise<GoalTransitionReceipt | null>;
+  commitTransition(command: CommitGoalTransition): Promise<GoalCommitResult>;
 }

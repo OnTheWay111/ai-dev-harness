@@ -25,6 +25,12 @@ import {
 import {
   PostgresGoalRepository,
 } from "../app/control-plane/adapters/postgres-goal-repository.ts";
+import {
+  GoalApplicationService,
+} from "../app/control-plane/application/goal-application-service.ts";
+import {
+  IdempotencyConflictError,
+} from "../app/control-plane/domain/errors.ts";
 import { assertGoalRepositoryContract } from "./goal-repository-contract.mjs";
 
 const databaseUrl = process.env.POSTGRES_INTEGRATION_DATABASE_URL;
@@ -34,6 +40,61 @@ const pool = databaseUrl
   ? new Pool({ connectionString: databaseUrl, max: 4 })
   : undefined;
 const scopePrefix = `p1_04_${process.pid}`;
+
+async function insertReliableGoal(label) {
+  const organizationId = crypto.randomUUID();
+  const projectId = crypto.randomUUID();
+  const goalId = crypto.randomUUID();
+  const suffix = `${process.pid}-${label}-${crypto.randomUUID().slice(0, 8)}`;
+  await pool.query(
+    `INSERT INTO organizations (id, slug, name)
+     VALUES ($1, $2, 'Reliable command organization')`,
+    [organizationId, `reliable-org-${suffix}`],
+  );
+  await pool.query(
+    `INSERT INTO projects (id, organization_id, slug, name)
+     VALUES ($1, $2, $3, 'Reliable command project')`,
+    [projectId, organizationId, `reliable-project-${suffix}`],
+  );
+  await pool.query(
+    `INSERT INTO goals
+       (id, organization_id, project_id, title,
+        problem_statement, desired_outcome)
+     VALUES ($1, $2, $3, 'Reliable command goal',
+             'A write may be retried or race.',
+             'Commit exactly once or fail without partial state.')`,
+    [goalId, organizationId, projectId],
+  );
+  return { organizationId, projectId, goalId };
+}
+
+function reliableCommand(scope, overrides = {}) {
+  return {
+    ...scope,
+    actorId: "integration-actor",
+    requestId: "integration-request",
+    idempotencyKey: "integration-idempotency",
+    expectedVersion: 1,
+    nextState: "clarifying",
+    reason: "Verify reliable command handling",
+    guards: {},
+    ...overrides,
+  };
+}
+
+function reliableService(repository, ids) {
+  const availableIds = [...ids];
+  return new GoalApplicationService({
+    repository,
+    authorizer: { async authorize() {} },
+    clock: () => new Date(),
+    idGenerator: () => {
+      const id = availableIds.shift();
+      assert.ok(id, "the command generated only the expected records");
+      return id;
+    },
+  });
+}
 
 before(async () => {
   if (!pool) return;
@@ -801,43 +862,204 @@ integrationTest(
       version: 1,
     };
     const repository = new PostgresGoalRepository(pool);
-    try {
-      await pool.query(
-        `INSERT INTO organizations (id, slug, name)
-         VALUES ($1, $2, 'Repository Contract Organization')`,
-        [goal.organizationId, `repository-contract-${process.pid}`],
-      );
-      await pool.query(
-        `INSERT INTO projects (id, organization_id, slug, name)
-         VALUES ($1, $2, $3, 'Repository Contract Project')`,
-        [goal.projectId, goal.organizationId, `repository-contract-${process.pid}`],
-      );
-      await pool.query(
-        `INSERT INTO goals
-           (id, organization_id, project_id, title,
-            problem_statement, desired_outcome)
-         VALUES ($1, $2, $3, $4, 'Hide persistence', 'One stable interface')`,
-        [goal.id, goal.organizationId, goal.projectId, goal.title],
-      );
-      await assertGoalRepositoryContract({
-        repository,
-        goal,
-        eventCount: async (eventId) =>
-          Number((await pool.query(
-            "SELECT count(*)::int AS count FROM outbox_events WHERE id = $1",
-            [eventId],
-          )).rows[0].count),
-      });
-    } finally {
-      await pool.query("DELETE FROM outbox_events WHERE organization_id = $1", [
-        goal.organizationId,
-      ]);
-      await pool.query("DELETE FROM goals WHERE id = $1", [goal.id]);
-      await pool.query("DELETE FROM projects WHERE id = $1", [goal.projectId]);
-      await pool.query("DELETE FROM organizations WHERE id = $1", [
-        goal.organizationId,
-      ]);
-    }
+    await pool.query(
+      `INSERT INTO organizations (id, slug, name)
+       VALUES ($1, $2, 'Repository Contract Organization')`,
+      [goal.organizationId, `repository-contract-${process.pid}`],
+    );
+    await pool.query(
+      `INSERT INTO projects (id, organization_id, slug, name)
+       VALUES ($1, $2, $3, 'Repository Contract Project')`,
+      [goal.projectId, goal.organizationId, `repository-contract-${process.pid}`],
+    );
+    await pool.query(
+      `INSERT INTO goals
+         (id, organization_id, project_id, title,
+          problem_statement, desired_outcome)
+       VALUES ($1, $2, $3, $4, 'Hide persistence', 'One stable interface')`,
+      [goal.id, goal.organizationId, goal.projectId, goal.title],
+    );
+    await assertGoalRepositoryContract({
+      repository,
+      goal,
+      eventCount: async (eventId) =>
+        Number((await pool.query(
+          "SELECT count(*)::int AS count FROM outbox_events WHERE id = $1",
+          [eventId],
+        )).rows[0].count),
+    });
+  },
+);
+
+integrationTest(
+  "commits Goal, Audit, Outbox, and idempotency once and replays the receipt",
+  async () => {
+    const scope = await insertReliableGoal("replay");
+    const repository = new PostgresGoalRepository(pool);
+    const service = reliableService(repository, [
+      crypto.randomUUID(),
+      crypto.randomUUID(),
+    ]);
+    const first = await service.transition(reliableCommand(scope));
+    const replay = await service.transition(reliableCommand(scope, {
+      requestId: "integration-retry",
+    }));
+    assert.deepEqual(replay, first);
+    await assert.rejects(
+      () => service.transition(reliableCommand(scope, {
+        reason: "A different command must not share the same key",
+      })),
+      (error) => error instanceof IdempotencyConflictError,
+    );
+
+    const persisted = await pool.query(
+      `SELECT g.status, g.version,
+              (SELECT count(*)::int FROM audit_events ae
+                WHERE ae.goal_id = g.id) AS audit_count,
+              (SELECT count(*)::int FROM outbox_events oe
+                WHERE oe.aggregate_id = g.id) AS outbox_count,
+              (SELECT count(*)::int FROM idempotency_records ir
+                WHERE ir.organization_id = g.organization_id
+                  AND ir.key = 'integration-idempotency') AS idempotency_count
+         FROM goals g WHERE g.id = $1`,
+      [scope.goalId],
+    );
+    assert.deepEqual(persisted.rows[0], {
+      status: "clarifying",
+      version: 2,
+      audit_count: 1,
+      outbox_count: 1,
+      idempotency_count: 1,
+    });
+    const outbox = await pool.query(
+      `SELECT status, attempts, published_at, payload->'receipt' AS receipt
+         FROM outbox_events WHERE id = $1`,
+      [first.eventId],
+    );
+    assert.deepEqual(outbox.rows[0], {
+      status: "pending",
+      attempts: 0,
+      published_at: null,
+      receipt: first,
+    });
+  },
+);
+
+integrationTest(
+  "serializes duplicate commands and rejects concurrent stale versions",
+  async () => {
+    const duplicateScope = await insertReliableGoal("duplicate-race");
+    const duplicateRepository = new PostgresGoalRepository(pool);
+    const duplicateCommand = reliableCommand(duplicateScope, {
+      idempotencyKey: "same-concurrent-key",
+    });
+    const duplicateReceipts = await Promise.all([
+      reliableService(duplicateRepository, [
+        crypto.randomUUID(),
+        crypto.randomUUID(),
+      ]).transition(duplicateCommand),
+      reliableService(duplicateRepository, [
+        crypto.randomUUID(),
+        crypto.randomUUID(),
+      ]).transition({ ...duplicateCommand, requestId: "concurrent-retry" }),
+    ]);
+    assert.deepEqual(duplicateReceipts[1], duplicateReceipts[0]);
+    const duplicateCounts = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM audit_events WHERE goal_id = $1) AS audits,
+         (SELECT count(*)::int FROM outbox_events WHERE aggregate_id = $1) AS outbox,
+         (SELECT count(*)::int FROM idempotency_records
+           WHERE organization_id = $2 AND key = 'same-concurrent-key') AS idempotency`,
+      [duplicateScope.goalId, duplicateScope.organizationId],
+    );
+    assert.deepEqual(duplicateCounts.rows[0], {
+      audits: 1,
+      outbox: 1,
+      idempotency: 1,
+    });
+
+    const conflictScope = await insertReliableGoal("version-race");
+    const conflictRepository = new PostgresGoalRepository(pool);
+    const results = await Promise.allSettled([
+      reliableService(conflictRepository, [
+        crypto.randomUUID(),
+        crypto.randomUUID(),
+      ]).transition(reliableCommand(conflictScope, {
+        idempotencyKey: "version-race-a",
+      })),
+      reliableService(conflictRepository, [
+        crypto.randomUUID(),
+        crypto.randomUUID(),
+      ]).transition(reliableCommand(conflictScope, {
+        idempotencyKey: "version-race-b",
+        requestId: "version-race-b",
+      })),
+    ]);
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    const rejected = results.find((result) => result.status === "rejected");
+    assert.ok(rejected && rejected.reason instanceof VersionConflictError);
+    const conflictCounts = await pool.query(
+      `SELECT g.status, g.version,
+              (SELECT count(*)::int FROM audit_events WHERE goal_id = g.id) AS audits,
+              (SELECT count(*)::int FROM outbox_events WHERE aggregate_id = g.id) AS outbox,
+              (SELECT count(*)::int FROM idempotency_records
+                WHERE organization_id = g.organization_id
+                  AND key LIKE 'version-race-%') AS idempotency
+         FROM goals g WHERE g.id = $1`,
+      [conflictScope.goalId],
+    );
+    assert.deepEqual(conflictCounts.rows[0], {
+      status: "clarifying",
+      version: 2,
+      audits: 1,
+      outbox: 1,
+      idempotency: 1,
+    });
+  },
+);
+
+integrationTest(
+  "rolls back the entire reliable command when Audit insertion fails",
+  async () => {
+    const scope = await insertReliableGoal("rollback");
+    const eventId = crypto.randomUUID();
+    const duplicateAuditId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO audit_events
+         (id, organization_id, project_id, goal_id, actor_id, action,
+          entity_type, entity_id, entity_version, reason, request_id,
+          retention_until)
+       VALUES ($1, $2, $3, $4, 'fixture', 'fixture.created', 'goal', $4, 1,
+               'Create rollback fixture', 'fixture-request', now() + interval '180 days')`,
+      [duplicateAuditId, scope.organizationId, scope.projectId, scope.goalId],
+    );
+    const service = reliableService(new PostgresGoalRepository(pool), [
+      eventId,
+      duplicateAuditId,
+    ]);
+    await assert.rejects(
+      () => service.transition(reliableCommand(scope, {
+        idempotencyKey: "rollback-key",
+      })),
+      /duplicate key/i,
+    );
+    const persisted = await pool.query(
+      `SELECT g.status, g.version,
+              (SELECT count(*)::int FROM audit_events WHERE goal_id = g.id) AS audits,
+              (SELECT count(*)::int FROM outbox_events WHERE aggregate_id = g.id) AS outbox,
+              (SELECT count(*)::int FROM idempotency_records
+                WHERE organization_id = g.organization_id
+                  AND key = 'rollback-key') AS idempotency
+         FROM goals g WHERE g.id = $1`,
+      [scope.goalId],
+    );
+    assert.deepEqual(persisted.rows[0], {
+      status: "draft",
+      version: 1,
+      audits: 1,
+      outbox: 0,
+      idempotency: 0,
+    });
   },
 );
 

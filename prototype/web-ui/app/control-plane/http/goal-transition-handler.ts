@@ -5,7 +5,12 @@ import type {
   GoalTransitionCommand,
   GoalTransitionReceipt,
 } from "../application/goal-application-service.ts";
-import { VersionConflictError } from "../domain/errors.ts";
+import {
+  CommandValidationError,
+  IdempotencyConflictError,
+  IdempotencyInProgressError,
+  VersionConflictError,
+} from "../domain/errors.ts";
 import {
   DomainTransitionError,
   goalStatuses,
@@ -99,16 +104,27 @@ export function createGoalTransitionHandler(dependencies: HandlerDependencies) {
       if (request.method !== "POST") return errorResponse("not_found", 404);
       const actor = await dependencies.actorResolver(request);
       const body = parseBody(await request.json());
+      const idempotencyKey = request.headers.get("idempotency-key") ?? "";
+      if (!idempotencyKey) {
+        throw new CommandValidationError("Idempotency-Key is required");
+      }
       const receipt = await dependencies.service.transition({
         ...scope,
         actorId: actor.actorId,
         requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
+        idempotencyKey,
         ...body,
       });
       return Response.json({ data: receipt }, { status: 200 });
     } catch (error) {
       if (error instanceof VersionConflictError) {
         return errorResponse("version_conflict", 409);
+      }
+      if (
+        error instanceof IdempotencyConflictError ||
+        error instanceof IdempotencyInProgressError
+      ) {
+        return errorResponse("idempotency_conflict", 409);
       }
       if (error instanceof DomainTransitionError) {
         return errorResponse(error.code === "version_conflict"
@@ -117,6 +133,9 @@ export function createGoalTransitionHandler(dependencies: HandlerDependencies) {
       }
       if (error instanceof GoalNotFoundError) {
         return errorResponse("not_found", 404);
+      }
+      if (error instanceof CommandValidationError) {
+        return errorResponse("validation_failed", 400);
       }
       return errorResponse("validation_failed", 400);
     }

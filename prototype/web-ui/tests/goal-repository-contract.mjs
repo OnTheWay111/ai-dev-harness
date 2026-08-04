@@ -6,6 +6,7 @@ export async function assertGoalRepositoryContract({
   eventCount,
 }) {
   assert.deepEqual(await repository.get(goal), goal);
+  const occurredAt = new Date().toISOString();
   const event = {
     id: crypto.randomUUID(),
     organizationId: goal.organizationId,
@@ -13,8 +14,17 @@ export async function assertGoalRepositoryContract({
     aggregateId: goal.id,
     aggregateVersion: 2,
     type: "goal.state_changed",
-    occurredAt: "2026-08-04T10:15:00.000Z",
+    occurredAt,
     payload: { previousState: "draft", state: "clarifying" },
+  };
+  const receipt = {
+    goalId: goal.id,
+    previousState: "draft",
+    state: "clarifying",
+    previousVersion: 1,
+    version: 2,
+    eventId: event.id,
+    occurredAt: event.occurredAt,
   };
   const transition = {
     current: goal,
@@ -22,16 +32,47 @@ export async function assertGoalRepositoryContract({
     nextState: "clarifying",
     occurredAt: new Date(event.occurredAt),
     event,
+    audit: {
+      id: crypto.randomUUID(),
+      organizationId: goal.organizationId,
+      projectId: goal.projectId,
+      goalId: goal.id,
+      actorId: "contract-actor",
+      action: "goal.state_changed",
+      entityType: "goal",
+      entityId: goal.id,
+      entityVersion: 2,
+      reason: "Verify the Repository contract",
+      requestId: "contract-request",
+      createdAt: event.occurredAt,
+    },
+    idempotency: {
+      organizationId: goal.organizationId,
+      actorId: "contract-actor",
+      endpoint: "goal.transition",
+      key: crypto.randomUUID(),
+      requestHash: "d".repeat(64),
+      responseDigest: "e".repeat(64),
+      expiresAt: new Date(new Date(occurredAt).getTime() + 24 * 60 * 60 * 1000),
+    },
+    receipt,
   };
   assert.deepEqual(await repository.commitTransition(transition), {
-    ...goal,
-    status: "clarifying",
-    version: 2,
+    goal: {
+      ...goal,
+      status: "clarifying",
+      version: 2,
+    },
+    receipt,
   });
-  await assert.rejects(
-    () => repository.commitTransition(transition),
-    /version|unique/i,
-  );
+  assert.deepEqual(await repository.commitTransition(transition), {
+    goal: {
+      ...goal,
+      status: "clarifying",
+      version: 2,
+    },
+    receipt,
+  });
   assert.deepEqual(await repository.get(goal), {
     ...goal,
     status: "clarifying",

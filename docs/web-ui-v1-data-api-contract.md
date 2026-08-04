@@ -209,6 +209,8 @@ Idempotency-Key: 41f0e79b-...
 要求：
 
 - `Idempotency-Key` 在组织、用户和接口范围内至少保留 24 小时；
+- 相同键与相同业务命令必须返回首次提交的完整 receipt，不重复写业务状态、Audit 或 Outbox；
+- 相同键用于不同业务命令返回 `409 idempotency_conflict`；
 - `expectedVersion` 不匹配返回 `409 version_conflict`；
 - 高风险决定必须校验 `reason`；
 - 审计事件保存 actor、reason、对象版本、请求 ID、前后状态和策略版本；
@@ -262,7 +264,7 @@ receipt.updated
 ```
 
 V1 错误码：`validation_failed`、`forbidden`、`not_found`、`version_conflict`、
-`invalid_transition`、`rate_limited`、`internal_error`。
+`idempotency_conflict`、`invalid_transition`、`rate_limited`、`internal_error`。
 
 ## 7. 认证、授权与隐私
 

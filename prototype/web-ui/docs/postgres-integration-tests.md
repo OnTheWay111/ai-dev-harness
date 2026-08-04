@@ -49,9 +49,15 @@ argument, build argument, artifact, or logged value.
 - empty projection failure instead of Demo fallback;
 - a real connection refusal;
 - rollback after snapshot replacement and task deletion when a later task
-  insert fails, proving the prior projection remains intact.
+  insert fails, proving the prior projection remains intact;
+- one-transaction Goal, Audit, Outbox, and IdempotencyRecord persistence;
+- exact receipt replay and one pending Outbox record for sequential and
+  concurrent duplicate commands;
+- concurrent `expectedVersion` conflict with the losing key claim rolled back;
+- full rollback of Goal and reliability records after a forced Audit failure.
 
 The standard `npm test` run discovers the integration test file but skips it
 when `POSTGRES_INTEGRATION_DATABASE_URL` is absent. The lifecycle runner is the
-required command for executing the six real-database cases, including the
-P2-01 Organization-boundary and write-model constraints.
+required command for executing the 13 real-database cases, including the P2
+Organization boundary, write-model constraints, state transitions, and command
+reliability guarantees.
