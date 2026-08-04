@@ -545,6 +545,7 @@ integrationTest(
       organizationId,
       projectId,
       goalId,
+      specRevisionId: generated.specRevision.id,
       actorId: "integration-viewer",
     })).decisions.length, 2);
   },

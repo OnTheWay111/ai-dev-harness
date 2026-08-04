@@ -23,6 +23,37 @@ export function withSecurityHeaders(response: Response): Response {
   return response;
 }
 
+export function configuredWriteOrigins(
+  environment: Record<string, string | undefined> = process.env,
+): readonly string[] | undefined {
+  const configured = environment.HARNESS_ALLOWED_ORIGINS?.trim();
+  if (!configured) return undefined;
+  const origins = configured.split(",").map((entry) => {
+    const value = entry.trim();
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new Error("HARNESS_ALLOWED_ORIGINS contains an invalid URL");
+    }
+    const loopback = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+    if (
+      !value || url.username || url.password || url.search || url.hash ||
+      url.pathname !== "/" ||
+      (url.protocol !== "https:" && !(url.protocol === "http:" && loopback))
+    ) {
+      throw new Error(
+        "HARNESS_ALLOWED_ORIGINS must contain HTTPS origins or HTTP loopback origins",
+      );
+    }
+    return url.origin;
+  });
+  if (origins.length === 0) {
+    throw new Error("HARNESS_ALLOWED_ORIGINS must contain at least one origin");
+  }
+  return [...new Set(origins)];
+}
+
 export type RequestSecurityErrorCode =
   | "csrf_rejected"
   | "invalid_content_type"

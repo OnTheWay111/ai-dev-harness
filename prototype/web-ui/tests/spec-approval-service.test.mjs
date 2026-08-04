@@ -215,6 +215,31 @@ test("authorization, blank reasons, stale versions, and changed policy fail clos
   }
 });
 
+test("an older SpecRevision cannot be approved after a replacement exists", async () => {
+  const latestId = "00000000-0000-4000-8000-000000000005";
+  const repository = new MemorySpecRevisionRepository([
+    spec(),
+    spec({
+      id: latestId,
+      revision: 2,
+      previousRevisionId: spec().id,
+      status: "draft",
+    }),
+  ]);
+  const service = new SpecApprovalService({
+    repository,
+    authorizer: { async authorize() {} },
+  });
+  await assert.rejects(
+    () => service.decide(command()),
+    (error) => error instanceof VersionConflictError,
+  );
+  assert.deepEqual((await repository.approvalTimeline({
+    ...scope,
+    specRevisionId: spec().id,
+  })).decisions, []);
+});
+
 test("the unified approval command fails closed when any mandatory field is missing", async () => {
   for (const field of [
     "target",
@@ -244,7 +269,10 @@ test("identical retries replay once while key reuse and concurrent stale writes 
   const first = await service.decide(command());
   assert.deepEqual(await service.decide(command()), first);
   assert.equal(repository.committedAuditEvents.length, 1);
-  assert.equal((await repository.approvalTimeline(scope)).decisions.length, 1);
+  assert.equal((await repository.approvalTimeline({
+    ...scope,
+    specRevisionId: spec().id,
+  })).decisions.length, 1);
   await assert.rejects(
     () => service.decide(command({ reason: "Different command" })),
     (error) => error instanceof IdempotencyConflictError,
@@ -265,5 +293,8 @@ test("an empty rejection reason is rejected before any decision is appended", as
     () => service.decide(command({ decision: "reject", reason: "" })),
     (error) => error instanceof SpecApprovalValidationError,
   );
-  assert.deepEqual((await repository.approvalTimeline(scope)).decisions, []);
+  assert.deepEqual((await repository.approvalTimeline({
+    ...scope,
+    specRevisionId: spec().id,
+  })).decisions, []);
 });

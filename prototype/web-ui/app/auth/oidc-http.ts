@@ -103,12 +103,13 @@ export async function handleOidcCallback(
 export async function handleOidcLogout(
   request: Request,
   service?: OidcService,
+  allowedOrigins?: readonly string[],
 ): Promise<Response> {
   if (request.method !== "POST") {
     return withSecurityHeaders(new Response(null, { status: 405 }));
   }
   try {
-    assertSameOrigin(request);
+    assertSameOrigin(request, allowedOrigins);
     const declaredLength = Number(request.headers.get("content-length") ?? "0");
     if (declaredLength > 0 || request.body) {
       throw new RequestSecurityError("validation_failed", 400);

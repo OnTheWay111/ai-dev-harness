@@ -19,6 +19,12 @@ bounded domain payload. The authenticated server context supplies the actor.
 A stale version, changed policy, invalid lifecycle state, unknown element,
 blank reason, or missing permission fails closed.
 
+Approval freshness has two checks: the target version must match and the target
+must be the latest SpecRevision for the Goal. The PostgreSQL transaction locks
+the Goal and rechecks that no newer revision exists before committing, closing
+the race between an approval request and concurrent regeneration. Approval
+history is queried by exact SpecRevision ID rather than merged across the Goal.
+
 Every success returns the shared `ApprovalReceipt`, including receipt and target
 IDs, prior/current versions, server actor, reason, request ID, policy revision,
 decision, recorded timestamp, and specification-specific result. The same
@@ -38,6 +44,26 @@ Audit events also persist the evaluated policy revision.
 The approval panel shows the category and rationale for each element, makes
 Helpful retention opt-in, and identifies Speculative deletion as the default.
 The API repeats all of these checks independently of the browser.
+
+## Revision review experience
+
+The workbench lists all immutable revisions using native keyboard-operable
+buttons, renders Proposal and PRD side by side, and shows each revision's
+structured difference from its direct predecessor. Selecting an older revision
+loads only that revision's approval history and makes its review controls
+read-only. This presentation is not authorization: every current-revision
+command still goes through server-side OIDC identity and RBAC.
+
+Before a write, the client snapshots the human reason, Helpful exceptions, and
+scope-change input. It restores all three after either a `409 version_conflict`
+or a transport failure. The browser test exercises create → planning → generate
+→ submit → approve → regenerate → compare, verifies a real stale API conflict,
+and injects conflict/network failures to prove draft recovery.
+
+The P5→P6 domain boundary is `requireCompilableSpecRevision`. It accepts only an
+`approved` candidate whose ID and version exactly match the latest revision and
+the compiler caller's `expectedVersion`; stale identity or version throws a
+version conflict, and every non-approved state fails closed.
 
 ## Atomic record and replay
 
@@ -67,3 +93,5 @@ reasons, missing command fields, optimistic concurrency, policy changes,
 unified receipts, default Speculative removal,
 Helpful exceptions, scope changes, replay, and history. The PostgreSQL suite
 also verifies the transaction and persisted receipt against the real schema.
+Run `npm run test:spec-review` for the focused domain/API/UI contracts and
+`npm run test:browser:spec-review` for the HTTPS browser path.

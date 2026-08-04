@@ -28,6 +28,8 @@ import {
 import { StatusPill, Stepper } from "./ui";
 import { OverdesignReviewPanel } from "./overdesign-review-panel";
 import { SpecApprovalPanel } from "./spec-approval-panel";
+import { SpecRevisionComparison } from "./spec-revision-comparison";
+import { preserveSpecReviewDraft } from "../spec-review-draft";
 
 const emptyDraft: GoalContractDraft = {
   title: "",
@@ -84,6 +86,7 @@ export function ClarifyView({
     policies: [], classifications: [],
   });
   const [specs, setSpecs] = useState<SpecRevisionViewTimeline>({ revisions: [] });
+  const [selectedSpecRevisionId, setSelectedSpecRevisionId] = useState("");
   const [approvals, setApprovals] = useState<SpecApprovalTimeline>({ decisions: [] });
   const [approvalReason, setApprovalReason] = useState(
     "Approve the minimum execution contract",
@@ -125,6 +128,7 @@ export function ClarifyView({
           setSpecs(specHistory);
           const latest = specHistory.revisions.at(-1);
           if (latest) {
+            setSelectedSpecRevisionId(latest.specRevision.id);
             setApprovals(await goalWorkspaceApi.approvalTimeline(
               scope,
               loaded.id,
@@ -275,8 +279,17 @@ export function ClarifyView({
           ? "Generate the first Proposal and PRD revision"
           : "Regenerate the Proposal and PRD after review",
       );
-      setSpecs(await goalWorkspaceApi.specTimeline(scope, goal.id));
-      setApprovals({ decisions: [] });
+      const nextSpecs = await goalWorkspaceApi.specTimeline(scope, goal.id);
+      setSpecs(nextSpecs);
+      const next = nextSpecs.revisions.at(-1);
+      if (next) {
+        setSelectedSpecRevisionId(next.specRevision.id);
+        setApprovals(await goalWorkspaceApi.approvalTimeline(
+          scope,
+          goal.id,
+          next.specRevision.id,
+        ));
+      }
       notify("已生成不可变 Proposal/PRD 修订与过度设计评审");
     } catch (caught) {
       const message = caught instanceof GoalWorkspaceApiError &&
@@ -288,21 +301,53 @@ export function ClarifyView({
     } finally { setPlanning(false); }
   }
 
+  async function advanceGoalTo(nextState: "clarifying" | "planning") {
+    if (!goal) return;
+    setPlanning(true);
+    setError("");
+    try {
+      await goalWorkspaceApi.transitionGoal(scope, goal.id, {
+        expectedVersion: goal.version,
+        nextState,
+        reason: nextState === "clarifying"
+          ? "Begin clarification against the saved Goal Contract"
+          : "Lock the clarified Goal Contract for specification planning",
+        guards: nextState === "planning" ? { clarificationsResolved: true } : {},
+      });
+      const current = await goalWorkspaceApi.get(scope, goal.id);
+      setGoal(current);
+      setDraft(editableDraft(current));
+      notify(nextState === "planning" ? "Goal 已锁定进入规划" : "Goal 已进入澄清阶段");
+    } catch (caught) {
+      const message = caught instanceof GoalWorkspaceApiError &&
+          caught.code === "version_conflict"
+        ? "Goal 状态已变化，请刷新后重试。"
+        : "Goal 阶段未改变；现有草稿与历史已保留。";
+      setError(message);
+      notify(message);
+    } finally { setPlanning(false); }
+  }
+
   async function decideSpec(decision: SpecApprovalDecision) {
-    if (!goal || !latestSpec) return;
+    if (!goal || !selectedSpec) return;
+    const preservedDraft = preserveSpecReviewDraft({
+      reason: approvalReason,
+      helpfulExceptionElementIds: helpfulExceptions,
+      scopeChange,
+    });
     setPlanning(true);
     setError("");
     try {
       await goalWorkspaceApi.decideSpec(
         scope,
         goal.id,
-        latestSpec.specRevision.id,
+        selectedSpec.specRevision.id,
         {
-          expectedVersion: latestSpec.specRevision.version,
+          expectedVersion: selectedSpec.specRevision.version,
           reason: approvalReason,
-          policyRevision: latestSpec.specRevision.overdesignPolicyRevision,
+          policyRevision: selectedSpec.specRevision.overdesignPolicyRevision,
           decision,
-          affectedItemIds: latestSpec.specRevision.overdesignReview.items
+          affectedItemIds: selectedSpec.specRevision.overdesignReview.items
             .map(({ elementId }) => elementId),
           payload: {
             helpfulExceptionElementIds: decision === "approve"
@@ -318,6 +363,7 @@ export function ClarifyView({
       setSpecs(nextSpecs);
       const next = nextSpecs.revisions.at(-1);
       if (next) {
+        setSelectedSpecRevisionId(next.specRevision.id);
         setApprovals(await goalWorkspaceApi.approvalTimeline(
           scope,
           goal.id,
@@ -326,6 +372,9 @@ export function ClarifyView({
       }
       notify(`人工决定 ${decision} 已审计保存`);
     } catch (caught) {
+      setApprovalReason(preservedDraft.reason);
+      setHelpfulExceptions(preservedDraft.helpfulExceptionElementIds);
+      setScopeChange(preservedDraft.scopeChange);
       const message = caught instanceof GoalWorkspaceApiError &&
           caught.code === "version_conflict"
         ? "审批对象已产生新版本；你的理由仍保留，请刷新后重试。"
@@ -347,6 +396,23 @@ export function ClarifyView({
     }, new Map<string, ClarificationTimeline["questions"][number]>());
   const latestClassification = classifications.classifications.at(-1);
   const latestSpec = specs.revisions.at(-1);
+  const selectedSpec = specs.revisions.find(({ specRevision }) =>
+    specRevision.id === selectedSpecRevisionId
+  ) ?? latestSpec;
+
+  async function selectSpecRevision(specRevisionId: string) {
+    setSelectedSpecRevisionId(specRevisionId);
+    if (!goal) return;
+    try {
+      setApprovals(await goalWorkspaceApi.approvalTimeline(
+        scope,
+        goal.id,
+        specRevisionId,
+      ));
+    } catch {
+      setError("修订已切换，但审批历史加载失败；现有输入仍保留。");
+    }
+  }
 
   return (
     <div className="screen detail-screen">
@@ -537,26 +603,48 @@ export function ClarifyView({
                   <h3 id="spec-draft-heading">不可变规格草稿</h3>
                   <p>每次生成都追加修订，并用确定性规则标注过度设计。</p>
                 </div>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  disabled={planning || goal.status !== "planning"}
-                  onClick={generateSpec}
-                  title={goal.status === "planning" ? undefined : "Goal 进入 planning 后可生成"}
-                >
-                  {latestSpec ? "重新生成新修订" : "生成 Proposal / PRD"}
-                </button>
+                <div className="heading-actions">
+                  {goal.status === "draft" && (
+                    <button className="secondary-button" type="button" disabled={planning} onClick={() => { void advanceGoalTo("clarifying"); }}>
+                      进入澄清阶段
+                    </button>
+                  )}
+                  {goal.status === "clarifying" && (
+                    <button className="secondary-button" type="button" disabled={planning} onClick={() => { void advanceGoalTo("planning"); }}>
+                      锁定规划合同
+                    </button>
+                  )}
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={planning || goal.status !== "planning" ||
+                      (latestSpec !== undefined &&
+                        !["approved", "rejected"].includes(latestSpec.specRevision.status))}
+                    onClick={generateSpec}
+                    title={goal.status === "planning"
+                      ? "现有修订完成审批后可重新生成"
+                      : "Goal 进入 planning 后可生成"}
+                  >
+                    {latestSpec ? "重新生成新修订" : "生成 Proposal / PRD"}
+                  </button>
+                </div>
               </div>
-              {latestSpec ? (
+              {selectedSpec ? (
                 <>
+                  <SpecRevisionComparison
+                    revisions={specs.revisions}
+                    selectedRevisionId={selectedSpec.specRevision.id}
+                    onSelect={(revisionId) => { void selectSpecRevision(revisionId); }}
+                  />
                   <p>
-                    Revision {latestSpec.specRevision.revision} · digest {latestSpec.specRevision.artifactDigest.slice(0, 12)} · Goal v{latestSpec.specRevision.sourceGoalVersion}
+                    Revision {selectedSpec.specRevision.revision} · digest {selectedSpec.specRevision.artifactDigest.slice(0, 12)} · Goal v{selectedSpec.specRevision.sourceGoalVersion}
                   </p>
-                  <OverdesignReviewPanel review={latestSpec.specRevision.overdesignReview} />
+                  <OverdesignReviewPanel review={selectedSpec.specRevision.overdesignReview} />
                   <SpecApprovalPanel
-                    specRevision={latestSpec.specRevision}
+                    specRevision={selectedSpec.specRevision}
                     timeline={approvals}
                     busy={planning}
+                    readOnly={selectedSpec.specRevision.id !== latestSpec?.specRevision.id}
                     reason={approvalReason}
                     setReason={setApprovalReason}
                     helpfulExceptions={helpfulExceptions}

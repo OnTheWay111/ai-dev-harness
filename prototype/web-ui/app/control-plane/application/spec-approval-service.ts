@@ -115,6 +115,7 @@ export class SpecApprovalService {
     organizationId: string;
     projectId: string;
     goalId: string;
+    specRevisionId: string;
     actorId: string;
   }) {
     await this.authorizer.authorize({
@@ -177,6 +178,8 @@ export class SpecApprovalService {
       specRevisionId: command.target.id,
     });
     if (!current) throw new SpecApprovalValidationError("SpecRevision was not found");
+    const latest = await this.repository.getLatest(command.scope);
+    if (!latest || latest.id !== current.id) throw new VersionConflictError();
     if (current.version !== command.expectedVersion) throw new VersionConflictError();
     const expectedStatus = command.decision === "submit_for_review"
       ? "draft"

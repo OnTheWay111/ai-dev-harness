@@ -42,17 +42,39 @@ export default defineConfig(async () => {
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
+  const e2eHttps = process.env.HARNESS_E2E_HTTPS === "true";
+  const basicSsl = e2eHttps
+    ? (await import("@vitejs/plugin-basic-ssl")).default()
+    : null;
 
   return {
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      ...(isCodexSeatbeltSandbox
+        ? { watch: { useFsEvents: false, usePolling: true } }
+        : {}),
+      ...(e2eHttps ? { https: {} } : {}),
+    },
     plugins: [
+      ...(basicSsl ? [basicSsl] : []),
       vinext(),
       sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: localBindingConfig,
+        config: {
+          ...localBindingConfig,
+          ...(e2eHttps ? {
+            vars: {
+              WORKBENCH_DATA_SOURCE: process.env.WORKBENCH_DATA_SOURCE,
+              OIDC_ISSUER: process.env.OIDC_ISSUER,
+              OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
+              OIDC_REDIRECT_URI: process.env.OIDC_REDIRECT_URI,
+              OIDC_COOKIE_SECRET: process.env.OIDC_COOKIE_SECRET,
+              OIDC_ALLOWED_RETURN_TO_PATHS:
+                process.env.OIDC_ALLOWED_RETURN_TO_PATHS,
+              HARNESS_ALLOWED_ORIGINS: process.env.HARNESS_ALLOWED_ORIGINS,
+            },
+          } : {}),
+        },
       }),
     ],
   };

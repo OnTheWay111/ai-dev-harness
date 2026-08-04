@@ -10,6 +10,7 @@ export function SpecApprovalPanel({
   specRevision,
   timeline,
   busy,
+  readOnly,
   reason,
   setReason,
   helpfulExceptions,
@@ -21,6 +22,7 @@ export function SpecApprovalPanel({
   specRevision: SpecRevision;
   timeline: SpecApprovalTimeline;
   busy: boolean;
+  readOnly?: boolean;
   reason: string;
   setReason(value: string): void;
   helpfulExceptions: readonly string[];
@@ -52,7 +54,7 @@ export function SpecApprovalPanel({
       </div>
 
       {helpful.length > 0 && (
-        <fieldset disabled={busy || specRevision.status !== "in_review"}>
+        <fieldset disabled={busy || readOnly || specRevision.status !== "in_review"}>
           <legend>Helpful 例外（未勾选则删除）</legend>
           {helpful.map((item) => (
             <label key={item.elementId}>
@@ -71,11 +73,15 @@ export function SpecApprovalPanel({
           Speculative 默认删除且不能例外保留：{speculative.map(({ title }) => title).join("、")}
         </p>
       )}
+      {readOnly && (
+        <p className="form-warning">该修订已有后续版本，仅供查看；服务端会拒绝任何过期审批。</p>
+      )}
 
-      <div className="scope-change-grid">
+      <div className="scope-change-grid" aria-disabled={readOnly}>
         <label className="goal-form-field">
           <span>范围操作</span>
           <select
+            disabled={readOnly}
             value={scopeChange.operation}
             onChange={(event) => setScopeChange({
               ...scopeChange,
@@ -89,6 +95,7 @@ export function SpecApprovalPanel({
         <label className="goal-form-field">
           <span>范围类型</span>
           <select
+            disabled={readOnly}
             value={scopeChange.kind}
             onChange={(event) => setScopeChange({
               ...scopeChange,
@@ -103,6 +110,7 @@ export function SpecApprovalPanel({
         <label className="goal-form-field goal-form-wide">
           <span>范围修改内容</span>
           <input
+            disabled={readOnly}
             value={scopeChange.value}
             maxLength={4_000}
             onChange={(event) => setScopeChange({ ...scopeChange, value: event.target.value })}
@@ -113,6 +121,7 @@ export function SpecApprovalPanel({
         <span>审批或修改理由</span>
         <textarea
           required
+          disabled={readOnly}
           value={reason}
           maxLength={4_000}
           onChange={(event) => setReason(event.target.value)}
@@ -121,19 +130,19 @@ export function SpecApprovalPanel({
 
       <div className="goal-form-actions approval-actions">
         {specRevision.status === "draft" && (
-          <button disabled={busy || !reason.trim()} className="primary-button" type="button" onClick={() => onDecision("submit_for_review")}>
+          <button disabled={busy || readOnly || !reason.trim()} className="primary-button" type="button" onClick={() => onDecision("submit_for_review")}>
             提交人工评审
           </button>
         )}
         {specRevision.status === "in_review" && (
           <>
-            <button disabled={busy || !reason.trim()} className="secondary-button" type="button" onClick={() => onDecision("reject")}>
+            <button disabled={busy || readOnly || !reason.trim()} className="secondary-button" type="button" onClick={() => onDecision("reject")}>
               拒绝
             </button>
-            <button disabled={busy || !reason.trim() || !scopeChange.value.trim()} className="secondary-button" type="button" onClick={() => onDecision("request_changes")}>
+            <button disabled={busy || readOnly || !reason.trim() || !scopeChange.value.trim()} className="secondary-button" type="button" onClick={() => onDecision("request_changes")}>
               请求范围修改
             </button>
-            <button disabled={busy || !reason.trim()} className="primary-button" type="button" onClick={() => onDecision("approve")}>
+            <button disabled={busy || readOnly || !reason.trim()} className="primary-button" type="button" onClick={() => onDecision("approve")}>
               批准最小合同
             </button>
           </>

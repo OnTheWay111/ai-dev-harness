@@ -2719,6 +2719,112 @@ kbd {
   border-top: 1px solid var(--line);
 }
 
+.spec-comparison {
+  display: grid;
+  gap: 18px;
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.spec-revision-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.spec-revision-tabs button {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 2px;
+  min-width: 132px;
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--ink-700);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.spec-revision-tabs button[aria-pressed="true"] {
+  color: var(--teal-700);
+  border-color: #7fcabb;
+  background: #f0faf7;
+}
+
+.spec-revision-tabs small,
+.spec-document-grid small {
+  display: block;
+  color: var(--ink-500);
+}
+
+.spec-document-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.spec-document-grid article {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.spec-document-grid h4,
+.spec-document-grid h5 {
+  margin: 8px 0;
+}
+
+.spec-document-grid li {
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+
+.spec-diff {
+  display: grid;
+  gap: 8px;
+}
+
+.spec-diff-summary,
+.spec-diff-row header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.spec-diff-summary span {
+  color: var(--ink-500);
+}
+
+.spec-diff-row {
+  padding: 12px;
+  border-left: 3px solid var(--amber-700);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.spec-diff-row.added { border-left-color: var(--teal-600); }
+.spec-diff-row.removed { border-left-color: var(--rose-700); }
+
+.spec-diff-row code {
+  overflow-wrap: anywhere;
+}
+
+.spec-diff-row p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.spec-diff-row del { color: var(--rose-700); }
+.spec-diff-row ins { color: var(--teal-700); text-decoration: none; }
+
 .spec-approval-panel fieldset {
   display: grid;
   gap: 10px;
@@ -4135,6 +4241,10 @@ kbd {
 
   .stepper li {
     gap: 0;
+  }
+
+  .spec-document-grid {
+    grid-template-columns: 1fr;
   }
 }
 

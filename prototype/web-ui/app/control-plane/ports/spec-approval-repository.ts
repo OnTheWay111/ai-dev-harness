@@ -34,7 +34,10 @@ export interface CommitSpecApproval {
 
 export interface SpecApprovalRepository {
   get(scope: SpecRevisionScope & { specRevisionId: string }): Promise<SpecRevision | null>;
-  approvalTimeline(scope: SpecRevisionScope): Promise<SpecApprovalTimeline>;
+  getLatest(scope: SpecRevisionScope): Promise<SpecRevision | null>;
+  approvalTimeline(
+    scope: SpecRevisionScope & { specRevisionId: string },
+  ): Promise<SpecApprovalTimeline>;
   findApprovalReceipt(
     lookup: SpecApprovalIdempotencyLookup,
   ): Promise<SpecApprovalReceipt | null>;

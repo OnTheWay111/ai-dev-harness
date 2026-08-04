@@ -27,7 +27,11 @@ version, Planner run/configuration, and generation time.
 - Reusing identical content returns the existing digest without replacing its
   original creation metadata.
 - A changed or regenerated document appends a new `SpecRevision`; prior content
-  and metadata remain readable.
+  and metadata remain readable. Timeline reads load and digest-check every
+  artifact, then return a deterministic structured diff between each revision
+  and its direct predecessor. Proposal, PRD, architecture, migration, rollback,
+  and solution-element changes are represented as added, removed, or changed
+  paths; the first revision has no predecessor diff.
 
 The filesystem adapter is the first production-shaped adapter behind the port.
 A managed object-store adapter can replace it without changing domain or API
@@ -36,7 +40,8 @@ contracts; deployments must not use ephemeral container storage.
 ## API and verification
 
 `GET /api/v1/goals/{goalId}/specs` returns the authorized immutable revision
-timeline. `POST` generates a new draft from the exact `expectedGoalVersion`.
+timeline, artifact content, and adjacent structured differences. `POST`
+generates a new draft from the exact `expectedGoalVersion`.
 Both are no-store responses; writes apply same-origin checks, strict body
 validation, server-derived identity, RBAC, rate limiting, and stable errors.
 

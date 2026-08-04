@@ -185,6 +185,22 @@ test("regeneration appends a revision and never overwrites prior artifact conten
   assert.equal(second.specRevision.previousRevisionId, first.specRevision.id);
   assert.notEqual(second.specRevision.artifactRef, first.specRevision.artifactRef);
   assert.deepEqual((await artifacts.get(first.specRevision.artifactRef))?.content, validBundle);
+  const timeline = await service.timeline({
+    organizationId: goal.organizationId,
+    projectId: goal.projectId,
+    goalId: goal.id,
+    actorId: "reviewer-1",
+  });
+  assert.equal(timeline.revisions[0].changesFromPrevious, null);
+  assert.deepEqual(timeline.revisions[1].changesFromPrevious?.counts, {
+    added: 0,
+    removed: 0,
+    changed: 1,
+  });
+  assert.equal(
+    timeline.revisions[1].changesFromPrevious?.changes[0].path,
+    "proposal.summary",
+  );
 });
 
 test("invalid Planner output and artifact storage failure do not append a revision", async () => {

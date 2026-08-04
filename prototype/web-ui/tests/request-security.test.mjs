@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createGoalTransitionHandler } from
   "../app/control-plane/http/goal-transition-handler.ts";
-import { MemoryFixedWindowRateLimiter } from
+import { configuredWriteOrigins, MemoryFixedWindowRateLimiter } from
   "../app/security/request-security.ts";
 import { handleOidcLogout } from "../app/auth/oidc-http.ts";
 
@@ -82,6 +82,26 @@ test("rejects cross-origin write requests before authentication or persistence",
   );
   assert.equal(missingOrigin.status, 403);
   assert.equal(forgedFetchSite.status, 403);
+});
+
+test("normalizes explicitly trusted proxy origins and rejects unsafe configuration", async () => {
+  assert.deepEqual(configuredWriteOrigins({
+    HARNESS_ALLOWED_ORIGINS:
+      "https://review.example.invalid,http://localhost:4174,https://review.example.invalid",
+  }), ["https://review.example.invalid", "http://localhost:4174"]);
+  assert.equal(configuredWriteOrigins({}), undefined);
+  assert.throws(() => configuredWriteOrigins({
+    HARNESS_ALLOWED_ORIGINS: "http://review.example.invalid",
+  }), /HTTPS origins/);
+  assert.throws(() => configuredWriteOrigins({
+    HARNESS_ALLOWED_ORIGINS: "https://review.example.invalid/path",
+  }), /HTTPS origins/);
+  const proxied = await handler({
+    allowedOrigins: ["https://review.example.invalid"],
+  })(request(validBody(), {
+    headers: { origin: "https://review.example.invalid" },
+  }), routeScope);
+  assert.equal(proxied.status, 200);
 });
 
 test("rejects unknown fields, unknown guards, and oversized bodies", async () => {

@@ -4,6 +4,10 @@ import type {
 } from "../control-plane/domain/goal-contract";
 import type { GoalWorkspaceReceipt } from
   "../control-plane/ports/goal-workspace-repository";
+import type { GoalTransitionReceipt } from
+  "../control-plane/application/goal-application-service";
+import type { GoalStatus, TransitionGuard } from
+  "../control-plane/domain/state-machines";
 import type {
   ClarificationAnswerReceipt,
   ClarificationGenerationReceipt,
@@ -224,6 +228,31 @@ export const goalWorkspaceApi = {
         credentials: "same-origin",
         headers: writeHeaders(),
         body: JSON.stringify({ ...scope, expectedGoalVersion, reason }),
+      },
+    ));
+  },
+
+  async transitionGoal(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+    input: {
+      expectedVersion: number;
+      nextState: GoalStatus;
+      reason: string;
+      guards: Readonly<Partial<Record<TransitionGuard, boolean>>>;
+    },
+  ): Promise<GoalTransitionReceipt> {
+    const query = new URLSearchParams({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+    });
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/transitions?${query}`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: writeHeaders(),
+        body: JSON.stringify(input),
       },
     ));
   },

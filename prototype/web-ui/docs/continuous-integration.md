@@ -10,11 +10,13 @@ disposable GitHub-hosted runner network, so the workflow contains no database
 password or persistent credential. It executes, in order:
 
 1. schema-to-migration drift generation in a temporary directory;
-2. empty-database migration and six real PostgreSQL integration cases;
+2. empty-database migration and the real PostgreSQL integration suite;
 3. the production build and full automated test suite;
-4. TypeScript and ESLint checks; and
+4. TypeScript and ESLint checks;
 5. a scan of every `dist/client` file for connection URLs, database Secret
-   names, and server-only Neon/Drizzle driver markers.
+   names, and server-only Neon/Drizzle driver markers; and
+6. an HTTPS Chromium path covering P5 revision generation, comparison,
+   approval, stale conflicts, and draft recovery.
 
 All database lifecycle commands suppress raw connection errors. The drift
 checker logs only changed migration paths, and the client scanner logs only a
@@ -28,6 +30,8 @@ From `prototype/web-ui`, run:
 ```bash
 npm ci
 npm run ci:p1
+npx playwright install chromium
+npm run test:browser:spec-review
 ```
 
 When `POSTGRES_TEST_ADMIN_URL` is absent, the integration runner creates a

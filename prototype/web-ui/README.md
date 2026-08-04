@@ -112,6 +112,10 @@ deny behavior, and role-change Audit transaction are documented in
 - `npm run typecheck`: type-check the Web UI surface
 - `npm run build`: verify the vinext build output
 - `npm test`: build and run SSR, HTTP API, client adapter, and selector tests
+- `npm run test:spec-review`: run the focused P5 revision, approval, recovery,
+  accessibility-contract, and compiler-gate tests
+- `npm run test:browser:spec-review`: run the HTTPS Chromium review path (run
+  `npx playwright install chromium` once on a new development machine)
 - `npm run test:postgres:integration`: create, migrate, test, and destroy a
   temporary real PostgreSQL database
 - `npm run ci:p1`: run the local equivalent of the P1 PostgreSQL CI gate
@@ -213,7 +217,8 @@ The strict Proposal/PRD bundle, immutable content-addressed Artifact Store,
 SpecRevision generation API, and controlled Planner smoke test are documented
 in [`../../docs/spec-artifacts.md`](../../docs/spec-artifacts.md).
 Helpful exceptions, scope-change requests, immutable approval history, and the
-default removal of Speculative elements are documented in
+default removal of Speculative elements, revision comparison, stale-conflict
+recovery, and the P5→P6 compilation gate are documented in
 [`../../docs/spec-approvals.md`](../../docs/spec-approvals.md).
 The versioned deterministic S/M/L/XL and risk policy, factor explanations,
 required Artifacts, approvers, and persistence contract are documented in

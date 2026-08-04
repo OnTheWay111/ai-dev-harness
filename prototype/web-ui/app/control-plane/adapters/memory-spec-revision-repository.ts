@@ -83,12 +83,18 @@ export class MemorySpecRevisionRepository implements SpecRevisionRepository,
     return revision ? structuredClone(revision) : null;
   }
 
-  async approvalTimeline(scope: SpecRevisionScope) {
+  async getLatest(scope: SpecRevisionScope) {
+    const revision = (this.revisions.get(scopeKey(scope)) ?? []).at(-1);
+    return revision ? structuredClone(revision) : null;
+  }
+
+  async approvalTimeline(scope: SpecRevisionScope & { specRevisionId: string }) {
     return {
       decisions: structuredClone(this.decisions.filter((decision) =>
         decision.organizationId === scope.organizationId &&
         decision.projectId === scope.projectId &&
-        decision.goalId === scope.goalId
+        decision.goalId === scope.goalId &&
+        decision.specRevisionId === scope.specRevisionId
       )),
     };
   }
@@ -111,6 +117,7 @@ export class MemorySpecRevisionRepository implements SpecRevisionRepository,
     const index = revisions.findIndex(({ id }) => id === command.current.id);
     if (
       index < 0 ||
+      index !== revisions.length - 1 ||
       revisions[index].version !== command.expectedVersion ||
       command.next.version !== command.expectedVersion + 1
     ) throw new VersionConflictError();

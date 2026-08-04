@@ -4,9 +4,12 @@ import { createSpecApprovalHandler } from
   "../../../../../../../control-plane/http/spec-approval-handler.ts";
 import { getSpecApprovalService } from
   "../../../../../../../control-plane/runtime/spec-approval-runtime.ts";
+import { configuredWriteOrigins } from
+  "../../../../../../../security/request-security.ts";
 
 const handle = createSpecApprovalHandler({
   service: getSpecApprovalService(),
+  allowedOrigins: configuredWriteOrigins(),
   actorResolver: async (request) => {
     const principal = await readRequestPrincipal(request, getOidcService());
     return principal ? { actorId: principal.actorId } : null;

@@ -15,6 +15,10 @@ import type { GoalWorkspaceRepository } from "../ports/goal-workspace-repository
 import type { ArtifactStore, ImmutableArtifact } from "../ports/artifact-store.ts";
 import type { PlannerPort } from "../ports/planner-port.ts";
 import type { SpecRevisionRepository } from "../ports/spec-revision-repository.ts";
+import {
+  diffSpecBundles,
+  type SpecRevisionDiff,
+} from "../domain/spec-revision-diff.ts";
 
 export class SpecGenerationValidationError extends Error {
   constructor(message: string) {
@@ -37,7 +41,9 @@ export interface SpecGenerationReceipt {
   artifact: ImmutableArtifact<SpecBundle>;
 }
 
-export type SpecRevisionView = SpecGenerationReceipt;
+export interface SpecRevisionView extends SpecGenerationReceipt {
+  changesFromPrevious: SpecRevisionDiff | null;
+}
 
 export interface SpecRevisionViewTimeline {
   revisions: readonly SpecRevisionView[];
@@ -180,12 +186,18 @@ export class SpecGenerationService {
       permission: "spec.read",
     });
     const timeline = await this.repository.list(command);
-    const revisions = await Promise.all(timeline.revisions.map(async (specRevision) => {
+    const loaded = await Promise.all(timeline.revisions.map(async (specRevision) => {
       const artifact = await this.artifacts.get<SpecBundle>(specRevision.artifactRef);
       if (!artifact || artifact.digest !== specRevision.artifactDigest) {
         throw new SpecGenerationValidationError("Spec artifact is missing or does not match its digest");
       }
       return { specRevision, artifact: { ...artifact, content: validateSpecBundle(artifact.content) } };
+    }));
+    const revisions = loaded.map((revision, index): SpecRevisionView => ({
+      ...revision,
+      changesFromPrevious: index === 0
+        ? null
+        : diffSpecBundles(loaded[index - 1].artifact.content, revision.artifact.content),
     }));
     return { revisions };
   }

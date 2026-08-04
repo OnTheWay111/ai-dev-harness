@@ -4,9 +4,12 @@ import { createSpecGenerationHandler } from
   "../../../../../control-plane/http/spec-generation-handler.ts";
 import { getSpecGenerationService } from
   "../../../../../control-plane/runtime/spec-generation-runtime.ts";
+import { configuredWriteOrigins } from
+  "../../../../../security/request-security.ts";
 
 const handle = createSpecGenerationHandler({
   service: getSpecGenerationService(),
+  allowedOrigins: configuredWriteOrigins(),
   actorResolver: async (request) => {
     const principal = await readRequestPrincipal(request, getOidcService());
     return principal ? { actorId: principal.actorId } : null;

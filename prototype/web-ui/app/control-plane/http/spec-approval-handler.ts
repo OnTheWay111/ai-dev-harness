@@ -80,6 +80,7 @@ export function createSpecApprovalHandler(input: {
             organizationId,
             projectId,
             goalId,
+            specRevisionId,
             actorId: actor.actorId,
           }),
         }, { headers: { "cache-control": "private, no-store" } }));

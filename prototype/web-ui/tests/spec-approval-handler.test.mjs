@@ -85,6 +85,7 @@ test("approval history is authorized and scoped to the Goal", async () => {
     organizationId: ids.organizationId,
     projectId: ids.projectId,
     goalId: ids.goalId,
+    specRevisionId: ids.specRevisionId,
     actorId: "viewer-1",
   }]);
 });

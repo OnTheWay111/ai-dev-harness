@@ -2,9 +2,11 @@ import { readRequestPrincipal } from "../../../../../auth/oidc-http.ts";
 import { getOidcService } from "../../../../../auth/oidc-runtime.ts";
 import { createClassificationHandler } from "../../../../../control-plane/http/classification-handler.ts";
 import { getClassificationService } from "../../../../../control-plane/runtime/classification-runtime.ts";
+import { configuredWriteOrigins } from "../../../../../security/request-security.ts";
 
 const handle = createClassificationHandler({
   service: getClassificationService(),
+  allowedOrigins: configuredWriteOrigins(),
   actorResolver: async (request) => {
     const principal = await readRequestPrincipal(request, getOidcService());
     return principal ? { actorId: principal.actorId } : null;

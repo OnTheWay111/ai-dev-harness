@@ -43,7 +43,7 @@ interface GoalRouteScope {
 
 interface HandlerDependencies {
   service: GoalApplication;
-  actorResolver(request: Request): Promise<Actor>;
+  actorResolver(request: Request): Promise<Actor | null>;
   rateLimiter?: RateLimiter;
   allowedOrigins?: readonly string[];
   maxBodyBytes?: number;
@@ -142,6 +142,7 @@ export function createGoalTransitionHandler(dependencies: HandlerDependencies) {
       if (request.method !== "POST") return errorResponse("not_found", 404);
       assertSameOrigin(request, dependencies.allowedOrigins);
       const actor = await dependencies.actorResolver(request);
+      if (!actor) return errorResponse("authentication_required", 401);
       (dependencies.rateLimiter ?? defaultWriteRateLimiter).consume({
         actorId: actor.actorId,
         organizationId: scope.organizationId,

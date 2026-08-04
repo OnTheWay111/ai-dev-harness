@@ -144,16 +144,20 @@ export class PostgresSpecApprovalRepository implements SpecApprovalRepository {
       .find(({ id }) => id === scope.specRevisionId) ?? null;
   }
 
-  async approvalTimeline(scope: SpecRevisionScope) {
+  async getLatest(scope: SpecRevisionScope) {
+    return (await this.revisions.list(scope)).revisions.at(-1) ?? null;
+  }
+
+  async approvalTimeline(scope: SpecRevisionScope & { specRevisionId: string }) {
     const result = await this.pool.query<DecisionRow>(
       `SELECT id, organization_id, project_id, goal_id, subject_id,
               subject_version, outcome, actor_id, reason, request_id,
               policy_revision, affected_item_ids, decision_payload, created_at
          FROM decisions
         WHERE organization_id=$1 AND project_id=$2 AND goal_id=$3
-          AND subject_type='spec_revision'
+          AND subject_type='spec_revision' AND subject_id=$4
         ORDER BY created_at, id`,
-      values(scope),
+      [...values(scope), scope.specRevisionId],
     );
     return { decisions: result.rows.map(mapDecision) };
   }
@@ -172,9 +176,21 @@ export class PostgresSpecApprovalRepository implements SpecApprovalRepository {
         await client.query("COMMIT");
         return replay;
       }
+      const goalLock = await client.query(
+        `SELECT id FROM goals
+          WHERE organization_id=$1 AND project_id=$2 AND id=$3
+          FOR UPDATE`,
+        values(command.current),
+      );
+      if (goalLock.rowCount !== 1) throw new VersionConflictError();
       const locked = await client.query<{ version: number; status: string }>(
         `SELECT version, status FROM spec_revisions
           WHERE organization_id=$1 AND project_id=$2 AND goal_id=$3 AND id=$4
+            AND NOT EXISTS (
+              SELECT 1 FROM spec_revisions newer
+               WHERE newer.organization_id=$1 AND newer.project_id=$2
+                 AND newer.goal_id=$3 AND newer.revision > spec_revisions.revision
+            )
           FOR UPDATE`,
         [...values(command.current), command.current.id],
       );
@@ -206,7 +222,7 @@ export class PostgresSpecApprovalRepository implements SpecApprovalRepository {
            actor_id, reason, request_id, policy_revision, affected_item_ids,
            decision_payload, created_at)
          VALUES
-          ($1,$2,$3,$4,$1,1,$5,'spec_revision',$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15)`,
+          ($1,$2,$3,$4,$16,1,$5,'spec_revision',$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15)`,
         [
           decision.id,
           decision.organizationId,
@@ -230,6 +246,7 @@ export class PostgresSpecApprovalRepository implements SpecApprovalRepository {
             removedElementIds: decision.removedElementIds,
           }),
           new Date(decision.createdAt),
+          decision.id,
         ],
       );
       const audit = command.audit;
@@ -260,7 +277,7 @@ export class PostgresSpecApprovalRepository implements SpecApprovalRepository {
         `INSERT INTO outbox_events
           (id, organization_id, aggregate_type, aggregate_id,
            aggregate_version, event_type, deduplication_key, payload)
-         VALUES ($1,$2,'spec_revision',$3,$4,$5,$1,$6::jsonb)`,
+         VALUES ($1,$2,'spec_revision',$3,$4,$5,$7,$6::jsonb)`,
         [
           event.id,
           event.organizationId,
@@ -268,6 +285,7 @@ export class PostgresSpecApprovalRepository implements SpecApprovalRepository {
           event.aggregateVersion,
           event.type,
           JSON.stringify({ ...event.payload, receipt: command.receipt }),
+          event.id,
         ],
       );
       const completed = await client.query(

@@ -46,6 +46,12 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
         working-directory: prototype/web-ui
+      - name: Install Chromium for the P5 review path
+        run: npx playwright install --with-deps chromium
+        working-directory: prototype/web-ui
       - name: Run the P1 PostgreSQL gate
         run: npm run ci:p1
+        working-directory: prototype/web-ui
+      - name: Run the P5 specification review browser path
+        run: npm run test:browser:spec-review
         working-directory: prototype/web-ui

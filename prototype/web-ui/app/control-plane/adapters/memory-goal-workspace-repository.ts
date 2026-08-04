@@ -4,6 +4,7 @@ import {
   VersionConflictError,
 } from "../domain/errors.ts";
 import type { GoalContract } from "../domain/goal-contract.ts";
+import type { GoalStatus } from "../domain/state-machines.ts";
 import type {
   CommitGoalCreate,
   CommitGoalUpdate,
@@ -84,6 +85,26 @@ export class MemoryGoalWorkspaceRepository implements GoalWorkspaceRepository {
     }
     this.goals.set(goalKey(command.next), structuredClone(command.next));
     return this.complete(command);
+  }
+
+  applyStateTransition(input: {
+    scope: GoalWorkspaceScope;
+    expectedVersion: number;
+    nextState: GoalStatus;
+    occurredAt: Date;
+  }): GoalContract {
+    const current = this.goals.get(goalKey(input.scope));
+    if (!current || current.version !== input.expectedVersion) {
+      throw new VersionConflictError();
+    }
+    const next = {
+      ...current,
+      status: input.nextState,
+      version: current.version + 1,
+      updatedAt: input.occurredAt.toISOString(),
+    };
+    this.goals.set(goalKey(next), structuredClone(next));
+    return structuredClone(next);
   }
 
   private async replay(
