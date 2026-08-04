@@ -100,6 +100,8 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm run typecheck`: type-check the Web UI surface
 - `npm run build`: verify the vinext build output
 - `npm test`: build and run SSR, HTTP API, client adapter, and selector tests
+- `npm run test:postgres:integration`: create, migrate, test, and destroy a
+  temporary real PostgreSQL database
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 - `npm run db:generate:postgres`: generate workbench PostgreSQL migrations
 - `npm run db:migrate:postgres`: atomically apply committed PostgreSQL
@@ -169,6 +171,8 @@ receipt contract, and verification command are defined in
 [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
 The reproducible real-database SSR/API evidence is recorded in
 [`docs/p1-03-development-postgres-verification.md`](docs/p1-03-development-postgres-verification.md).
+Temporary local/CI PostgreSQL lifecycle and transaction coverage are documented
+in [`docs/postgres-integration-tests.md`](docs/postgres-integration-tests.md).
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls
