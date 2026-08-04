@@ -206,6 +206,9 @@ test are documented in
 The versioned clarification JSON Schema, strict server validation, fixtures,
 and diagnostic contract are documented in
 [`../../docs/planner-output-schema.md`](../../docs/planner-output-schema.md).
+The append-only clarification rounds, question/answer revisions, human
+decisions, API/UI timeline, and concurrency rules are documented in
+[`../../docs/clarification-history.md`](../../docs/clarification-history.md).
 The Goal write-module interface, Repository seam, adapters, and HTTP mapping are
 documented in
 [`../../docs/control-plane-write-architecture.md`](../../docs/control-plane-write-architecture.md).

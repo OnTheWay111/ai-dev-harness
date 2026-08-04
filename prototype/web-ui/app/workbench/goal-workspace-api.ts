@@ -4,6 +4,11 @@ import type {
 } from "../control-plane/domain/goal-contract";
 import type { GoalWorkspaceReceipt } from
   "../control-plane/ports/goal-workspace-repository";
+import type {
+  ClarificationAnswerReceipt,
+  ClarificationGenerationReceipt,
+  ClarificationTimeline,
+} from "../control-plane/domain/clarification-history";
 
 export interface GoalWorkspaceScope {
   organizationId: string;
@@ -84,6 +89,63 @@ export const goalWorkspaceApi = {
           ...scope,
           expectedVersion,
           draft,
+          reason,
+        }),
+      },
+    ));
+  },
+
+  async clarificationTimeline(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+  ): Promise<ClarificationTimeline> {
+    const query = new URLSearchParams({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+    });
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/clarifications?${query}`,
+      { credentials: "same-origin", cache: "no-store" },
+    ));
+  },
+
+  async generateClarifications(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+    expectedGoalVersion: number,
+    reason: string,
+  ): Promise<ClarificationGenerationReceipt> {
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/clarifications`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: writeHeaders(),
+        body: JSON.stringify({ ...scope, expectedGoalVersion, reason }),
+      },
+    ));
+  },
+
+  async answerClarification(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+    threadId: string,
+    expectedGoalVersion: number,
+    expectedQuestionRevision: number,
+    answer: string,
+    reason: string,
+  ): Promise<ClarificationAnswerReceipt> {
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/clarifications/${encodeURIComponent(threadId)}/answers`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: writeHeaders(),
+        body: JSON.stringify({
+          ...scope,
+          expectedGoalVersion,
+          expectedQuestionRevision,
+          answer,
           reason,
         }),
       },

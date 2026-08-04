@@ -18,6 +18,10 @@ import {
   type GoalWorkspacePool,
 } from "../adapters/postgres-goal-workspace-repository.ts";
 import { GoalWorkspaceService } from "../application/goal-workspace-service.ts";
+import type {
+  GoalWorkspaceAuthorizer,
+  GoalWorkspaceRepository,
+} from "../ports/goal-workspace-repository.ts";
 
 export interface DefaultGoalWorkspaceScope {
   organizationId: string;
@@ -26,6 +30,8 @@ export interface DefaultGoalWorkspaceScope {
 
 let pool: GoalWorkspacePool | undefined;
 let service: GoalWorkspaceService | undefined;
+let repository: GoalWorkspaceRepository | undefined;
+let authorizer: GoalWorkspaceAuthorizer | undefined;
 
 function runtimeConfig() {
   return readWorkbenchRepositoryConfig(process.env);
@@ -41,27 +47,38 @@ function getPool(): GoalWorkspacePool {
 
 export function getGoalWorkspaceService(): GoalWorkspaceService {
   if (service) return service;
-  const config = runtimeConfig();
-  if (selectWorkbenchDataSource(config) === "demo") {
-    service = new GoalWorkspaceService({
-      repository: new MemoryGoalWorkspaceRepository(),
-      authorizer: { async authorize() {} },
-    });
-    return service;
-  }
-  const runtimePool = getPool();
-  const policy = new PolicyEvaluator(
-    new PostgresRoleBindingRepository(runtimePool),
-  );
   service = new GoalWorkspaceService({
-    repository: new PostgresGoalWorkspaceRepository(runtimePool),
-    authorizer: {
-      async authorize(input) {
-        await policy.assertAllowed(input);
-      },
-    },
+    repository: getGoalWorkspaceRepository(),
+    authorizer: getGoalWorkspaceAuthorizer(),
   });
   return service;
+}
+
+export function getGoalWorkspaceRepository(): GoalWorkspaceRepository {
+  if (repository) return repository;
+  repository = selectWorkbenchDataSource(runtimeConfig()) === "demo"
+    ? new MemoryGoalWorkspaceRepository()
+    : new PostgresGoalWorkspaceRepository(getPool());
+  return repository;
+}
+
+export function getGoalWorkspaceAuthorizer(): GoalWorkspaceAuthorizer {
+  if (authorizer) return authorizer;
+  if (selectWorkbenchDataSource(runtimeConfig()) === "demo") {
+    authorizer = { async authorize() {} };
+    return authorizer;
+  }
+  const policy = new PolicyEvaluator(new PostgresRoleBindingRepository(getPool()));
+  authorizer = { async authorize(input) { await policy.assertAllowed(input); } };
+  return authorizer;
+}
+
+export function getGoalWorkspacePool(): GoalWorkspacePool {
+  return getPool();
+}
+
+export function usesDemoGoalWorkspace(): boolean {
+  return selectWorkbenchDataSource(runtimeConfig()) === "demo";
 }
 
 export async function resolveDefaultGoalWorkspaceScope(

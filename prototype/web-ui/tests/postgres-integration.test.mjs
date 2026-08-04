@@ -34,6 +34,14 @@ import {
 import {
   PostgresGoalWorkspaceRepository,
 } from "../app/control-plane/adapters/postgres-goal-workspace-repository.ts";
+import { PostgresClarificationHistoryRepository } from
+  "../app/control-plane/adapters/postgres-clarification-history-repository.ts";
+import { FakePlannerAdapter } from
+  "../app/control-plane/adapters/fake-planner-adapter.ts";
+import { ClarificationPlannerService } from
+  "../app/control-plane/application/clarification-planner-service.ts";
+import { ClarificationHistoryService } from
+  "../app/control-plane/application/clarification-history-service.ts";
 import {
   IdempotencyConflictError,
 } from "../app/control-plane/domain/errors.ts";
@@ -156,7 +164,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 8);
+  assert.equal(migrations.length, 9);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -175,6 +183,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
     [
       "acceptance_criteria",
       "audit_events",
+      "clarification_rounds",
       "clarifications",
       "decisions",
       "evidence",
@@ -275,6 +284,54 @@ integrationTest(
       [created.goal.id],
     );
     assert.deepEqual(evidence.rows[0], { audits: 2, events: 2, criteria: 1 });
+  },
+);
+
+integrationTest(
+  "appends clarification rounds, answers, and decisions under concurrent PostgreSQL writes",
+  async () => {
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const suffix = `${process.pid}-${crypto.randomUUID().slice(0, 8)}`;
+    await pool.query(`INSERT INTO organizations (id, slug, name) VALUES ($1,$2,'Clarification org')`, [organizationId, `clarification-org-${suffix}`]);
+    await pool.query(`INSERT INTO projects (id, organization_id, slug, name) VALUES ($1,$2,$3,'Clarification project')`, [projectId, organizationId, `clarification-project-${suffix}`]);
+    const goals = new PostgresGoalWorkspaceRepository(pool);
+    const goalService = new GoalWorkspaceService({ repository: goals, authorizer: { async authorize() {} } });
+    const created = await goalService.create({
+      organizationId, projectId, actorId: "integration-author", requestId: "clarification-goal-request",
+      idempotencyKey: `clarification-goal-${suffix}`, reason: "Create source Goal",
+      draft: { title: "Clarification history", problemStatement: "Answers can race", desiredOutcome: "One append wins", acceptanceCriteria: ["All revisions remain"], nonGoals: [], constraints: [] },
+    });
+    const plannerOutput = {
+      schemaVersion: "planner-clarification.v1",
+      knownFacts: [{ id: "goal_exists", fact: "A Goal exists", basis: "goal_contract" }],
+      uncertainties: [{ id: "owner", statement: "Owner is unknown", impact: "Approval cannot route" }],
+      questions: [{ id: "owner", prompt: "Who owns approval?", rationale: "Approval needs an actor", blockingLevel: "high", answerType: "text", suggestedOptions: [] }],
+    };
+    const historyRepository = new PostgresClarificationHistoryRepository(pool);
+    const service = new ClarificationHistoryService({
+      repository: historyRepository,
+      goals,
+      planner: new ClarificationPlannerService(new FakePlannerAdapter([plannerOutput])),
+      authorizer: { async authorize() {} },
+    });
+    const scope = { organizationId, projectId, goalId: created.goal.id };
+    const generated = await service.generate({ ...scope, expectedGoalVersion: 1, actorId: "integration-author", reason: "Generate missing owner question" });
+    const question = generated.questions[0];
+    const writes = await Promise.allSettled([
+      service.answer({ ...scope, threadId: question.threadId, expectedQuestionRevision: 1, expectedGoalVersion: 1, answer: "Team A", actorId: "reviewer-a", reason: "Team A owns it" }),
+      service.answer({ ...scope, threadId: question.threadId, expectedQuestionRevision: 1, expectedGoalVersion: 1, answer: "Team B", actorId: "reviewer-b", reason: "Team B owns it" }),
+    ]);
+    assert.equal(writes.filter(({ status }) => status === "fulfilled").length, 1);
+    assert.equal(writes.filter(({ status }) => status === "rejected").length, 1);
+    const timeline = await historyRepository.getTimeline(scope);
+    assert.equal(timeline.rounds.length, 1);
+    assert.equal(timeline.questions.length, 2);
+    assert.equal(timeline.decisions.length, 1);
+    await assert.rejects(
+      () => pool.query(`UPDATE clarification_rounds SET reason='overwrite' WHERE id=$1`, [generated.round.id]),
+      /append-only/i,
+    );
   },
 );
 
@@ -468,6 +525,7 @@ integrationTest(
     const secondIssueId = crypto.randomUUID();
     const otherIssueId = crypto.randomUUID();
     const clarificationId = crypto.randomUUID();
+    const clarificationRoundId = crypto.randomUUID();
     const clarificationThreadId = crypto.randomUUID();
     const decisionId = crypto.randomUUID();
     const digest = "a".repeat(64);
@@ -564,16 +622,29 @@ integrationTest(
       await client.query("ROLLBACK TO SAVEPOINT self_dependency");
 
       await client.query(
+        `INSERT INTO clarification_rounds
+           (id, organization_id, project_id, goal_id, round_number,
+            source_goal_version, planner_run_id, known_facts, uncertainties,
+            actor_id, reason)
+         VALUES ($1, $2, $3, $4, 1, 1, 'integration-planner-run', '[]', '[]',
+                 'integration-actor', 'Generate test questions')`,
+        [clarificationRoundId, organizationId, projectId, goalId],
+      );
+      await client.query(
         `INSERT INTO clarifications
-           (id, organization_id, project_id, goal_id, thread_id, revision,
-            status, question, source_goal_version)
-         VALUES ($1, $2, $3, $4, $5, 1, 'open',
-                 'Which boundary applies?', 1)`,
+           (id, organization_id, project_id, goal_id, round_id, thread_id,
+            revision, status, question, planner_question_id, rationale,
+            blocking_level, answer_type, suggested_options,
+            source_goal_version, actor_id, reason)
+         VALUES ($1, $2, $3, $4, $5, $6, 1, 'open',
+                 'Which boundary applies?', 'boundary', 'Required for scope',
+                 'high', 'text', '[]', 1, 'integration-actor', 'Generate')`,
         [
           clarificationId,
           organizationId,
           projectId,
           goalId,
+          clarificationRoundId,
           clarificationThreadId,
         ],
       );
@@ -589,21 +660,24 @@ integrationTest(
       await client.query("ROLLBACK TO SAVEPOINT immutable_clarification");
       await client.query(
         `INSERT INTO clarifications
-           (organization_id, project_id, goal_id, thread_id, revision,
-            previous_clarification_id, status, question, answer,
-            source_goal_version)
-         VALUES ($1, $2, $3, $4, 2, $5, 'answered',
-                 'Which boundary applies?', 'The Organization boundary.', 1)`,
-        [organizationId, projectId, goalId, clarificationThreadId, clarificationId],
+           (organization_id, project_id, goal_id, round_id, thread_id, revision,
+            previous_clarification_id, status, question, planner_question_id,
+            rationale, blocking_level, answer_type, suggested_options, answer,
+            source_goal_version, actor_id, reason)
+         VALUES ($1, $2, $3, $4, $5, 2, $6, 'answered',
+                 'Which boundary applies?', 'boundary', 'Required for scope',
+                 'high', 'text', '[]', 'The Organization boundary.', 1,
+                 'integration-reviewer', 'Confirm scope')`,
+        [organizationId, projectId, goalId, clarificationRoundId, clarificationThreadId, clarificationId],
       );
 
       await client.query(
         `INSERT INTO decisions
            (id, organization_id, project_id, goal_id, decision_key, revision,
-            status, subject_type, subject_id, subject_version, outcome, reason)
+            status, subject_type, subject_id, subject_version, outcome, actor_id, reason)
          VALUES ($1, $2, $3, $4, $5, 1, 'approved', 'issue_plan', $6, 1,
                  'Use the Goal-scoped dependency graph',
-                 'Cross-Goal dependencies are not allowed')`,
+                 'integration-reviewer', 'Cross-Goal dependencies are not allowed')`,
         [
           decisionId,
           organizationId,

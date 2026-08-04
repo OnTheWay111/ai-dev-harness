@@ -455,6 +455,58 @@ export const acceptanceCriteria = pgTable(
   ],
 );
 
+export const clarificationRounds = pgTable(
+  "clarification_rounds",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    roundNumber: integer("round_number").notNull(),
+    previousRoundId: uuid("previous_round_id"),
+    regeneratedFromRoundId: uuid("regenerated_from_round_id"),
+    sourceGoalVersion: integer("source_goal_version").notNull(),
+    plannerRunId: text("planner_run_id").notNull(),
+    knownFacts: jsonb("known_facts").notNull(),
+    uncertainties: jsonb("uncertainties").notNull(),
+    actorId: text("actor_id").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "clarification_rounds_goal_organization_fk",
+      columns: [table.organizationId, table.projectId, table.goalId],
+      foreignColumns: [goals.organizationId, goals.projectId, goals.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("clarification_rounds_goal_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    foreignKey({
+      name: "clarification_rounds_previous_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.previousRoundId],
+      foreignColumns: [table.organizationId, table.projectId, table.goalId, table.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "clarification_rounds_regenerated_from_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.regeneratedFromRoundId],
+      foreignColumns: [table.organizationId, table.projectId, table.goalId, table.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("clarification_rounds_goal_number_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.roundNumber,
+    ),
+    check("clarification_rounds_number_chk", sql`${table.roundNumber} > 0`),
+    check("clarification_rounds_goal_version_chk", sql`${table.sourceGoalVersion} > 0`),
+    check(
+      "clarification_rounds_chain_chk",
+      sql`(${table.roundNumber} = 1 AND ${table.previousRoundId} IS NULL AND ${table.regeneratedFromRoundId} IS NULL) OR (${table.roundNumber} > 1 AND ${table.previousRoundId} IS NOT NULL AND ${table.regeneratedFromRoundId} IS NOT NULL)`,
+    ),
+    check("clarification_rounds_actor_chk", sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200`),
+    check("clarification_rounds_reason_chk", sql`char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`),
+  ],
+);
+
 export const clarifications = pgTable(
   "clarifications",
   {
@@ -462,13 +514,21 @@ export const clarifications = pgTable(
     organizationId: uuid("organization_id").notNull(),
     projectId: uuid("project_id").notNull(),
     goalId: uuid("goal_id").notNull(),
+    roundId: uuid("round_id").notNull(),
     threadId: uuid("thread_id").notNull(),
     revision: integer("revision").notNull(),
     previousClarificationId: uuid("previous_clarification_id"),
     status: text("status").$type<ClarificationStatus>().notNull(),
     question: text("question").notNull(),
+    plannerQuestionId: text("planner_question_id").notNull(),
+    rationale: text("rationale").notNull(),
+    blockingLevel: text("blocking_level").notNull(),
+    answerType: text("answer_type").notNull(),
+    suggestedOptions: jsonb("suggested_options").notNull(),
     answer: text("answer"),
     sourceGoalVersion: integer("source_goal_version").notNull(),
+    actorId: text("actor_id").notNull(),
+    reason: text("reason").notNull(),
     createdAt: timestamp("created_at", {
       withTimezone: true,
       mode: "date",
@@ -490,6 +550,16 @@ export const clarifications = pgTable(
       table.goalId,
       table.id,
     ),
+    foreignKey({
+      name: "clarifications_round_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.roundId],
+      foreignColumns: [
+        clarificationRounds.organizationId,
+        clarificationRounds.projectId,
+        clarificationRounds.goalId,
+        clarificationRounds.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
     foreignKey({
       name: "clarifications_previous_revision_fk",
       columns: [
@@ -530,6 +600,9 @@ export const clarifications = pgTable(
       "clarifications_source_goal_version_chk",
       sql`${table.sourceGoalVersion} > 0`,
     ),
+    check("clarifications_metadata_chk", sql`char_length(btrim(${table.plannerQuestionId})) BETWEEN 1 AND 64 AND char_length(btrim(${table.rationale})) BETWEEN 1 AND 4000 AND ${table.blockingLevel} IN ('blocker', 'high', 'medium', 'low') AND ${table.answerType} IN ('single_choice', 'multiple_choice', 'boolean', 'text', 'number')`),
+    check("clarifications_actor_chk", sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200`),
+    check("clarifications_reason_chk", sql`char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`),
   ],
 );
 
@@ -548,6 +621,7 @@ export const decisions = pgTable(
     subjectId: uuid("subject_id").notNull(),
     subjectVersion: integer("subject_version").notNull(),
     outcome: text("outcome").notNull(),
+    actorId: text("actor_id").notNull(),
     reason: text("reason").notNull(),
     createdAt: timestamp("created_at", {
       withTimezone: true,
@@ -609,7 +683,7 @@ export const decisions = pgTable(
     check("decisions_subject_version_chk", sql`${table.subjectVersion} > 0`),
     check(
       "decisions_content_chk",
-      sql`char_length(btrim(${table.outcome})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`,
+      sql`char_length(btrim(${table.outcome})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`,
     ),
   ],
 );
@@ -1265,6 +1339,8 @@ export type AcceptanceCriterion = typeof acceptanceCriteria.$inferSelect;
 export type NewAcceptanceCriterion = typeof acceptanceCriteria.$inferInsert;
 export type Clarification = typeof clarifications.$inferSelect;
 export type NewClarification = typeof clarifications.$inferInsert;
+export type ClarificationRound = typeof clarificationRounds.$inferSelect;
+export type NewClarificationRound = typeof clarificationRounds.$inferInsert;
 export type Decision = typeof decisions.$inferSelect;
 export type NewDecision = typeof decisions.$inferInsert;
 export type SpecRevision = typeof specRevisions.$inferSelect;

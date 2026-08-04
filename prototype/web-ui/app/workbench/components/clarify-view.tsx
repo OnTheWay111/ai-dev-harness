@@ -4,6 +4,8 @@ import type {
   GoalContract,
   GoalContractDraft,
 } from "../../control-plane/domain/goal-contract";
+import type { ClarificationTimeline } from
+  "../../control-plane/domain/clarification-history";
 import {
   goalWorkspaceApi,
   GoalWorkspaceApiError,
@@ -59,6 +61,14 @@ export function ClarifyView({
   const [restored, setRestored] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [timeline, setTimeline] = useState<ClarificationTimeline>({
+    rounds: [], questions: [], decisions: [],
+  });
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [clarificationReason, setClarificationReason] = useState(
+    "Resolve this uncertainty for planning",
+  );
+  const [planning, setPlanning] = useState(false);
   const storageKey = useMemo(() => goalDraftStorageKey(scope), [scope]);
   const lastGoalKey = `${storageKey}:last-goal`;
 
@@ -79,6 +89,8 @@ export function ClarifyView({
         if (!active) return;
         setGoal(loaded);
         if (!saved) setDraft(editableDraft(loaded));
+        const history = await goalWorkspaceApi.clarificationTimeline(scope, loaded.id);
+        if (active) setTimeline(history);
       } catch {
         window.localStorage.removeItem(lastGoalKey);
       } finally {
@@ -133,6 +145,74 @@ export function ClarifyView({
       setSaving(false);
     }
   }
+
+  async function refreshTimeline(currentGoal = goal) {
+    if (!currentGoal) return;
+    setTimeline(await goalWorkspaceApi.clarificationTimeline(scope, currentGoal.id));
+  }
+
+  async function generateClarifications() {
+    if (!goal) return;
+    setPlanning(true);
+    setError("");
+    try {
+      await goalWorkspaceApi.generateClarifications(
+        scope,
+        goal.id,
+        goal.version,
+        timeline.rounds.length === 0
+          ? "Generate the first clarification round"
+          : "Regenerate clarification questions without replacing history",
+      );
+      await refreshTimeline(goal);
+      notify("已追加新的澄清轮次");
+    } catch (caught) {
+      const message = caught instanceof GoalWorkspaceApiError &&
+          ["version_conflict", "question_expired"].includes(caught.code)
+        ? "Goal 版本已变化，请刷新后重新生成。"
+        : "澄清问题生成失败，既有历史未改变。";
+      setError(message);
+      notify(message);
+    } finally { setPlanning(false); }
+  }
+
+  async function answerQuestion(threadId: string, revision: number) {
+    if (!goal) return;
+    const answer = answers[threadId]?.trim() ?? "";
+    if (!answer) {
+      setError("请先填写人工答案。");
+      return;
+    }
+    setPlanning(true);
+    setError("");
+    try {
+      await goalWorkspaceApi.answerClarification(
+        scope, goal.id, threadId, goal.version, revision, answer,
+        clarificationReason,
+      );
+      setAnswers((current) => ({ ...current, [threadId]: "" }));
+      await refreshTimeline(goal);
+      notify(`已追加答案 revision ${revision + 1}`);
+    } catch (caught) {
+      const message = caught instanceof GoalWorkspaceApiError &&
+          caught.code === "question_expired"
+        ? "该问题已过期，请基于当前 Goal 重新生成。"
+        : "答案未提交；可能已有并发修订，请刷新后重试。";
+      setError(message);
+      notify(message);
+    } finally { setPlanning(false); }
+  }
+
+  const latestRound = timeline.rounds.at(-1);
+  const latestQuestions = [...timeline.questions]
+    .filter(({ roundId }) => roundId === latestRound?.id)
+    .reduce((items, question) => {
+      const existing = items.get(question.threadId);
+      if (!existing || question.revision > existing.revision) {
+        items.set(question.threadId, question);
+      }
+      return items;
+    }, new Map<string, ClarificationTimeline["questions"][number]>());
 
   return (
     <div className="screen detail-screen">
@@ -245,6 +325,76 @@ export function ClarifyView({
               </button>
             </div>
           </form>
+
+          {goal && (
+            <section className="panel contract-panel clarification-panel" aria-labelledby="clarification-heading">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">CLARIFICATION HISTORY</p>
+                  <h3 id="clarification-heading">澄清问答与人工决定</h3>
+                  <p>重新生成和重新回答都会追加版本；旧记录保持不可变。</p>
+                </div>
+                <button className="secondary-button" type="button" disabled={planning} onClick={generateClarifications}>
+                  {planning ? "处理中…" : latestRound ? "重新生成一轮" : "生成澄清问题"}
+                </button>
+              </div>
+              {[...latestQuestions.values()].map((question, index) => (
+                <article className="question-card" key={question.threadId}>
+                  <span className="question-number">{String(index + 1).padStart(2, "0")}</span>
+                  <div className="question-content">
+                    <div className="question-title">
+                      <h4>{question.prompt}</h4>
+                      <StatusPill tone={question.status === "answered" ? "success" : "warning"}>
+                        {question.blockingLevel} · revision {question.revision}
+                      </StatusPill>
+                    </div>
+                    <p>{question.rationale}</p>
+                    {question.suggestedOptions.length > 0 && (
+                      <small>建议：{question.suggestedOptions.join(" / ")}</small>
+                    )}
+                    {question.answer && <p><strong>当前答案：</strong>{question.answer}</p>}
+                    <label className="goal-form-field">
+                      <span>{question.answer ? "重新回答（将创建新版本）" : "人工答案"}</span>
+                      <textarea
+                        aria-label={`${question.prompt} 的人工答案`}
+                        value={answers[question.threadId] ?? ""}
+                        onChange={(event) => setAnswers((current) => ({ ...current, [question.threadId]: event.target.value }))}
+                      />
+                    </label>
+                    <button className="primary-button" type="button" disabled={planning} onClick={() => answerQuestion(question.threadId, question.revision)}>
+                      提交新答案版本
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {latestRound && (
+                <label className="goal-form-field">
+                  <span>人工决定原因</span>
+                  <input value={clarificationReason} maxLength={4_000} onChange={(event) => setClarificationReason(event.target.value)} />
+                </label>
+              )}
+              {timeline.rounds.length > 0 && (
+                <div className="timeline" aria-label="澄清历史时间线">
+                  {timeline.rounds.map((round) => (
+                    <div className="timeline-event" key={round.id}>
+                      <span className="timeline-dot info" />
+                      <time>{new Date(round.createdAt).toLocaleString()}</time>
+                      <strong>Round {round.roundNumber} · Goal v{round.sourceGoalVersion}</strong>
+                      <small>{round.actorId}：{round.reason}</small>
+                    </div>
+                  ))}
+                  {timeline.decisions.map((decision) => (
+                    <div className="timeline-event" key={decision.id}>
+                      <span className="timeline-dot success" />
+                      <time>{new Date(decision.createdAt).toLocaleString()}</time>
+                      <strong>人工决定 revision {decision.revision}</strong>
+                      <small>{decision.actorId}：{decision.reason}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </main>
 
         <aside className="workspace-aside">

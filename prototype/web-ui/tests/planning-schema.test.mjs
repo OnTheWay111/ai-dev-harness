@@ -4,6 +4,7 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 
 import {
   clarificationStatuses,
+  clarificationRounds,
   clarifications,
   decisionStatuses,
   decisions,
@@ -56,18 +57,31 @@ test("defines the P2-02 planning states as stable serialized values", () => {
 });
 
 test("defines immutable clarification and decision revision chains", () => {
+  assert.deepEqual(names(clarificationRounds).foreignKeys, [
+    "clarification_rounds_goal_organization_fk",
+    "clarification_rounds_previous_fk",
+    "clarification_rounds_regenerated_from_fk",
+  ]);
   assert.deepEqual(names(clarifications).columns, [
     "id",
     "organization_id",
     "project_id",
     "goal_id",
+    "round_id",
     "thread_id",
     "revision",
     "previous_clarification_id",
     "status",
     "question",
+    "planner_question_id",
+    "rationale",
+    "blocking_level",
+    "answer_type",
+    "suggested_options",
     "answer",
     "source_goal_version",
+    "actor_id",
+    "reason",
     "created_at",
   ]);
   assert.deepEqual(names(decisions).columns, [
@@ -83,12 +97,14 @@ test("defines immutable clarification and decision revision chains", () => {
     "subject_id",
     "subject_version",
     "outcome",
+    "actor_id",
     "reason",
     "created_at",
   ]);
   assert.deepEqual(names(clarifications).foreignKeys, [
     "clarifications_goal_organization_fk",
     "clarifications_previous_revision_fk",
+    "clarifications_round_fk",
   ]);
   assert.deepEqual(names(decisions).foreignKeys, [
     "decisions_goal_organization_fk",
