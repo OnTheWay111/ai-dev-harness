@@ -10,7 +10,7 @@ disposable GitHub-hosted runner network, so the workflow contains no database
 password or persistent credential. It executes, in order:
 
 1. schema-to-migration drift generation in a temporary directory;
-2. P1-04 empty-database migration and five real PostgreSQL integration cases;
+2. empty-database migration and six real PostgreSQL integration cases;
 3. the production build and full automated test suite;
 4. TypeScript and ESLint checks; and
 5. a scan of every `dist/client` file for connection URLs, database Secret

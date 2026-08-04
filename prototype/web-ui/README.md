@@ -178,6 +178,9 @@ Production/pre-production fail-closed rules and the `/health/ready` contract are
 documented in [`docs/readiness.md`](docs/readiness.md).
 Migration drift, isolated CI PostgreSQL, and client Secret scanning are
 documented in [`docs/continuous-integration.md`](docs/continuous-integration.md).
+Authoritative control-plane entities are defined in
+[`../../docs/control-plane-data-dictionary.md`](../../docs/control-plane-data-dictionary.md),
+separately from the replaceable workbench projection.
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls

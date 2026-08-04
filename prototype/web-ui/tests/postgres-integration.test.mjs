@@ -10,6 +10,7 @@ import {
 } from "../app/workbench/server/node-postgres-workbench-store.ts";
 import { PostgresWorkbenchReadRepository } from
   "../app/workbench/server/postgres-workbench-repository.ts";
+import { loadPostgresMigrations } from "../scripts/postgres-migration.ts";
 
 const databaseUrl = process.env.POSTGRES_INTEGRATION_DATABASE_URL;
 const integrationTest = databaseUrl ? test : test.skip;
@@ -45,23 +46,212 @@ after(async () => {
 });
 
 integrationTest("migrates an empty temporary PostgreSQL database", async () => {
+  const migrations = loadPostgresMigrations(
+    new URL("../drizzle-postgres/", import.meta.url),
+  );
+  assert.equal(migrations.length, 2);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
-  assert.deepEqual(ledger.rows, [
-    {
-      hash: "43239da5baa413cb0475b5285ed5ded7a932f89dc5014eae2ff9fd79e82f92a0",
-      created_at: "1785742303861",
-    },
-  ]);
+  assert.deepEqual(
+    ledger.rows,
+    migrations.map((migration) => ({
+      hash: migration.hash,
+      created_at: String(migration.createdAt),
+    })),
+  );
   const tables = await pool.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name",
   );
   assert.deepEqual(
     tables.rows.map((row) => row.table_name),
-    ["workbench_snapshots", "workbench_tasks"],
+    [
+      "acceptance_criteria",
+      "goals",
+      "organizations",
+      "projects",
+      "repositories",
+      "workbench_snapshots",
+      "workbench_tasks",
+    ],
   );
 });
+
+integrationTest(
+  "enforces Organization, version, and acceptance constraints",
+  async () => {
+    const organizationId = crypto.randomUUID();
+    const otherOrganizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const otherProjectId = crypto.randomUUID();
+    const repositoryId = crypto.randomUUID();
+    const goalId = crypto.randomUUID();
+    const criterionId = crypto.randomUUID();
+    try {
+      await pool.query(
+        `INSERT INTO organizations (id, slug, name)
+         VALUES ($1, $2, $3), ($4, $5, $6)`,
+        [
+          organizationId,
+          `p2-org-${process.pid}`,
+          "P2 Organization",
+          otherOrganizationId,
+          `p2-other-${process.pid}`,
+          "Other Organization",
+        ],
+      );
+      await pool.query(
+        `INSERT INTO projects (id, organization_id, slug, name)
+         VALUES ($1, $2, $3, $4), ($5, $2, $6, $7)`,
+        [
+          projectId,
+          organizationId,
+          `p2-project-${process.pid}`,
+          "P2 Project",
+          otherProjectId,
+          `p2-other-project-${process.pid}`,
+          "Other P2 Project",
+        ],
+      );
+      await pool.query(
+        `INSERT INTO repositories
+           (id, organization_id, project_id, provider,
+            provider_repository_id, owner, name, default_branch)
+         VALUES ($1, $2, $3, 'github', $4, $5, $6, 'main')`,
+        [
+          repositoryId,
+          organizationId,
+          projectId,
+          `provider-${process.pid}`,
+          "example",
+          "repository",
+        ],
+      );
+      await pool.query(
+        `INSERT INTO goals
+           (id, organization_id, project_id, title,
+            problem_statement, desired_outcome)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          goalId,
+          organizationId,
+          projectId,
+          "P2 Goal",
+          "The control plane has no authoritative goal record.",
+          "Persist a Goal inside its Organization boundary.",
+        ],
+      );
+      await pool.query(
+        `INSERT INTO acceptance_criteria
+           (id, organization_id, project_id, goal_id, position, statement)
+         VALUES ($1, $2, $3, $4, 1, $5)`,
+        [
+          criterionId,
+          organizationId,
+          projectId,
+          goalId,
+          "The goal can be traced to its project and organization.",
+        ],
+      );
+
+      const hierarchy = await pool.query(
+        `SELECT o.slug AS organization_slug, p.slug AS project_slug,
+                r.name AS repository_name, g.title AS goal_title,
+                ac.statement
+         FROM organizations o
+         JOIN projects p ON p.organization_id = o.id
+         JOIN repositories r
+           ON r.organization_id = p.organization_id AND r.project_id = p.id
+         JOIN goals g
+           ON g.organization_id = p.organization_id AND g.project_id = p.id
+         JOIN acceptance_criteria ac
+           ON ac.organization_id = g.organization_id
+          AND ac.project_id = g.project_id AND ac.goal_id = g.id
+         WHERE o.id = $1`,
+        [organizationId],
+      );
+      assert.equal(hierarchy.rowCount, 1);
+
+      await assert.rejects(
+        () =>
+          pool.query(
+            `INSERT INTO repositories
+               (organization_id, project_id, provider,
+                provider_repository_id, owner, name, default_branch)
+             VALUES ($1, $2, 'github', $3, 'wrong', 'organization', 'main')`,
+            [
+              otherOrganizationId,
+              projectId,
+              `cross-organization-${process.pid}`,
+            ],
+          ),
+        /foreign key/i,
+      );
+      await assert.rejects(
+        () =>
+          pool.query(
+            `INSERT INTO acceptance_criteria
+               (organization_id, project_id, goal_id, position, statement)
+             VALUES ($1, $2, $3, 2, 'Cross-Project criterion')`,
+            [organizationId, otherProjectId, goalId],
+          ),
+        /foreign key/i,
+      );
+      await assert.rejects(
+        () =>
+          pool.query(
+            `INSERT INTO acceptance_criteria
+               (organization_id, project_id, goal_id, position, statement)
+             VALUES ($1, $2, $3, 2, 'Cross-Organization criterion')`,
+            [otherOrganizationId, projectId, goalId],
+          ),
+        /foreign key/i,
+      );
+      await assert.rejects(
+        () =>
+          pool.query(
+            `INSERT INTO goals
+               (organization_id, project_id, title,
+                problem_statement, desired_outcome, version)
+             VALUES ($1, $2, 'Invalid', 'Invalid version', 'Rejected', 0)`,
+            [organizationId, projectId],
+          ),
+        /check constraint/i,
+      );
+      await assert.rejects(
+        () =>
+          pool.query(
+            `INSERT INTO acceptance_criteria
+               (organization_id, project_id, goal_id, position, statement)
+             VALUES ($1, $2, $3, 1, 'Duplicate position')`,
+            [organizationId, projectId, goalId],
+          ),
+        /unique constraint/i,
+      );
+    } finally {
+      await pool.query(
+        "DELETE FROM acceptance_criteria WHERE organization_id IN ($1, $2)",
+        [organizationId, otherOrganizationId],
+      );
+      await pool.query(
+        "DELETE FROM goals WHERE organization_id IN ($1, $2)",
+        [organizationId, otherOrganizationId],
+      );
+      await pool.query(
+        "DELETE FROM repositories WHERE organization_id IN ($1, $2)",
+        [organizationId, otherOrganizationId],
+      );
+      await pool.query(
+        "DELETE FROM projects WHERE organization_id IN ($1, $2)",
+        [organizationId, otherOrganizationId],
+      );
+      await pool.query(
+        "DELETE FROM organizations WHERE id IN ($1, $2)",
+        [organizationId, otherOrganizationId],
+      );
+    }
+  },
+);
 
 integrationTest(
   "replaces and reads a real projection with consistent revision and filters",

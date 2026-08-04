@@ -285,7 +285,7 @@ app/workbench/server/postgres-workbench-repository.ts PostgreSQL 投影映射
 app/workbench/server/neon-workbench-store.ts Neon/Drizzle 原子分页读取
 app/workbench/server/neon-workbench-projection-writer.ts 投影批量替换入口
 app/workbench/server/demo-workbench-snapshot.ts 服务端演示种子
-db/postgres-schema.ts                     PostgreSQL 读模型表结构
+db/postgres-schema.ts                     PostgreSQL 权威写模型与工作台读模型表结构
 drizzle-postgres/                         PostgreSQL 迁移记录
 app/api/v1/workbench/route.ts              V1 聚合读取接口
 app/workbench/components/workbench-app.tsx 状态协调与页面路由
@@ -299,9 +299,12 @@ app/workbench/components/ui.tsx            通用状态、进度和 Stepper
 仓库工厂根据环境选择 Demo 或 PostgreSQL 实现；页面组件不读取数据库字段、拼接领域状态或自行
 计算服务端排序。
 
-## 9. PostgreSQL 读模型与运行契约
+## 9. PostgreSQL 权威模型、读模型与运行契约
 
-PostgreSQL 只承载工作台投影，不替代 Goal、Issue、Run 或 Scheduler 的事实表：
+PostgreSQL 同时承载控制面权威表与工作台投影。P2-01 的 Organization、Project、Repository、Goal
+和 AcceptanceCriterion 是业务事实源，字段和约束见
+[控制面数据词典](control-plane-data-dictionary.md)。以下 `workbench_*` 表仍只是派生读模型，不能
+替代 Goal、Issue、Run 或 Scheduler 的事实表：
 
 - `workbench_snapshots`：每个 `scope_id` 保存 revision、生成时间和全局 summary；
 - `workbench_tasks`：每个 `scope_id + task_id` 保存稳定 rank、筛选列和完整 `GlobalTask` JSON；

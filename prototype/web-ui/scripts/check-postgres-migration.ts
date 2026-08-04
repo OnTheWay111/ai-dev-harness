@@ -25,6 +25,9 @@ async function main(): Promise<number> {
     const migrations = loadPostgresMigrations(migrationsDirectory);
     const receipt: unknown = JSON.parse(readFileSync(receiptUrl, "utf8"));
     validateMigrationReceipt(receipt, migrations);
+    const receiptMigrations = migrations.filter(
+      (migration) => migration.createdAt <= receipt.migrationCreatedAt,
+    );
 
     const sql = neon(connection.databaseUrl);
     const [ledger, columns, indexes, owners, grants] = await Promise.all([
@@ -122,7 +125,7 @@ async function main(): Promise<number> {
       failedProbeRecorded: grantRow.failed_probe_recorded === true,
       failedProbeTableExists: grantRow.failed_probe_table_exists === true,
     };
-    assertDevelopmentMigrationState(observation, migrations);
+    assertDevelopmentMigrationState(observation, receiptMigrations);
     console.log(
       "PostgreSQL development migration receipt and schema verification passed",
     );

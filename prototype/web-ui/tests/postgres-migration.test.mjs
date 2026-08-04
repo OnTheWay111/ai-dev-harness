@@ -18,6 +18,8 @@ const receiptUrl = new URL(
 
 const expectedHash =
   "43239da5baa413cb0475b5285ed5ded7a932f89dc5014eae2ff9fd79e82f92a0";
+const authoritativeSchemaHash =
+  "4a02f956e011b984374624c410f5e5b3bd4f41d7aaddcac182861d669906c54f";
 
 function validObservation() {
   return {
@@ -59,14 +61,25 @@ function validObservation() {
   };
 }
 
+function receiptMigrations() {
+  const receipt = JSON.parse(readFileSync(receiptUrl, "utf8"));
+  return loadPostgresMigrations(migrationsDirectory).filter(
+    (migration) => migration.createdAt <= receipt.migrationCreatedAt,
+  );
+}
+
 test("loads the committed Drizzle migration and hashes its exact bytes", () => {
   const migrations = loadPostgresMigrations(migrationsDirectory);
 
-  assert.equal(migrations.length, 1);
+  assert.equal(migrations.length, 2);
   assert.equal(migrations[0].tag, "0000_tan_mikhail_rasputin");
   assert.equal(migrations[0].createdAt, 1785742303861);
   assert.equal(migrations[0].hash, expectedHash);
   assert.equal(migrations[0].statements.length, 6);
+  assert.equal(migrations[1].tag, "0001_thin_maginty");
+  assert.equal(migrations[1].createdAt, 1785827465206);
+  assert.equal(migrations[1].hash, authoritativeSchemaHash);
+  assert.equal(migrations[1].statements.length, 15);
 });
 
 test("builds an atomic, locked, idempotent migration batch", () => {
@@ -90,6 +103,17 @@ test("validates the committed receipt against the migration bytes", () => {
 
   assert.doesNotMatch(contents, /postgres(?:ql)?:\/\/|password|secret/i);
   assert.doesNotThrow(() => validateMigrationReceipt(receipt, migrations));
+  assert.doesNotThrow(() =>
+    validateMigrationReceipt(receipt, [
+      ...migrations,
+      {
+        tag: "9999_future_migration",
+        createdAt: receipt.migrationCreatedAt + 1,
+        hash: "f".repeat(64),
+        statements: ["SELECT 1"],
+      },
+    ]),
+  );
   assert.throws(
     () => validateMigrationReceipt({ ...receipt, result: "failed" }, migrations),
     /successful migration/,
@@ -113,14 +137,13 @@ test("validates the committed receipt against the migration bytes", () => {
 });
 
 test("accepts the exact live schema and least-privilege observation", () => {
-  const migrations = loadPostgresMigrations(migrationsDirectory);
   assert.doesNotThrow(() =>
-    assertDevelopmentMigrationState(validObservation(), migrations),
+    assertDevelopmentMigrationState(validObservation(), receiptMigrations()),
   );
 });
 
 test("fails closed on drift or a failed transaction recorded as successful", () => {
-  const migrations = loadPostgresMigrations(migrationsDirectory);
+  const migrations = receiptMigrations();
   const drifted = validObservation();
   drifted.indexSignatures = drifted.indexSignatures.slice(1);
   assert.throws(

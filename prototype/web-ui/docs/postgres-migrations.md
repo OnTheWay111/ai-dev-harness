@@ -79,8 +79,9 @@ migrator least privilege, and the committed development receipt. It prints
 only a pass/fail summary and suppresses driver details on failure.
 
 To check that the TypeScript schema and committed Drizzle metadata have not
-drifted, run `npm run db:generate:postgres` and require a clean Git diff. Do not
-commit a newly generated migration merely to make a check green; review the
+drifted, run `npm run db:check:drift`. It generates into an operating-system
+temporary directory, compares digests, and leaves the worktree unchanged. Do
+not commit a newly generated migration merely to make a check green; review the
 schema change as a separate delivery item.
 
 ## Receipt contract
@@ -89,14 +90,16 @@ Receipts live under `migration-receipts/<environment>/`. A successful receipt
 records only:
 
 - receipt schema version, environment, and database name;
-- latest Drizzle migration tag, journal timestamp, and SHA-256 digest;
+- applied Drizzle migration tag, journal timestamp, and SHA-256 digest;
 - application and verification timestamps in UTC;
 - the result plus empty-database, repeat-run, drift, and rollback checks.
 
 A receipt must never contain a connection URL, hostname, password, Secret
 value, or raw driver error. Failed attempts do not produce a successful
 receipt. Receipts are immutable evidence: a later migration creates a new file
-instead of rewriting an earlier result.
+instead of rewriting an earlier result. Receipt verification resolves the
+recorded journal entry and digest, so historical receipts remain valid after
+new migrations are committed.
 
 The development receipt
 `migration-receipts/development/0000_tan_mikhail_rasputin.json` records the

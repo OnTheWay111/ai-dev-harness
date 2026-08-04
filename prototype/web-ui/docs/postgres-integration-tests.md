@@ -53,4 +53,5 @@ argument, build argument, artifact, or logged value.
 
 The standard `npm test` run discovers the integration test file but skips it
 when `POSTGRES_INTEGRATION_DATABASE_URL` is absent. The lifecycle runner is the
-required command for executing the five real-database cases.
+required command for executing the six real-database cases, including the
+P2-01 Organization-boundary and write-model constraints.

@@ -250,8 +250,12 @@ export function validateMigrationReceipt(
     ],
     "Migration receipt",
   );
-  const latest = migrations.at(-1);
-  if (!latest) {
+  const recordedMigration = migrations.find(
+    (migration) =>
+      migration.tag === receipt.migrationVersion &&
+      migration.createdAt === receipt.migrationCreatedAt,
+  );
+  if (!recordedMigration) {
     throw new Error("Migration receipt requires a committed migration");
   }
   if (
@@ -264,13 +268,7 @@ export function validateMigrationReceipt(
   if (receipt.result !== "applied") {
     throw new Error("Migration receipt must describe a successful migration");
   }
-  if (
-    receipt.migrationVersion !== latest.tag ||
-    receipt.migrationCreatedAt !== latest.createdAt
-  ) {
-    throw new Error("Migration receipt version does not match the journal");
-  }
-  if (receipt.migrationSha256 !== latest.hash) {
+  if (receipt.migrationSha256 !== recordedMigration.hash) {
     throw new Error("Migration receipt hash does not match the migration bytes");
   }
   assertIsoTimestamp(receipt.appliedAt, "appliedAt");
@@ -308,7 +306,9 @@ export function assertDevelopmentMigrationState(
   migrations: PostgresMigration[],
 ): void {
   assertArrayEqual(
-    observation.ledger.map(({ createdAt, hash }) => `${createdAt}|${hash}`),
+    observation.ledger
+      .slice(0, migrations.length)
+      .map(({ createdAt, hash }) => `${createdAt}|${hash}`),
     migrations.map(({ createdAt, hash }) => `${createdAt}|${hash}`),
     "migration ledger drift",
   );

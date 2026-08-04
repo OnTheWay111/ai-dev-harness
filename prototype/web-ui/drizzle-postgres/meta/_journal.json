@@ -8,6 +8,13 @@
       "when": 1785742303861,
       "tag": "0000_tan_mikhail_rasputin",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785827465206,
+      "tag": "0001_thin_maginty",
+      "breakpoints": true
     }
   ]
 }
