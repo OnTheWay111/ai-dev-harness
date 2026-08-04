@@ -137,6 +137,11 @@ Apply migrations only with the migrator Secret:
 HARNESS_DEPLOYMENT_ENV=development npm run db:migrate:postgres
 ```
 
+The one-time Drizzle ledger provisioning, atomic runner, receipt format, and
+post-migration verification are documented in
+[`postgres-migrations.md`](postgres-migrations.md). The runner preserves this
+file's rule that the migrator has no database `CREATE` privilege.
+
 Run `npm run test:unit` to validate all environment mappings and failure-closed
 behavior without a real credential. A real connectivity pass is required after
 each instance is provisioned or rotated; a unit test is not a substitute for

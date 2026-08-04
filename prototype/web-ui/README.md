@@ -102,11 +102,13 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm test`: build and run SSR, HTTP API, client adapter, and selector tests
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 - `npm run db:generate:postgres`: generate workbench PostgreSQL migrations
-- `npm run db:migrate:postgres`: apply PostgreSQL migrations using
-  `MIGRATION_DATABASE_URL`
+- `npm run db:migrate:postgres`: atomically apply committed PostgreSQL
+  migrations using `MIGRATION_DATABASE_URL`
 - `npm run db:seed:postgres`: publish the demo snapshot to the configured scope
 - `npm run db:check:postgres`: validate environment mapping, connection identity,
   and least-privilege grants without printing connection details
+- `npm run db:check:migration:postgres`: validate the development migration
+  ledger, live schema, grants, and committed receipt
 
 ## Workbench API
 
@@ -159,6 +161,10 @@ and rotation steps are defined in
 [`docs/postgres-environments.md`](docs/postgres-environments.md). Never expose
 either value through a `NEXT_PUBLIC_` variable, build argument, log, or browser
 bundle.
+
+The one-time migration ledger setup, atomic and idempotent runner behavior,
+receipt contract, and verification command are defined in
+[`docs/postgres-migrations.md`](docs/postgres-migrations.md).
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls
