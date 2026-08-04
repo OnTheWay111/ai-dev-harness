@@ -382,7 +382,7 @@ P2-04 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P2-05** 实现 Repository/Application Service，HTTP Handler 不直接操作 ORM。
+- [x] **P2-05** 实现 Repository/Application Service，HTTP Handler 不直接操作 ORM。（已完成：2026-08-04；实现提交：ai-dev-harness@c823d3f63ed98df9794326c6b6e85b294c4dcf89）
 
 <details>
 <summary>快捷复制开发提示词 P2-05 · gpt-5.6-sol(深度) · high(高)</summary>
