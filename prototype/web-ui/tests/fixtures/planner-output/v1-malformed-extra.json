@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "planner-clarification.v1",
+  "knownFacts": [],
+  "uncertainties": [],
+  "questions": [
+    {
+      "id": "question-1",
+      "prompt": "Which deployment boundary applies?",
+      "rationale": "It changes security controls.",
+      "blockingLevel": "high",
+      "answerType": "single_choice",
+      "suggestedOptions": ["Internal", "Public"],
+      "modelApproved": true
+    }
+  ]
+}

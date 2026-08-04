@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "planner-clarification.v1",
+  "knownFacts": [
+    {
+      "id": "fact-1",
+      "fact": "The Goal must preserve human approval.",
+      "basis": "goal_contract"
+    }
+  ],
+  "uncertainties": [
+    {
+      "id": "uncertainty-1",
+      "statement": "The deployment boundary is not selected.",
+      "impact": "It changes identity and network controls."
+    }
+  ],
+  "questions": [
+    {
+      "id": "question-1",
+      "prompt": "Which deployment boundary applies?",
+      "rationale": "The answer changes required security controls.",
+      "blockingLevel": "high",
+      "answerType": "single_choice",
+      "suggestedOptions": [
+        "Private internal network",
+        "Public endpoint for organization members"
+      ]
+    }
+  ]
+}

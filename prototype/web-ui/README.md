@@ -203,6 +203,9 @@ browser draft-recovery boundary are documented in
 The isolated, read-only Codex Planner subprocess contract and controlled smoke
 test are documented in
 [`../../docs/codex-planner.md`](../../docs/codex-planner.md).
+The versioned clarification JSON Schema, strict server validation, fixtures,
+and diagnostic contract are documented in
+[`../../docs/planner-output-schema.md`](../../docs/planner-output-schema.md).
 The Goal write-module interface, Repository seam, adapters, and HTTP mapping are
 documented in
 [`../../docs/control-plane-write-architecture.md`](../../docs/control-plane-write-architecture.md).
