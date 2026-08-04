@@ -874,7 +874,7 @@ QueueProjectionPort，将 approved plan 幂等映射为 AutoDev 任务，保存�
 
 目标：安全、可恢复地执行 dependency-ready Issue。
 
-- [ ] **P7-01** 完成 AutoDev 0.4.16 队列导入、任务级 Builder 和授权范围兼容性门禁。
+- [x] **P7-01** 完成 AutoDev 0.4.16 队列导入、任务级 Builder 和授权范围兼容性门禁。（已完成：2026-08-04；实现提交：ai-dev-harness@0cfbcb9fa6d814b99973704d367c35fd8ec8dfb6）
 
 <details>
 <summary>快捷复制开发提示词 P7-01 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -894,7 +894,7 @@ preferred_builder、状态输出、事件和许可证允许的使用范围；形
 
 </details>
 
-- [ ] **P7-02** 实现 Durable Job、Supervisor、预算、超时和 reconciliation 循环。
+- [x] **P7-02** 实现 Durable Job、Supervisor、预算、超时和 reconciliation 循环。（已完成：2026-08-04；实现提交：ai-dev-harness@0cfbcb9fa6d814b99973704d367c35fd8ec8dfb6）
 
 <details>
 <summary>快捷复制开发提示词 P7-02 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -914,7 +914,7 @@ P7-02 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P7-03** 实现 ExecutionNode Registry、容量、lease、heartbeat 和失联处理。
+- [x] **P7-03** 实现 ExecutionNode Registry、容量、lease、heartbeat 和失联处理。（已完成：2026-08-04；实现提交：ai-dev-harness@0cfbcb9fa6d814b99973704d367c35fd8ec8dfb6）
 
 <details>
 <summary>快捷复制开发提示词 P7-03 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -934,7 +934,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P7-04** 实现 Execution Gateway：参数数组、最小环境变量、Worktree 和网络策略。
+- [x] **P7-04** 实现 Execution Gateway：参数数组、最小环境变量、Worktree 和网络策略。（已完成：2026-08-04；实现提交：ai-dev-harness@0cfbcb9fa6d814b99973704d367c35fd8ec8dfb6）
 
 <details>
 <summary>快捷复制开发提示词 P7-04 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -954,7 +954,7 @@ P7-04 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P7-05** 映射 AutoDev Task/Run/Event 到控制面 Run 状态和 Outbox/Inbox。
+- [x] **P7-05** 映射 AutoDev Task/Run/Event 到控制面 Run 状态和 Outbox/Inbox。（已完成：2026-08-04；实现提交：ai-dev-harness@0cfbcb9fa6d814b99973704d367c35fd8ec8dfb6）
 
 <details>
 <summary>快捷复制开发提示词 P7-05 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -973,7 +973,7 @@ Inbox 和真实 AutoDev 机器可读输出。定义版本化外部事件 Schema 
 
 </details>
 
-- [ ] **P7-06** 实现启动、暂停、排空、恢复、重试、失败熔断和全局/项目 Stop。
+- [x] **P7-06** 实现启动、暂停、排空、恢复、重试、失败熔断和全局/项目 Stop。（已完成：2026-08-04；实现提交：ai-dev-harness@0cfbcb9fa6d814b99973704d367c35fd8ec8dfb6）
 
 <details>
 <summary>快捷复制开发提示词 P7-06 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -993,7 +993,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P7-07** 使用 fake 与真实 AutoDev 建立契约测试、崩溃恢复和重复执行测试。
+- [x] **P7-07** 使用 fake 与真实 AutoDev 建立契约测试、崩溃恢复和重复执行测试。（已完成：2026-08-04；实现提交：ai-dev-harness@0cfbcb9fa6d814b99973704d367c35fd8ec8dfb6）
 
 <details>
 <summary>快捷复制开发提示词 P7-07 · gpt-5.6-sol(深度) · high(高)</summary>
