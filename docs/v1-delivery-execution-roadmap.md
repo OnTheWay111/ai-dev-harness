@@ -428,7 +428,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 目标：让控制面具备真实组织和项目边界。
 
-- [ ] **P3-01** 接入 OIDC/SSO，建立安全 Session、登录、登出和过期处理。
+- [x] **P3-01** 接入 OIDC/SSO，建立安全 Session、登录、登出和过期处理。（已完成：2026-08-04；实现提交：ai-dev-harness@a3c87cd47148d3680f397cc5c0eafed95a8d669a）
 
 <details>
 <summary>快捷复制开发提示词 P3-01 · gpt-5.6-sol(深度) · high(高)</summary>
