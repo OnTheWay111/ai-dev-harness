@@ -448,7 +448,7 @@ state/nonce/PKCE、登录登出、过期和回跳白名单；不在客户端保�
 
 </details>
 
-- [ ] **P3-02** 实现 Owner、Project Admin、Approver、Operator、Viewer 的服务端 RBAC。
+- [x] **P3-02** 实现 Owner、Project Admin、Approver、Operator、Viewer 的服务端 RBAC。（已完成：2026-08-04；实现提交：ai-dev-harness@9ee915898577f20d57b476655855b3657b1a405e）
 
 <details>
 <summary>快捷复制开发提示词 P3-02 · gpt-5.6-sol(深度) · high(高)</summary>
