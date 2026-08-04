@@ -200,6 +200,9 @@ Goal, SpecRevision, Issue, and Run lifecycle rules are listed in
 The versioned Goal Contract fields, CRUD API, authorization transaction, and
 browser draft-recovery boundary are documented in
 [`../../docs/goal-workspace.md`](../../docs/goal-workspace.md).
+The isolated, read-only Codex Planner subprocess contract and controlled smoke
+test are documented in
+[`../../docs/codex-planner.md`](../../docs/codex-planner.md).
 The Goal write-module interface, Repository seam, adapters, and HTTP mapping are
 documented in
 [`../../docs/control-plane-write-architecture.md`](../../docs/control-plane-write-architecture.md).
