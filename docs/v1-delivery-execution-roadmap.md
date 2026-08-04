@@ -660,7 +660,7 @@ Planner 配置和生成时间；重新生成创建新修订。用 fake/真实受
 
 </details>
 
-- [ ] **P5-02** 实现 Required、Helpful、Speculative 过度设计分类。
+- [x] **P5-02** 实现 Required、Helpful、Speculative 过度设计分类。（已完成：2026-08-04；实现提交：ai-dev-harness@43290ae761547f36b5938ee1d877157bcfd1a533）
 
 <details>
 <summary>快捷复制开发提示词 P5-02 · gpt-5.6-terra(均衡) · medium(中等)</summary>
