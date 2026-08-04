@@ -102,6 +102,7 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm test`: build and run SSR, HTTP API, client adapter, and selector tests
 - `npm run test:postgres:integration`: create, migrate, test, and destroy a
   temporary real PostgreSQL database
+- `npm run ci:p1`: run the local equivalent of the P1 PostgreSQL CI gate
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 - `npm run db:generate:postgres`: generate workbench PostgreSQL migrations
 - `npm run db:migrate:postgres`: atomically apply committed PostgreSQL
@@ -175,6 +176,8 @@ Temporary local/CI PostgreSQL lifecycle and transaction coverage are documented
 in [`docs/postgres-integration-tests.md`](docs/postgres-integration-tests.md).
 Production/pre-production fail-closed rules and the `/health/ready` contract are
 documented in [`docs/readiness.md`](docs/readiness.md).
+Migration drift, isolated CI PostgreSQL, and client Secret scanning are
+documented in [`docs/continuous-integration.md`](docs/continuous-integration.md).
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls

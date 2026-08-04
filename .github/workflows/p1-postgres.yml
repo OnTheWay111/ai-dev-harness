@@ -1,0 +1,51 @@
+name: P1 PostgreSQL gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-postgres-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  p1-postgres:
+    name: Migration, integration, build, and Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CI: "true"
+      POSTGRES_TEST_ADMIN_URL: postgresql://postgres@127.0.0.1:5432/postgres
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: prototype/web-ui/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+        working-directory: prototype/web-ui
+      - name: Run the P1 PostgreSQL gate
+        run: npm run ci:p1
+        working-directory: prototype/web-ui

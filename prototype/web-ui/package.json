@@ -13,6 +13,9 @@
     "test:unit": "node --experimental-strip-types --test tests/repository-layout.test.mjs tests/workbench-selectors.test.mjs tests/workbench-api-client.test.mjs tests/workbench-repository-factory.test.mjs tests/postgres-environment.test.mjs tests/postgres-connectivity.test.mjs tests/postgres-migration.test.mjs tests/development-postgres-workbench.test.mjs tests/postgres-workbench-repository.test.mjs tests/workbench-projection-writer.test.mjs",
     "test": "npm run build && node --experimental-strip-types --test tests/*.test.mjs",
     "test:postgres:integration": "node --experimental-strip-types scripts/run-postgres-integration-tests.ts",
+    "db:check:drift": "node --experimental-strip-types scripts/check-postgres-migration-drift.ts",
+    "scan:client-secrets": "node --experimental-strip-types scripts/check-client-secret-leaks.ts",
+    "ci:p1": "npm run db:check:drift && npm run test:postgres:integration && npm test && npm run typecheck && npm run lint && npm run scan:client-secrets",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:generate:postgres": "drizzle-kit generate --config=drizzle-postgres.config.ts",
@@ -47,7 +50,8 @@
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "yaml": "^2.9.0"
   },
   "overrides": {
     "postcss": "8.5.18",
