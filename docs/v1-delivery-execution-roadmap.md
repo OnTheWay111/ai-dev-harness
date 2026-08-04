@@ -700,7 +700,7 @@ P5-03 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P5-04** 所有审批携带 `expectedVersion`、actor、reason、request ID 和策略版本。
+- [x] **P5-04** 所有审批携带 `expectedVersion`、actor、reason、request ID 和策略版本。（已完成：2026-08-04；实现提交：ai-dev-harness@d203c42962ebc79e193588b64424797307d49c56）
 
 <details>
 <summary>快捷复制开发提示词 P5-04 · gpt-5.6-sol(深度) · high(高)</summary>
