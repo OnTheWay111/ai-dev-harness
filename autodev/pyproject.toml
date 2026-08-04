@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autodev-harness"
+dynamic = ["version"]
+description = "A local-first, cross-project development harness with independent verification."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "LicenseRef-Proprietary"
+authors = [{name = "Charles"}]
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+postgres = [
+  "SQLAlchemy>=2.0,<3",
+  "alembic>=1.13,<2",
+  "psycopg[binary]>=3.2,<4",
+]
+dev = [
+  "build>=1.2",
+  "SQLAlchemy>=2.0,<3",
+  "alembic>=1.13,<2",
+  "psycopg[binary]>=3.2,<4",
+]
+
+[project.scripts]
+autodev = "autodev.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["autodev*"]
+
+[tool.setuptools.package-data]
+"autodev.resources" = ["*.yaml", "*.md"]
+"autodev.database.migrations" = ["*.mako"]
+
+[tool.setuptools.dynamic]
+version = {attr = "autodev.__version__"}

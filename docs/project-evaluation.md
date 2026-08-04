@@ -30,10 +30,10 @@ GitHub Star 数统计于 **2026-07-31**。Star 会持续变化，`k` 为页面�
 
 ### 3.1 评估对象
 
-本地目录：
+根仓库统一管理目录：
 
 ```text
-/Users/onthewayli/harness/autodev-harness-0.4.16
+autodev/
 ```
 
 实际运行版本：
@@ -42,7 +42,9 @@ GitHub Star 数统计于 **2026-07-31**。Star 会持续变化，`k` 为页面�
 autodev 0.4.16
 ```
 
-该目录是一次性源码分享包。根据 `START_HERE.md`，它不包含 Git 历史、内部记忆和测试；`pyproject.toml` 将许可证声明为 `LicenseRef-Proprietary`。
+源码最初来自一次性分享包，目前已作为根仓库普通目录统一版本管理，并补充原子 Import
+能力与自动化测试。迁入时排除了原分享目录的虚拟环境、构建产物、缓存和安装元数据；
+`pyproject.toml` 仍将许可证声明为 `LicenseRef-Proprietary`。
 
 ### 3.2 总体结论
 

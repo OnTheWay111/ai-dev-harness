@@ -43,6 +43,18 @@ jobs:
           node-version: 22.13.0
           cache: npm
           cache-dependency-path: prototype/web-ui/package-lock.json
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: autodev/pyproject.toml
+      - name: Install AutoDev from the root repository
+        run: |
+          python -m venv autodev/.venv
+          autodev/.venv/bin/python -m pip install -e "./autodev[dev]"
+      - name: Run AutoDev tests
+        run: autodev/.venv/bin/python -m unittest discover -s autodev/tests -v
       - name: Install locked dependencies
         run: npm ci
         working-directory: prototype/web-ui

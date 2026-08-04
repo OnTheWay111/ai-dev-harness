@@ -1,16 +1,22 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { parse } from "yaml";
 
 import { AutoDevQueueImportAdapter } from
   "../app/control-plane/adapters/autodev-queue-import-adapter.ts";
 
-const sourcePath = process.env.AUTODEV_SOURCE_PATH?.trim() ?? "";
+const repositorySourcePath = fileURLToPath(new URL("../../../autodev", import.meta.url));
+const sourcePath = process.env.AUTODEV_SOURCE_PATH?.trim() || repositorySourcePath;
+const python = process.env.AUTODEV_PYTHON?.trim() ||
+  path.join(sourcePath, ".venv", "bin", "python");
+const runtimeAvailable = existsSync(python);
 
 const approvedPlan = {
   id: "00000000-0000-4000-8000-000000000610",
@@ -114,10 +120,9 @@ async function startServer(python, configPath) {
 }
 
 test("P6-06 projects through the real AutoDev atomic HTTP import boundary", {
-  skip: sourcePath ? false : "set AUTODEV_SOURCE_PATH to the authorized AutoDev source tree",
+  skip: runtimeAvailable ? false : "install autodev/.venv or set AUTODEV_PYTHON",
   timeout: 30_000,
 }, async () => {
-  const python = path.join(sourcePath, ".venv", "bin", "python");
   const project = await mkdtemp(path.join(tmpdir(), "p6-06-autodev-"));
   const configPath = path.join(project, ".autodev", "project.yaml");
   const queuePath = path.join(project, "tasks", "agent_task_queue.yaml");

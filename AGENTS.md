@@ -5,9 +5,9 @@ These rules apply to the entire repository rooted at
 
 ## Single-repository policy
 
-- This project uses exactly one Git repository. `prototype/web-ui` is a normal
-  directory owned by the root repository, not a submodule or independent
-  repository.
+- This project uses exactly one Git repository. `prototype/web-ui` and
+  `autodev` are normal directories owned by the root repository, not submodules
+  or independent repositories.
 - Never create or retain a nested `.git` directory or `.git` file anywhere
   below the repository root. Do not run `git init`, `git clone`, or `git
   worktree add` with a destination inside this repository.
@@ -20,8 +20,8 @@ These rules apply to the entire repository rooted at
 
 - Every Git command must target the absolute repository path explicitly:
   `git -C /Users/onthewayli/harness/ai-dev-harness ...`.
-- The implementation code, `prototype/web-ui`, root files, and `docs/` are all
-  committed through the root repository's `main` branch.
+- The implementation code, `prototype/web-ui`, `autodev`, root files, and
+  `docs/` are all committed through the root repository's `main` branch.
 - Push only with
   `git -C /Users/onthewayli/harness/ai-dev-harness push origin HEAD:main`, then
   fetch `origin main` and verify that local `HEAD` equals `origin/main`.
@@ -35,3 +35,13 @@ These rules apply to the entire repository rooted at
 - Secrets must be injected into server-side child processes at runtime. Never
   expose them through client variables, build arguments, command arguments, or
   logs.
+
+## AutoDev development
+
+- AutoDev packaging and Python source live under `autodev/`. Its `.venv`,
+  build outputs, caches, and generated `*.egg-info` are never committed.
+- Install for development with `python -m pip install -e "./autodev[dev]"` in
+  an isolated virtual environment.
+- Run its suite with
+  `python -m unittest discover -s autodev/tests -v`, then run the control-plane
+  integration with `npm run test:autodev:integration` from `prototype/web-ui`.

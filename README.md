@@ -19,6 +19,16 @@
 - [Production V1 方案](docs/production-v1-plan.md)
 - [Web UI 交互设计说明](docs/web-ui-design.md)
 - [可交互 Web UI 原型](prototype/web-ui)
+- [AutoDev 执行引擎源码](autodev)
+
+## 仓库布局
+
+- `prototype/web-ui/`：AI Dev Harness 控制面、规划与审批工作台。
+- `autodev/`：AutoDev 0.4.16 执行、队列、验证、恢复及原子 Import 服务。
+- `docs/`：跨控制面与执行面的协议、路线图和兼容性证据。
+
+所有目录都由根仓库统一版本管理；禁止在 `prototype/web-ui/`、`autodev/` 或其他
+子目录创建嵌套 `.git`。AutoDev 的 `.venv/`、构建目录、缓存和安装元数据均被排除。
 
 ## 核心原则
 

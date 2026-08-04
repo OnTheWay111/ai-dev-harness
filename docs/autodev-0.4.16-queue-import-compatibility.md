@@ -2,7 +2,7 @@
 
 > Verification date: 2026-08-04
 >
-> Verified source: `/Users/onthewayli/harness/autodev-harness-0.4.16`
+> Verified source: root repository `autodev/`
 >
 > Result: **P6-06 compatibility gate passed**
 
@@ -69,9 +69,13 @@ The control-plane integration command also passes against the real AutoDev
 process:
 
 ```bash
-AUTODEV_SOURCE_PATH=/Users/onthewayli/harness/autodev-harness-0.4.16 \
-  npm run test:autodev:integration
+cd prototype/web-ui
+npm run test:autodev:integration
 ```
+
+The test defaults to the root repository's `autodev/` source and its local
+`.venv`. `AUTODEV_SOURCE_PATH` and `AUTODEV_PYTHON` remain available only as
+explicit development overrides.
 
 It scaffolds a temporary AutoDev project, starts the formal HTTP server, proves
 an invalid two-Issue batch leaves zero tasks, imports a valid two-Issue plan
@@ -90,8 +94,8 @@ server, changing both server-side secret-store values, restarting it, verifying
 variables, project YAML, command arguments, logs, or committed environment
 files. The existing client artifact secret scan remains green.
 
-The inspected AutoDev directory is a source distribution without Git metadata.
-Its authorized working copy is modified and verified, but no nested or new Git
-repository was created. The AI Dev Harness integration test and compatibility
-record are versioned in the root repository; publishing the AutoDev changes
-itself requires the owner's actual AutoDev Git repository.
+The authorized AutoDev source, tests, migration resources, documentation, and
+packaging metadata now live under the root repository's `autodev/` directory.
+No nested Git metadata, virtual environment, build output, cache, or generated
+installation metadata is committed; AutoDev and the control plane share the
+same root history and delivery branch.

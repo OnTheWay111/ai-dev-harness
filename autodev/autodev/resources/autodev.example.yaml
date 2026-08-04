@@ -1,0 +1,190 @@
+# Packaged AutoDev harness defaults.
+# Merge with an explicit, AUTODEV_CONFIG, or XDG project config.
+# Do not put secrets, tokens, cookies, or real webhooks in this file.
+
+schema_version: 1
+
+project:
+  id: autodev-project
+  name: AutoDev project
+  repo_root: ${AUTODEV_REPO_ROOT}
+
+queue:
+  type: task_harness_yaml
+  path: tasks/agent_task_queue.yaml
+  max_in_progress: 1
+
+execution:
+  max_parallel_tasks: 1
+  stop_behavior: drain
+  circuit_breaker: cancel_and_requeue
+
+branch:
+  enabled: true
+  prefix: autodev/
+  strategy: per_loop_integration
+  name_template: "autodev/{project_id}/{date}"
+  base_ref: main
+  commit_per_task: true
+  push: false
+  worktree:
+    enabled: true
+    scope: per_task
+    root: ../.autodev-worktrees
+    setup:
+      mode: symlink_venv
+      source: .venv
+      target: .venv
+      commands: []
+
+agent:
+  builder: claude
+  evaluator: codex_check
+  allow_same_agent: false
+  evaluator_by_builder:
+    claude: codex_check
+    codex: claude_check
+  commands:
+    claude:
+      kind: claude
+      command: claude
+      args: ["-p", "--model", "opus", "--effort", "high", "--max-turns", "100"]
+      max_turns: 100
+      fresh_session_per_task: true
+      timeout_minutes: 30
+      permissions: {profile: autodev_builder, allow: [], deny: []}
+    codex:
+      kind: codex
+      command: codex
+      args: ["exec", "--model", "gpt-5.6-terra", "-c", "model_reasoning_effort=\"high\"", "-"]
+      fresh_session_per_task: true
+      timeout_minutes: 30
+      permissions: {profile: autodev_builder, allow: [], deny: []}
+    codex_check:
+      kind: codex
+      command: codex
+      args: ["exec", "--model", "gpt-5.6-sol", "-c", "model_reasoning_effort=\"high\"", "-"]
+      fresh_session_per_task: true
+      read_only: true
+      frequency: every_task
+      permissions: {profile: autodev_checker, allow: [], deny: []}
+    claude_check:
+      kind: claude
+      command: claude
+      args: ["-p", "--model", "claude-fable-5", "--effort", "high", "--fallback-model", "claude-opus-4-8"]
+      fresh_session_per_task: true
+      timeout_minutes: 10
+      read_only: true
+      frequency: every_task
+      permissions: {profile: autodev_checker, allow: [], deny: []}
+
+  # Inline legacy shape is still accepted:
+  # builder:
+  #   kind: command
+  #   command: claude
+  #   args: ["-p"]
+  # evaluator:
+  #   kind: command
+  #   command: codex
+  #   args: ["exec"]
+  #
+  # Old inline defaults before H-044m:
+  # builder:
+  #   kind: command
+  #   command: claude
+  #   args: ["-p", "--max-turns", "100"]
+  #   max_turns: 100
+  #   fresh_session_per_task: true
+  #   timeout_minutes: 30
+  #   permission_mode: allowlist
+  #   allowlist_profile: autodev_builder
+  # evaluator:
+  #   kind: command
+  #   command: codex
+  #   args: ["exec"]
+  #   read_only: true
+  #   frequency: every_task
+
+verify:
+  default:
+    - .venv/bin/python -m unittest discover -s tests
+    - git diff --check
+  command_timeout_minutes: 10
+
+governance:
+  # generic: packaged reviewer profile; project_docs: every listed file must
+  # exist and be readable; disabled: explicit audited opt-out.
+  mode: generic
+  reference_docs: []
+
+policy:
+  max_tasks_per_loop: 3
+  max_tasks_per_loop_after_direction_gate: 6
+  max_minutes_per_loop: 240
+  same_task_failures_before_block: 2
+  consecutive_failures_before_stop: 3
+  direction_check:
+    # mode: every_k_done (checkpoint every N done tasks + at loop end)
+    #       | loop_end_only (only review once at loop end, no mid-loop circuit breaker)
+    mode: every_k_done
+    every_done_tasks: 3
+  stop_file: .autodev/STOP
+  steer_file: .autodev/STEER.md
+  forbid_real_external_write: true
+  require_fresh_evaluator: true
+  require_fresh_builder_session: true
+  # Initial work starts fresh. A Codex retry prefers the healthy session from
+  # the failed run, then can fall back once; cwd-scoped Claude retries stay fresh.
+  # Evaluators always stay fresh.
+  builder_session_retry: prefer_resume  # prefer_resume | fresh
+  require_worktree_isolation: true
+  require_explicit_base_commit: true
+  main_worktree_dirty_policy: warn
+
+context_sharing:
+  enabled: true
+  mode: packet_first
+  latest_handoff_path: .autodev/latest_handoff.md
+  agents_pointer: one_line_only
+  handoff_on:
+    - loop_end
+    - task_blocked
+    - red_review
+    - tool_switch
+  save_context:
+    enabled: false
+    invocation: manual_only
+  brain_memory:
+    auto_write: false
+  bridges:
+    diagnostic_only: true
+    codex_reads_claude: ~/.codex/skills/claude-context-bridge/scripts/claude_context_bridge.py
+    claude_reads_codex: ~/.claude/skills/codex-context-bridge/scripts/codex-context-bridge.py
+
+notifications:
+  mode: dry_run
+  provider: feishu
+  feishu_webhook_env: AUTODEV_FEISHU_WEBHOOK
+  fallback_provider: dingtalk
+  dingtalk_webhook_env: AUTODEV_DINGTALK_WEBHOOK
+
+# Optional: unattended scheduled/conditional auto-trigger (docs/25 §7 G1).
+# The `schedule` CLI (python -m autodev.scheduler --project <config>, or
+# `controller schedule`) only starts a run-loop when: no .autodev/STOP file, the
+# queue has a claimable pending task (pending + in_progress budget not full), and
+# (if set) the current time is inside `window`. It reuses run-loop's circuit
+# breaker / budgets / STOP-STEER and never enables push.
+# `window` is "HH:MM-HH:MM" (supports overnight wrap like 22:00-06:00); omit or
+# leave empty for no time restriction. A --window CLI flag overrides this.
+schedule:
+  window: "00:00-06:00"
+
+safety:
+  forbidden_paths:
+    - .env
+    - .env.*
+    - secrets/**
+    - credentials/**
+  secret_patterns:
+    - "(?i)(api[_-]?key|secret|token|password)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_./+=-]{12,}"
+  external_write_policy: dry_run_only
