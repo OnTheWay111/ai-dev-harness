@@ -846,9 +846,9 @@ stale approval 和可访问性测试。通过后按第 2.1 自动 commit/push `m
 
 </details>
 
-- [ ] **P6-06** 通过正式 AutoDev Import/API 投影 Approved Issue，禁止直接编辑 Queue YAML。
+- [x] **P6-06** 通过正式 AutoDev Import/API 投影 Approved Issue，禁止直接编辑 Queue YAML。（已完成：2026-08-04；实现提交：ai-dev-harness@a4107707e8ee518cd32cfb858d67d03ce0b9dc2f）
 
-  阻塞（2026-08-04）：已实现失败关闭的 `QueueProjectionPort`、正式原子 HTTP Import 适配器、幂等 receipt 持久化和契约测试；但经验证 AutoDev 0.4.16 仅提供逐任务 `queue propose`，没有受支持的原子 Import/API 或任务级 Builder 能力，且仓库内无扩展授权。为避免半条队列和越权修改，未直接编辑 Queue YAML，P6-06 与 M2 Gate 保持未完成。兼容性证据见 [`autodev-0.4.16-queue-import-compatibility.md`](autodev-0.4.16-queue-import-compatibility.md)。
+  完成（2026-08-04）：在获得源码修改授权后，AutoDev 0.4.16 已增加正式的鉴权原子 HTTP Import 服务、YAML 单次原子替换、数据库同事务写入、幂等键/计划身份绑定、确定性 receipt、完整 DAG/Route 校验和 Builder prompt 契约传播。真实跨进程兼容性测试证明非法批次不产生任务、合法批次精确映射依赖和能力路由、重放不重复；Secret 注入与轮换边界也已验证。兼容性证据见 [`autodev-0.4.16-queue-import-compatibility.md`](autodev-0.4.16-queue-import-compatibility.md)。
 
 <details>
 <summary>快捷复制开发提示词 P6-06 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -868,7 +868,7 @@ QueueProjectionPort，将 approved plan 幂等映射为 AutoDev 任务，保存�
 
 </details>
 
-**M2 Gate：** Approved Issue DAG 能重复、可审计地生成同一执行投影；失败不会产生半条队列。
+**M2 Gate（已通过：2026-08-04；实现提交：ai-dev-harness@a4107707e8ee518cd32cfb858d67d03ce0b9dc2f）：** Approved Issue DAG 能重复、可审计地生成同一执行投影；失败不会产生半条队列。
 
 ## 11. P7：Scheduler、Execution Gateway 与 AutoDev 集成
 
