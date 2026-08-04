@@ -1,0 +1,56 @@
+[
+  {
+    "name": "small-low-risk",
+    "goal": {
+      "title": "Update dashboard copy",
+      "problemStatement": "The dashboard guidance is unclear.",
+      "desiredOutcome": "Users understand the existing workflow.",
+      "acceptanceCriteria": ["The guidance is visible"],
+      "nonGoals": [],
+      "constraints": []
+    },
+    "clarifications": [],
+    "expected": {
+      "size": "S",
+      "risk": "low",
+      "requiredArtifacts": ["proposal", "prd", "test_plan"],
+      "requiredApproverRoles": ["project_approver"]
+    }
+  },
+  {
+    "name": "large-security-change",
+    "goal": {
+      "title": "Harden authentication",
+      "problemStatement": "Credential and secret handling needs stronger controls.",
+      "desiredOutcome": "Authentication is secure and auditable.",
+      "acceptanceCriteria": ["OIDC enforced", "Tokens stay server-side", "Audit is retained", "RBAC denies by default", "Sessions expire", "Tests cover bypasses"],
+      "nonGoals": [],
+      "constraints": ["Production rollout", "No credential logging", "Rollback required"]
+    },
+    "clarifications": [{ "blockingLevel": "high", "status": "open" }],
+    "expected": {
+      "size": "L",
+      "risk": "high",
+      "requiredArtifacts": ["proposal", "prd", "test_plan", "architecture_decision_record", "risk_assessment", "recovery_plan"],
+      "requiredApproverRoles": ["project_approver", "technical_approver", "organization_approver"]
+    }
+  },
+  {
+    "name": "xl-database-migration",
+    "goal": {
+      "title": "Migrate production schema",
+      "problemStatement": "The database schema must move without data loss or deletion.",
+      "desiredOutcome": "Production uses the new schema with a tested rollback.",
+      "acceptanceCriteria": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"],
+      "nonGoals": ["No unrelated UI rewrite"],
+      "constraints": ["PostgreSQL migration", "Production deployment", "Zero data loss", "Rollback plan", "Backup", "Maintenance window"]
+    },
+    "clarifications": [],
+    "expected": {
+      "size": "XL",
+      "risk": "high",
+      "requiredArtifacts": ["proposal", "prd", "test_plan", "architecture_decision_record", "migration_plan", "rollback_plan", "risk_assessment", "recovery_plan"],
+      "requiredApproverRoles": ["project_approver", "technical_approver", "organization_approver"]
+    }
+  }
+]

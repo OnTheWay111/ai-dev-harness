@@ -5,7 +5,8 @@ These tables record business facts; `workbench_snapshots` and
 `workbench_tasks` remain replaceable projections derived from them.
 
 The current scope contains Organization, Project, Repository, Goal,
-AcceptanceCriterion, Clarification, Decision, SpecRevision, Issue,
+AcceptanceCriterion, ClarificationRound, Clarification, Decision,
+ClassificationPolicyRevision, Classification, SpecRevision, Issue,
 IssueDependency, Run, Evidence, AuditEvent, OutboxEvent, and
 IdempotencyRecord.
 
@@ -22,7 +23,8 @@ IdempotencyRecord.
   application services must perform explicit archival or domain transitions.
 - Human-readable values are non-blank and bounded; slugs and scoped identities
   are unique where they select a single entity.
-- Clarification and Decision history is append-only. A changed answer or
+- ClarificationRound, Clarification, Decision, ClassificationPolicyRevision,
+  and Classification history is append-only. A changed answer or
   disposition creates a successor revision and PostgreSQL rejects mutation of
   earlier rows.
 - SpecRevision and Issue keep content revisions distinct from their optimistic
@@ -122,6 +124,14 @@ Ordered statements used later by Goal verification.
 belong on this table; later entities record those facts without overwriting the
 criterion.
 
+## `clarification_rounds`
+
+An immutable Planner generation round for one Goal version. It stores the
+ordered round number, prior and regenerated-from round IDs, Planner run ID,
+validated known facts and uncertainties, server-derived actor, reason, and
+creation time. Its update/delete trigger prevents regenerated output from
+replacing prior context.
+
 ## `clarifications`
 
 An immutable revision in a Goal-scoped clarification thread.
@@ -129,12 +139,15 @@ An immutable revision in a Goal-scoped clarification thread.
 | Column | Meaning |
 |---|---|
 | `id` | Immutable revision identity |
-| `organization_id`, `project_id`, `goal_id` | Owning Goal hierarchy |
+| `organization_id`, `project_id`, `goal_id`, `round_id` | Owning Goal hierarchy and generation round |
 | `thread_id`, `revision` | Stable thread identity and positive revision number |
 | `previous_clarification_id` | Prior revision in the same Goal; required after revision 1 |
 | `status` | `open`, `answered`, or `superseded` |
-| `question`, `answer` | Bounded question and state-consistent answer |
+| `question`, `planner_question_id`, `rationale` | Validated Planner question identity and explanation |
+| `blocking_level`, `answer_type`, `suggested_options` | Strict versioned question metadata |
+| `answer` | State-consistent human answer |
 | `source_goal_version` | Goal version used to create the revision |
+| `actor_id`, `reason` | Server-derived author and explicit reason |
 | `created_at` | Immutable creation time |
 
 The Goal/thread/revision tuple is unique. Update and delete triggers force
@@ -152,10 +165,25 @@ An immutable, reasoned disposition of a versioned planning subject.
 | `previous_decision_id` | Prior revision in the same Goal |
 | `status` | `proposed`, `approved`, `rejected`, or `superseded` |
 | `subject_type`, `subject_id`, `subject_version` | Exact planning subject being decided |
-| `outcome`, `reason` | Bounded result and rationale |
+| `outcome`, `actor_id`, `reason` | Bounded result, server-derived human actor, and rationale |
 | `created_at` | Immutable creation time |
 
 Decision revisions are append-only and cannot be updated or deleted.
+
+## `classification_policy_revisions`
+
+An immutable deterministic rule set identified by policy key, positive
+revision, schema version, canonical SHA-256 digest, and complete JSON rule
+definition. A revision links to its predecessor and records actor, reason, and
+creation time. Digest and key/revision are unique.
+
+## `classifications`
+
+An immutable Goal classification revision. It records the source Goal version,
+exact policy revision, S/M/L/XL size, low/medium/high risk, size/risk scores,
+matched factors with explanations, required Artifacts, required approver roles,
+actor, and reason. The Goal/revision tuple is unique and a successor links to
+the previous classification. Models do not write any of these decision fields.
 
 ## `spec_revisions`
 

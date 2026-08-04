@@ -9,19 +9,26 @@ import {
   getGoalWorkspaceRepository,
   usesDemoGoalWorkspace,
 } from "./goal-workspace-runtime.ts";
+import type { ClarificationHistoryRepository } from "../ports/clarification-history-repository.ts";
 
 let service: ClarificationHistoryService | undefined;
+let repository: ClarificationHistoryRepository | undefined;
 
 export function getClarificationHistoryService(): ClarificationHistoryService {
   if (service) return service;
-  const demo = usesDemoGoalWorkspace();
   service = new ClarificationHistoryService({
-    repository: demo
-      ? new MemoryClarificationHistoryRepository()
-      : new PostgresClarificationHistoryRepository(getGoalWorkspacePool()),
+    repository: getClarificationHistoryRepository(),
     goals: getGoalWorkspaceRepository(),
     authorizer: getGoalWorkspaceAuthorizer(),
     planner: new ClarificationPlannerService(new DemoClarificationPlannerAdapter()),
   });
   return service;
+}
+
+export function getClarificationHistoryRepository(): ClarificationHistoryRepository {
+  if (repository) return repository;
+  repository = usesDemoGoalWorkspace()
+    ? new MemoryClarificationHistoryRepository()
+    : new PostgresClarificationHistoryRepository(getGoalWorkspacePool());
+  return repository;
 }

@@ -6,6 +6,8 @@ import type {
 } from "../../control-plane/domain/goal-contract";
 import type { ClarificationTimeline } from
   "../../control-plane/domain/clarification-history";
+import type { ClassificationTimeline } from
+  "../../control-plane/domain/classification";
 import {
   goalWorkspaceApi,
   GoalWorkspaceApiError,
@@ -69,6 +71,9 @@ export function ClarifyView({
     "Resolve this uncertainty for planning",
   );
   const [planning, setPlanning] = useState(false);
+  const [classifications, setClassifications] = useState<ClassificationTimeline>({
+    policies: [], classifications: [],
+  });
   const storageKey = useMemo(() => goalDraftStorageKey(scope), [scope]);
   const lastGoalKey = `${storageKey}:last-goal`;
 
@@ -89,8 +94,14 @@ export function ClarifyView({
         if (!active) return;
         setGoal(loaded);
         if (!saved) setDraft(editableDraft(loaded));
-        const history = await goalWorkspaceApi.clarificationTimeline(scope, loaded.id);
-        if (active) setTimeline(history);
+        const [history, classificationHistory] = await Promise.all([
+          goalWorkspaceApi.clarificationTimeline(scope, loaded.id),
+          goalWorkspaceApi.classificationTimeline(scope, loaded.id),
+        ]);
+        if (active) {
+          setTimeline(history);
+          setClassifications(classificationHistory);
+        }
       } catch {
         window.localStorage.removeItem(lastGoalKey);
       } finally {
@@ -203,6 +214,24 @@ export function ClarifyView({
     } finally { setPlanning(false); }
   }
 
+  async function classifyCurrentGoal() {
+    if (!goal) return;
+    setPlanning(true);
+    setError("");
+    try {
+      await goalWorkspaceApi.classify(
+        scope, goal.id, goal.version,
+        "Apply the current deterministic classification policy",
+      );
+      setClassifications(await goalWorkspaceApi.classificationTimeline(scope, goal.id));
+      notify("确定性规模与风险分类已保存");
+    } catch {
+      const message = "分类失败；已保存的分类和策略修订保持不变。";
+      setError(message);
+      notify(message);
+    } finally { setPlanning(false); }
+  }
+
   const latestRound = timeline.rounds.at(-1);
   const latestQuestions = [...timeline.questions]
     .filter(({ roundId }) => roundId === latestRound?.id)
@@ -213,6 +242,7 @@ export function ClarifyView({
       }
       return items;
     }, new Map<string, ClarificationTimeline["questions"][number]>());
+  const latestClassification = classifications.classifications.at(-1);
 
   return (
     <div className="screen detail-screen">
@@ -423,6 +453,32 @@ export function ClarifyView({
               <div><strong>服务端 Goal</strong><small>冲突时不覆盖旧版本</small></div>
             </div>
           </section>
+          {goal && (
+            <section className="panel summary-card" aria-labelledby="classification-heading">
+              <p className="eyebrow">DETERMINISTIC POLICY</p>
+              <h3 id="classification-heading">规模、风险与审批</h3>
+              {latestClassification ? (
+                <>
+                  <div className="classification">
+                    <div><small>规模</small><strong>{latestClassification.size}</strong><span>{latestClassification.sizeScore} 分</span></div>
+                    <div><small>风险</small><strong>{latestClassification.risk.toUpperCase()}</strong><span>{latestClassification.riskScore} 分</span></div>
+                  </div>
+                  <p>Policy {latestClassification.policySchemaVersion} · revision {latestClassification.revision}</p>
+                  <ul className="reason-list">
+                    {latestClassification.matchedFactors.map((factor) => (
+                      <li key={factor.code}><span>•</span>{factor.explanation}</li>
+                    ))}
+                  </ul>
+                  <p><strong>所需 Artifact</strong><br />{latestClassification.requiredArtifacts.join(" · ")}</p>
+                  <p><strong>审批角色</strong><br />{latestClassification.requiredApproverRoles.join(" · ")}</p>
+                </>
+              ) : <p>尚未针对当前 Goal 运行规则。</p>}
+              <button className="secondary-button" type="button" disabled={planning} onClick={classifyCurrentGoal}>
+                {latestClassification ? "重新分类并追加版本" : "运行确定性分类"}
+              </button>
+              <small>模型不参与 Gate 决定；结果仅由版本化规则计算。</small>
+            </section>
+          )}
         </aside>
       </div>
 

@@ -9,6 +9,10 @@ import type {
   ClarificationGenerationReceipt,
   ClarificationTimeline,
 } from "../control-plane/domain/clarification-history";
+import type {
+  ClassificationReceipt,
+  ClassificationTimeline,
+} from "../control-plane/domain/classification";
 
 export interface GoalWorkspaceScope {
   organizationId: string;
@@ -148,6 +152,37 @@ export const goalWorkspaceApi = {
           answer,
           reason,
         }),
+      },
+    ));
+  },
+
+  async classificationTimeline(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+  ): Promise<ClassificationTimeline> {
+    const query = new URLSearchParams({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+    });
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/classifications?${query}`,
+      { credentials: "same-origin", cache: "no-store" },
+    ));
+  },
+
+  async classify(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+    expectedGoalVersion: number,
+    reason: string,
+  ): Promise<ClassificationReceipt> {
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/classifications`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: writeHeaders(),
+        body: JSON.stringify({ ...scope, expectedGoalVersion, reason }),
       },
     ));
   },

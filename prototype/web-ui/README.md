@@ -209,6 +209,9 @@ and diagnostic contract are documented in
 The append-only clarification rounds, question/answer revisions, human
 decisions, API/UI timeline, and concurrency rules are documented in
 [`../../docs/clarification-history.md`](../../docs/clarification-history.md).
+The versioned deterministic S/M/L/XL and risk policy, factor explanations,
+required Artifacts, approvers, and persistence contract are documented in
+[`../../docs/deterministic-classification.md`](../../docs/deterministic-classification.md).
 The Goal write-module interface, Repository seam, adapters, and HTTP mapping are
 documented in
 [`../../docs/control-plane-write-architecture.md`](../../docs/control-plane-write-architecture.md).

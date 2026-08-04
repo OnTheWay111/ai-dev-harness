@@ -688,6 +688,95 @@ export const decisions = pgTable(
   ],
 );
 
+export const classificationPolicyRevisions = pgTable(
+  "classification_policy_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    policyKey: text("policy_key").notNull(),
+    revision: integer("revision").notNull(),
+    previousPolicyRevisionId: uuid("previous_policy_revision_id"),
+    schemaVersion: text("schema_version").notNull(),
+    digest: text("digest").notNull(),
+    definition: jsonb("definition").notNull(),
+    actorId: text("actor_id").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "classification_policy_revisions_previous_fk",
+      columns: [table.previousPolicyRevisionId],
+      foreignColumns: [table.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("classification_policy_revisions_key_revision_uidx").on(
+      table.policyKey, table.revision,
+    ),
+    uniqueIndex("classification_policy_revisions_digest_uidx").on(table.digest),
+    check("classification_policy_revisions_revision_chk", sql`${table.revision} > 0 AND ((${table.revision} = 1 AND ${table.previousPolicyRevisionId} IS NULL) OR (${table.revision} > 1 AND ${table.previousPolicyRevisionId} IS NOT NULL))`),
+    check("classification_policy_revisions_key_chk", sql`char_length(btrim(${table.policyKey})) BETWEEN 1 AND 100`),
+    check("classification_policy_revisions_schema_chk", sql`char_length(btrim(${table.schemaVersion})) BETWEEN 1 AND 100`),
+    check("classification_policy_revisions_digest_chk", sql`${table.digest} ~ '^[0-9a-f]{64}$'`),
+    check("classification_policy_revisions_actor_chk", sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200`),
+    check("classification_policy_revisions_reason_chk", sql`char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`),
+  ],
+);
+
+export const classifications = pgTable(
+  "classifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    revision: integer("revision").notNull(),
+    previousClassificationId: uuid("previous_classification_id"),
+    sourceGoalVersion: integer("source_goal_version").notNull(),
+    policyRevisionId: uuid("policy_revision_id").notNull(),
+    size: text("size").notNull(),
+    risk: text("risk").notNull(),
+    sizeScore: integer("size_score").notNull(),
+    riskScore: integer("risk_score").notNull(),
+    matchedFactors: jsonb("matched_factors").notNull(),
+    requiredArtifacts: jsonb("required_artifacts").notNull(),
+    requiredApproverRoles: jsonb("required_approver_roles").notNull(),
+    actorId: text("actor_id").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "classifications_goal_organization_fk",
+      columns: [table.organizationId, table.projectId, table.goalId],
+      foreignColumns: [goals.organizationId, goals.projectId, goals.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("classifications_goal_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    foreignKey({
+      name: "classifications_previous_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.previousClassificationId],
+      foreignColumns: [table.organizationId, table.projectId, table.goalId, table.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "classifications_policy_revision_fk",
+      columns: [table.policyRevisionId],
+      foreignColumns: [classificationPolicyRevisions.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("classifications_goal_revision_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.revision,
+    ),
+    check("classifications_revision_chain_chk", sql`${table.revision} > 0 AND ((${table.revision} = 1 AND ${table.previousClassificationId} IS NULL) OR (${table.revision} > 1 AND ${table.previousClassificationId} IS NOT NULL))`),
+    check("classifications_goal_version_chk", sql`${table.sourceGoalVersion} > 0`),
+    check("classifications_size_chk", sql`${table.size} IN ('S','M','L','XL')`),
+    check("classifications_risk_chk", sql`${table.risk} IN ('low','medium','high')`),
+    check("classifications_scores_chk", sql`${table.sizeScore} >= 0 AND ${table.riskScore} >= 0`),
+    check("classifications_actor_chk", sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200`),
+    check("classifications_reason_chk", sql`char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`),
+  ],
+);
+
 export const specRevisions = pgTable(
   "spec_revisions",
   {
@@ -1343,6 +1432,10 @@ export type ClarificationRound = typeof clarificationRounds.$inferSelect;
 export type NewClarificationRound = typeof clarificationRounds.$inferInsert;
 export type Decision = typeof decisions.$inferSelect;
 export type NewDecision = typeof decisions.$inferInsert;
+export type ClassificationPolicyRevision = typeof classificationPolicyRevisions.$inferSelect;
+export type NewClassificationPolicyRevision = typeof classificationPolicyRevisions.$inferInsert;
+export type Classification = typeof classifications.$inferSelect;
+export type NewClassification = typeof classifications.$inferInsert;
 export type SpecRevision = typeof specRevisions.$inferSelect;
 export type NewSpecRevision = typeof specRevisions.$inferInsert;
 export type Issue = typeof issues.$inferSelect;

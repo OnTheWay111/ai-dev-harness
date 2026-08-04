@@ -42,6 +42,10 @@ import { ClarificationPlannerService } from
   "../app/control-plane/application/clarification-planner-service.ts";
 import { ClarificationHistoryService } from
   "../app/control-plane/application/clarification-history-service.ts";
+import { PostgresClassificationRepository } from
+  "../app/control-plane/adapters/postgres-classification-repository.ts";
+import { ClassificationService } from
+  "../app/control-plane/application/classification-service.ts";
 import {
   IdempotencyConflictError,
 } from "../app/control-plane/domain/errors.ts";
@@ -164,7 +168,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 9);
+  assert.equal(migrations.length, 10);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -185,6 +189,8 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
       "audit_events",
       "clarification_rounds",
       "clarifications",
+      "classification_policy_revisions",
+      "classifications",
       "decisions",
       "evidence",
       "goals",
@@ -332,6 +338,40 @@ integrationTest(
       () => pool.query(`UPDATE clarification_rounds SET reason='overwrite' WHERE id=$1`, [generated.round.id]),
       /append-only/i,
     );
+  },
+);
+
+integrationTest(
+  "persists deterministic classifications against one immutable policy revision",
+  async () => {
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const suffix = `${process.pid}-${crypto.randomUUID().slice(0, 8)}`;
+    await pool.query(`INSERT INTO organizations (id, slug, name) VALUES ($1,$2,'Classification org')`, [organizationId, `classification-org-${suffix}`]);
+    await pool.query(`INSERT INTO projects (id, organization_id, slug, name) VALUES ($1,$2,$3,'Classification project')`, [projectId, organizationId, `classification-project-${suffix}`]);
+    const goals = new PostgresGoalWorkspaceRepository(pool);
+    const created = await new GoalWorkspaceService({ repository: goals, authorizer: { async authorize() {} } }).create({
+      organizationId, projectId, actorId: "classification-author", requestId: "classification-goal-request",
+      idempotencyKey: `classification-goal-${suffix}`, reason: "Create classification source",
+      draft: { title: "Migrate production schema", problemStatement: "Avoid data loss during migration", desiredOutcome: "A reversible deployment", acceptanceCriteria: ["Migration passes", "Rollback passes", "Audit retained", "No credential leakage", "Production remains available", "Recovery is tested"], nonGoals: [], constraints: ["Production rollout", "PostgreSQL schema migration", "No data loss"] },
+    });
+    const repository = new PostgresClassificationRepository(pool);
+    const service = new ClassificationService({
+      repository, goals,
+      clarifications: new PostgresClarificationHistoryRepository(pool),
+      authorizer: { async authorize() {} },
+    });
+    const command = { organizationId, projectId, goalId: created.goal.id, expectedGoalVersion: 1, actorId: "classification-reviewer", reason: "Apply policy revision one" };
+    const first = await service.classify(command);
+    const second = await service.classify(command);
+    assert.equal(first.classification.risk, "high");
+    assert.equal(second.classification.revision, 2);
+    const timeline = await repository.getTimeline(command);
+    assert.equal(timeline.policies.length, 1);
+    assert.equal(timeline.classifications.length, 2);
+    assert.equal(timeline.classifications[0].policyRevisionId, timeline.classifications[1].policyRevisionId);
+    await assert.rejects(() => pool.query(`UPDATE classifications SET risk='low' WHERE id=$1`, [first.classification.id]), /append-only/i);
+    await assert.rejects(() => pool.query(`DELETE FROM classification_policy_revisions WHERE id=$1`, [first.policy.id]), /append-only/i);
   },
 );
 
