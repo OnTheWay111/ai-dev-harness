@@ -28,6 +28,8 @@ This starter does not use `wrangler.jsonc`.
 - `app/workbench/workbench-api.ts` is the browser HTTP adapter with ETag caching
 - `app/workbench/server/` contains the demo/PostgreSQL repositories and projection writer
 - `app/api/v1/workbench/route.ts` serves filtering, pagination, ETag, and structured errors
+- `app/api/v1/workbench/events/route.ts` streams revision invalidations with reconnect cursors
+- `app/api/v1/tasks/` and `app/api/v1/receipts/` expose task details and durable async commands
 - `db/postgres-schema.ts` defines the PostgreSQL workbench read model
 - `drizzle-postgres/` contains committed PostgreSQL migrations
 - `.openai/hosting.json` declares optional Sites D1 and R2 bindings
@@ -116,6 +118,9 @@ deny behavior, and role-change Audit transaction are documented in
   accessibility-contract, and compiler-gate tests
 - `npm run test:browser:spec-review`: run the HTTPS Chromium review path (run
   `npx playwright install chromium` once on a new development machine)
+- `npm run test:p8`: run projection, task action, realtime, and UI state tests
+- `npm run test:browser:p8`: run retained-data, empty-state, conflict, and duplicate-click Chromium paths
+- `npm run projector:p8`: run the independent Outbox-driven workbench projector (server-side `DATABASE_URL` required)
 - `npm run test:postgres:integration`: create, migrate, test, and destroy a
   temporary real PostgreSQL database
 - `npm run ci:p1`: run the local equivalent of the P1 PostgreSQL CI gate
@@ -139,6 +144,19 @@ hydration, the browser refreshes the same snapshot through:
 ```text
 GET /api/v1/workbench
 ```
+
+Production clients also use:
+
+```text
+GET  /api/v1/workbench/events?afterRevision=<revision>
+GET  /api/v1/tasks/{taskId}
+POST /api/v1/tasks/{taskId}/actions
+GET  /api/v1/receipts/{receiptId}
+```
+
+SSE contains revision-only invalidation summaries. The browser retains the last successful snapshot, reconnects with
+exponential backoff, and performs an ETag-backed full read after invalidation instead of rebuilding authority locally.
+Task writes return `202` Receipt records without waiting for execution.
 
 Supported query parameters are `goalId`, `filter`, `cursor`, and `limit`. The
 response implements `workbench.v1`, emits an ETag, identifies the active source
@@ -235,11 +253,13 @@ CSRF/同源校验、严格请求 Schema、大小上限、限流、安全响应�
 [`../../docs/security-regression-matrix.md`](../../docs/security-regression-matrix.md)。
 
 The seed command is only a bootstrap utility. In the real pipeline, the
-scheduler/aggregator owns `WorkbenchSnapshot` generation and calls
-`NeonWorkbenchProjectionWriter.replaceProjection()` once per revision and
-Organization/Project scope. Projection writes for one composite scope must be
-serialized; the writer replaces that Project snapshot and its ordered task rows
-in one database batch.
+scheduler/aggregator owns `WorkbenchSnapshot` generation. The P8 Projector
+consumes Outbox triggers, reloads authoritative Goal/Issue/Run/Scheduler facts,
+and publishes once per semantic revision and Organization/Project scope.
+Projection writes for one composite scope are serialized with an advisory lock;
+snapshot, ordered task rows, semantic digest, and Outbox checkpoint commit in
+one transaction. Run the process separately from the HTTP service with
+`npm run projector:p8`.
 
 ## Learn More
 

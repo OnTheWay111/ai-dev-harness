@@ -90,6 +90,7 @@ export class NeonWorkbenchReadStore implements PostgresWorkbenchReadStore {
         projectId: workbenchSnapshots.projectId,
         revision: workbenchSnapshots.revision,
         generatedAt: workbenchSnapshots.generatedAt,
+        summary: workbenchSnapshots.summary,
       })
       .from(workbenchSnapshots)
       .where(and(
@@ -168,8 +169,8 @@ export class NeonWorkbenchReadStore implements PostgresWorkbenchReadStore {
         !current || row.generatedAt > current.generatedAt ? row : current,
       undefined,
     );
-    const maximumRevision = snapshots.reduce(
-      (maximum, row) => Math.max(maximum, Number(row.revision)),
+    const visibleRevision = snapshots.reduce(
+      (total, row) => total + Number(row.revision),
       0,
     );
     const counts = summaries[0];
@@ -177,7 +178,7 @@ export class NeonWorkbenchReadStore implements PostgresWorkbenchReadStore {
     return {
       snapshot: counts
         ? {
-            revision: maximumRevision,
+            revision: visibleRevision,
             generatedAt: latest?.generatedAt ?? new Date(0),
             summary: buildScopedWorkbenchSummary({
               all: Number(counts.all),
@@ -187,7 +188,7 @@ export class NeonWorkbenchReadStore implements PostgresWorkbenchReadStore {
               blocked: Number(counts.blocked),
               waiting: Number(counts.waiting),
               activeWorkers: Number(counts.activeWorkers),
-            }),
+            }, snapshots.map((row) => row.summary)),
             cacheTag: snapshots
               .sort((left, right) =>
                 `${left.organizationId}/${left.projectId}`.localeCompare(

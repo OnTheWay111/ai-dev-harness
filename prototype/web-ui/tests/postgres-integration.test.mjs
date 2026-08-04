@@ -190,7 +190,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 17);
+  assert.equal(migrations.length, 18);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -236,6 +236,8 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
       "runs",
       "scheduler_jobs",
       "spec_revisions",
+      "task_action_receipts",
+      "workbench_projection_checkpoints",
       "workbench_snapshots",
       "workbench_tasks",
     ],
@@ -1384,8 +1386,9 @@ integrationTest(
     await pool.query(
       `INSERT INTO goals
          (id, organization_id, project_id, title,
-          problem_statement, desired_outcome)
-       VALUES ($1, $2, $3, $4, 'Hide persistence', 'One stable interface')`,
+          problem_statement, desired_outcome, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'Hide persistence', 'One stable interface',
+               now() - interval '1 second', now() - interval '1 second')`,
       [goal.id, goal.organizationId, goal.projectId, goal.title],
     );
     await assertGoalRepositoryContract({

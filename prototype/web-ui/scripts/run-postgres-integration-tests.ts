@@ -105,6 +105,7 @@ async function runIntegrationTest(url: string): Promise<number> {
         "--test-concurrency=1",
         "tests/postgres-integration.test.mjs",
         "tests/p7-postgres-integration.test.mjs",
+        "tests/p8-postgres-integration.test.mjs",
         "tests/security-regression-postgres.test.mjs",
       ],
       {

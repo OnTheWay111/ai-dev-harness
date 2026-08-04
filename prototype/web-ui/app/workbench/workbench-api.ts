@@ -135,6 +135,15 @@ export class HttpWorkbenchApi implements WorkbenchApi {
     if (!response.ok) throw await readError(response);
     return (await response.json()) as CommandReceipt;
   }
+
+  async getReceipt(receiptId: string): Promise<CommandReceipt> {
+    const response = await this.fetcher(
+      `${this.basePath}/api/v1/receipts/${encodeURIComponent(receiptId)}`,
+      { headers: { accept: "application/json" } },
+    );
+    if (!response.ok) throw await readError(response);
+    return (await response.json()) as CommandReceipt;
+  }
 }
 
 export const workbenchApi: WorkbenchApi = new HttpWorkbenchApi();

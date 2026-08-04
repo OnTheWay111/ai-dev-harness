@@ -47,7 +47,23 @@ export interface WorkbenchSummaryCounts {
 
 export function buildScopedWorkbenchSummary(
   counts: WorkbenchSummaryCounts,
+  authoritativeSummaries: readonly WorkbenchSnapshot["summary"][] = [],
 ): WorkbenchSnapshot["summary"] {
+  const metrics = authoritativeSummaries.flatMap((summary) => summary.metrics);
+  const sumMetric = (id: string) => metrics
+    .filter((metric) => metric.id === id)
+    .reduce((sum, metric) => sum + (Number.parseInt(metric.value, 10) || 0), 0);
+  const capacity = metrics
+    .filter((metric) => metric.id === "active_workers")
+    .reduce((sum, metric) => sum + (Number.parseInt(metric.suffix?.replace("/", "") ?? "0", 10) || 0), 0);
+  const budgetValues = metrics
+    .filter((metric) => metric.id === "budget_health")
+    .map((metric) => metric.value);
+  const budgetHealth = budgetValues.includes("超限")
+    ? "超限"
+    : budgetValues.includes("告警")
+    ? "告警"
+    : "健康";
   return {
     taskCounts: {
       all: counts.all,
@@ -75,8 +91,11 @@ export function buildScopedWorkbenchSummary(
       {
         id: "active_workers",
         label: "活跃 Worker",
-        value: String(counts.activeWorkers),
-        detail: "当前可见范围",
+        value: String(authoritativeSummaries.length > 0
+          ? sumMetric("active_workers")
+          : counts.activeWorkers),
+        suffix: authoritativeSummaries.length > 0 ? `/${capacity}` : undefined,
+        detail: "有效 lease / 可见项目容量",
         targetView: "scheduler",
       },
       {
@@ -86,6 +105,21 @@ export function buildScopedWorkbenchSummary(
         detail: "当前可见范围",
         tone: counts.blocked > 0 ? "danger" : "default",
         targetFilter: "blocked",
+      },
+      {
+        id: "completed_today",
+        label: "今日完成",
+        value: String(sumMetric("completed_today")),
+        detail: "当前可见范围",
+        tone: sumMetric("completed_today") > 0 ? "success" : "default",
+      },
+      {
+        id: "budget_health",
+        label: "预算健康",
+        value: budgetHealth,
+        detail: "采用可见项目中的最严重状态",
+        tone: budgetHealth === "健康" ? "success" : "danger",
+        targetView: "scheduler",
       },
     ],
   };

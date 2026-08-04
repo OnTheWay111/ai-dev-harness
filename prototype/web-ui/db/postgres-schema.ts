@@ -139,6 +139,15 @@ export const executionControlStates = [
 ] as const;
 export type ExecutionControlState = (typeof executionControlStates)[number];
 
+export const taskActionReceiptStatuses = [
+  "accepted",
+  "running",
+  "completed",
+  "failed",
+] as const;
+export type TaskActionReceiptStatus =
+  (typeof taskActionReceiptStatuses)[number];
+
 export const organizations = pgTable(
   "organizations",
   {
@@ -1757,6 +1766,90 @@ export const executionCommandReceipts = pgTable(
   ],
 );
 
+export const taskActionReceipts = pgTable(
+  "task_action_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    taskId: text("task_id").notNull(),
+    goalId: text("goal_id").notNull(),
+    actorId: text("actor_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    requestId: text("request_id").notNull(),
+    action: text("action").notNull(),
+    reason: text("reason").notNull(),
+    input: jsonb("input").$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+    status: text("status").$type<TaskActionReceiptStatus>()
+      .default("accepted")
+      .notNull(),
+    taskVersion: integer("task_version").notNull(),
+    resultTaskVersion: integer("result_task_version"),
+    error: jsonb("error").$type<Record<string, unknown> | null>(),
+    version: integer("version").default(1).notNull(),
+    completedAt: timestamp("completed_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "task_action_receipts_project_fk",
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    uniqueIndex("task_action_receipts_actor_endpoint_key_uidx").on(
+      table.organizationId,
+      table.actorId,
+      table.taskId,
+      table.idempotencyKey,
+    ),
+    index("task_action_receipts_task_status_idx").on(
+      table.organizationId,
+      table.projectId,
+      table.taskId,
+      table.status,
+    ),
+    check(
+      "task_action_receipts_status_chk",
+      sql`${table.status} IN ('accepted','running','completed','failed')`,
+    ),
+    check(
+      "task_action_receipts_action_chk",
+      sql`${table.action} IN ('review_evidence','answer_questions','resolve_blocker','inspect_schedule','inspect_run')`,
+    ),
+    check(
+      "task_action_receipts_identity_chk",
+      sql`char_length(btrim(${table.taskId})) BETWEEN 1 AND 128 AND char_length(btrim(${table.goalId})) BETWEEN 1 AND 128 AND char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.idempotencyKey})) BETWEEN 8 AND 200 AND ${table.requestHash} ~ '^[0-9a-f]{64}$' AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000`,
+    ),
+    check(
+      "task_action_receipts_version_chk",
+      sql`${table.taskVersion} > 0 AND ${table.version} > 0 AND (${table.resultTaskVersion} IS NULL OR ${table.resultTaskVersion} >= ${table.taskVersion})`,
+    ),
+    check(
+      "task_action_receipts_lifecycle_chk",
+      sql`((${table.status} IN ('accepted','running') AND ${table.completedAt} IS NULL) OR (${table.status} IN ('completed','failed') AND ${table.completedAt} IS NOT NULL)) AND (${table.status}='failed' OR ${table.error} IS NULL) AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
 export const evidence = pgTable(
   "evidence",
   {
@@ -2092,6 +2185,8 @@ export type ExecutionControl = typeof executionControls.$inferSelect;
 export type NewExecutionControl = typeof executionControls.$inferInsert;
 export type ExecutionCommandReceipt = typeof executionCommandReceipts.$inferSelect;
 export type NewExecutionCommandReceipt = typeof executionCommandReceipts.$inferInsert;
+export type TaskActionReceiptRecord = typeof taskActionReceipts.$inferSelect;
+export type NewTaskActionReceiptRecord = typeof taskActionReceipts.$inferInsert;
 export type IdempotencyRecord = typeof idempotencyRecords.$inferSelect;
 export type NewIdempotencyRecord = typeof idempotencyRecords.$inferInsert;
 
@@ -2124,6 +2219,52 @@ export const workbenchSnapshots = pgTable(
       table.scopeId,
       table.organizationId,
       table.projectId,
+    ),
+  ],
+);
+
+export const workbenchProjectionCheckpoints = pgTable(
+  "workbench_projection_checkpoints",
+  {
+    scopeId: text("scope_id").notNull(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    revision: bigint("revision", { mode: "number" }).notNull(),
+    snapshotDigest: text("snapshot_digest").notNull(),
+    lastEventAt: timestamp("last_event_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    lastEventId: uuid("last_event_id"),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.scopeId, table.organizationId, table.projectId],
+    }),
+    foreignKey({
+      name: "workbench_projection_checkpoints_project_fk",
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+    })
+      .onDelete("restrict")
+      .onUpdate("restrict"),
+    check(
+      "workbench_projection_checkpoints_revision_chk",
+      sql`${table.revision} > 0`,
+    ),
+    check(
+      "workbench_projection_checkpoints_digest_chk",
+      sql`${table.snapshotDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "workbench_projection_checkpoints_cursor_chk",
+      sql`(${table.lastEventAt} IS NULL AND ${table.lastEventId} IS NULL) OR (${table.lastEventAt} IS NOT NULL AND ${table.lastEventId} IS NOT NULL)`,
     ),
   ],
 );

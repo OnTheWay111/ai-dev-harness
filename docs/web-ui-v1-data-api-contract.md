@@ -57,7 +57,7 @@ flowchart LR
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | `string` | 稳定任务 ID，例如 `DEV-07` |
+| `id` | `string` | 稳定任务 ID；正式 Issue 投影使用 `{goalId}:{issueKey}`，演示数据可显示为 `DEV-07` |
 | `version` | `number` | 乐观锁版本；所有写操作必须携带 |
 | `goalId` | `string` | 所属 Goal |
 | `kind` | `issue \| gate \| scheduling` | Issue、Goal 门禁或调度任务 |
@@ -129,6 +129,23 @@ inspect_run
 - 阻塞：`stage = blocked`；
 - Review、等待同理；
 - 活跃 Worker、今日完成、预算健康由 Scheduler/Run 聚合服务提供，不能从当前分页任务反推。
+
+P8 的权威输入和边界值固定如下：
+
+| 输出 | 权威输入 | 聚合规则 |
+|---|---|---|
+| 需处理 | Goal 门禁、Issue/Run/Scheduler 阻塞、reconciliation、ExecutionControl | 对当前可见 scope 中 `attention.required=true` 的任务计数 |
+| 执行中 | Issue、最新 Run、最新 SchedulerJob | 只计 `stage=running`；Review、等待和阻塞不重复计入 |
+| 活跃 Worker | 未过期的 active ExecutionLease、对应可见项目的 ExecutionNode | Worker 按 node 去重；容量只加在线且心跳未过期的节点槽位 |
+| 阻塞 | Issue blocked、Run failed、SchedulerJob blocked/failed | 对 `stage=blocked` 计数，不从错误文案猜测 |
+| 今日完成 | 成功 Run 的 `finishedAt` | 按 `Asia/Shanghai` 自然日计数，不按浏览器时区 |
+| 预算健康 | SchedulerJob `budget.tokensUsed/tokenLimit` | `<85%` 健康、`85%..100%` 告警、`>100%` 超限；多 scope 取最严重状态 |
+| 冲突 | SchedulerJob `failureCode/failureReason` 与 `budget.conflictKeys` | 进入 attention、影响和 blockedTaskCount，不从工作区字符串推断 |
+
+投影只包含非终态 Issue；终态 Run 仍参与“今日完成”。同一 Issue 只使用最新 attempt 的 Run 和
+SchedulerJob。相同输入（包含聚合截止时间）必须生成相同任务、指标、排序与 semantic digest。
+权限隔离先按 Organization/Project 生成独立投影，读取时再用服务端 RoleBinding 合并可见 scope；
+任何指标都不得从当前分页或不可见项目反推。
 
 筛选可以重叠。例如 Review 任务也可能同时属于“需处理”。
 
@@ -212,7 +229,12 @@ Idempotency-Key: 41f0e79b-...
 - 相同键与相同业务命令必须返回首次提交的完整 receipt，不重复写业务状态、Audit 或 Outbox；
 - 相同键用于不同业务命令返回 `409 idempotency_conflict`；
 - `expectedVersion` 不匹配返回 `409 version_conflict`；
+- Issue 任务的 `version` 是 Issue、最新 Run 与最新 SchedulerJob 版本之和；任一权威参与者变化都会
+  使复合任务版本递增。同一任务版本最多接受一个非失败命令，竞争命令返回 `409 version_conflict`；
 - 高风险决定必须校验 `reason`；
+- `input` 按 action 关闭校验：`review_evidence` 只接受一个
+  `decision=approve|request_changes|reject`；`answer_questions` 只接受
+  `source=workbench`；`resolve_blocker` 只接受 `source=workbench` 和/或有界 `resolution`；
 - 审计事件保存 actor、reason、对象版本、请求 ID、前后状态和策略版本；
 - 命令成功不代表异步工作已经完成，前端根据 receipt 或实时事件更新。
 
@@ -245,6 +267,12 @@ receipt.updated
 
 事件只携带 ID、版本和必要摘要。客户端发现 revision 跳跃或断线后重新请求完整快照，不在浏览器
 内重建权威状态。
+
+服务端每秒检查可见投影 revision，15 秒发送一次注释心跳。跨多个可见 Project 的 HTTP/SSE
+`revision` 是各 Project 单调 revision 之和，因此任一可见 Project 发布都会使组合 revision 增长；
+缓存身份仍包含各 scope 的独立 revision 和生成时间。客户端使用 `afterRevision`（或
+`Last-Event-ID`）恢复，去重旧事件，指数退避从 1 秒增长到最多 30 秒；收到任何失效事件都通过
+ETag 重新读取权威快照，跳版本时同样完整刷新，并保留上次成功数据直到刷新成功。
 
 ## 6. 错误协议
 
@@ -310,10 +338,16 @@ PostgreSQL 同时承载控制面权威表与工作台投影。P2-01 的 Organiza
 
 - `workbench_snapshots`：每个 `scope_id + organization_id + project_id` 保存 revision 和生成时间；
 - `workbench_tasks`：每个 `scope_id + organization_id + project_id + task_id` 保存稳定 rank、筛选列和完整 `GlobalTask` JSON；
+- `workbench_projection_checkpoints`：保存最后消费的 Outbox 位置、semantic digest 和已发布 revision；
+- `task_action_receipts`：保存任务异步命令、状态、对象版本和失败摘要；
 - 分页读取把 snapshot、任务页和 total 放在同一个 Neon/Drizzle batch 中，避免一次响应混用不同
   revision 的结果；
-- 投影发布由聚合器调用 `NeonWorkbenchProjectionWriter.replaceProjection()`，同一 scope 必须单写者
-  串行发布，revision 必须单调递增；
+- 正式投影由独立 Projector 调用事务型 `PostgresWorkbenchProjectionPublisher`；
+  `NeonWorkbenchProjectionWriter` 只保留给种子和迁移验证。每个 scope 必须串行发布，revision 单调递增；
+- Projector 以 Outbox 事件为触发器，从 Goal/Issue/Run/Scheduler 权威表重读事实；重复或乱序触发
+  若 semantic digest 未变化，只推进 checkpoint，不创建新 revision；
+- 发布过程使用 scope advisory lock，并在同一数据库事务中更新 snapshot、task rows 与 checkpoint；
+  任一步失败都回滚，最后成功投影保持可读；
 - `scope_id` 是部署投影命名空间，不是授权输入。服务端从 OIDC actor 的活跃 RoleBinding 解析
   Organization/Project 可见范围，并在 SQL 层同时过滤任务、total 和 summary；客户端查询参数不能
   扩大范围。详细契约见 [服务端可见范围与隔离读取](visibility-scoped-reads.md)。
@@ -342,6 +376,21 @@ WORKBENCH_DATA_SOURCE=postgres npm run dev
 `db:seed:postgres` 只用于首次验证，会把服务端 Demo snapshot 写入指定 scope。正式数据由聚合器
 发布。接口通过 `x-workbench-source: demo | postgres` 暴露当前读取源，便于部署巡检；生产环境使用
 显式 `postgres` 模式，避免数据库 Secret 丢失时静默退回演示数据。
+
+生产 Projector 是独立进程，不运行在 HTTP 请求内：
+
+```bash
+DATABASE_URL='<server-side secret>' WORKBENCH_SCOPE_ID=default npm run projector:p8
+```
+
+它每秒消费一次，因此正常数据库和网络条件下，Run 状态变化在 5 秒 SLA 内进入 SSE。一次性巡检可
+增加 `WORKBENCH_PROJECTOR_ONCE=true`；强制全量重建验证使用
+`WORKBENCH_PROJECTOR_REPLAY=true`。进程日志只报告脱敏 tick 结果，不输出驱动错误或连接串。
+
+任务动作由 `POST /api/v1/tasks/{taskId}/actions` 在一个事务内创建 Receipt、24 小时以上幂等记录、
+带前后状态详情引用的 Audit 和 Outbox command，HTTP 不等待 Scheduler/Worker。`review_evidence`、`answer_questions`、
+`resolve_blocker` 分别校验 Approver、Approver、Operator 权限；Receipt 消费者只允许
+`accepted → running/completed/failed` 和 `running → completed/failed`，终态不可覆盖。
 
 ## 10. 后端实现验收清单
 

@@ -156,11 +156,17 @@ export interface ExecuteTaskActionRequest {
 export interface CommandReceipt {
   receiptId: string;
   requestId: string;
-  status: "accepted" | "completed";
+  status: "accepted" | "running" | "completed" | "failed";
   taskId: string;
   taskVersion: number;
   submittedAt: string;
   statusUrl: string;
+  completedAt?: string;
+  error?: {
+    code: string;
+    message?: string;
+    nextAction?: string;
+  };
 }
 
 export interface ApiErrorEnvelope {
@@ -170,8 +176,10 @@ export interface ApiErrorEnvelope {
       | "forbidden"
       | "not_found"
       | "version_conflict"
+      | "idempotency_conflict"
       | "invalid_transition"
       | "rate_limited"
+      | "service_unavailable"
       | "internal_error";
     message: string;
     impact: string;
@@ -190,6 +198,7 @@ export interface WorkbenchApi {
     request: ExecuteTaskActionRequest,
     idempotencyKey: string,
   ): Promise<CommandReceipt>;
+  getReceipt(receiptId: string): Promise<CommandReceipt>;
 }
 
 export interface NavItem {

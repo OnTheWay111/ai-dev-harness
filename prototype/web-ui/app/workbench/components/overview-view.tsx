@@ -15,12 +15,17 @@ import {
   formatDuration,
 } from "../selectors";
 import { ProgressBar, StatusPill } from "./ui";
+import { TaskActionDialog } from "./task-action-dialog";
 
 const taskKindLabels: Record<TaskKind, string> = {
   issue: "Issue",
   gate: "门禁任务",
   scheduling: "调度任务",
 };
+
+function displayTaskId(taskId: string): string {
+  return taskId.split(":").at(-1) ?? taskId;
+}
 
 function MetricCard({
   metric,
@@ -75,13 +80,13 @@ function TaskRow({
         className="global-task-row-toggle"
         onClick={onToggle}
         aria-expanded={expanded}
-        aria-label={`${expanded ? "收起" : "展开"} ${task.id} ${task.title} 详情`}
+        aria-label={`${expanded ? "收起" : "展开"} ${displayTaskId(task.id)} ${task.title} 详情`}
       >
         <div className="global-task-identity">
           <div className="global-task-meta">
             <b className={`priority-label ${task.priority.toLowerCase()}`}>{task.priority}</b>
             <span className="task-kind">{taskKindLabels[task.kind]}</span>
-            <span>{task.goalId} · {task.id}</span>
+            <span>{task.goalId} · {displayTaskId(task.id)}</span>
           </div>
           <strong>{task.title}</strong>
           <small>{task.attention.impact}</small>
@@ -117,7 +122,7 @@ function TaskRow({
           <div><span>依赖</span><strong>{task.detail.dependency}</strong></div>
           <div><span>证据</span><strong>{task.detail.evidence}</strong></div>
           <div><span>工作区</span><strong>{task.detail.workspace}</strong></div>
-          <button className="text-button" onClick={() => notify(`${task.id} 日志与证据已打开`)}>
+          <button className="text-button" onClick={() => notify(`${displayTaskId(task.id)} 日志与证据已打开`)}>
             查看日志与证据 →
           </button>
         </div>
@@ -130,13 +135,16 @@ export function OverviewView({
   snapshot,
   onNavigate,
   notify,
+  onRefresh,
 }: {
   snapshot: WorkbenchSnapshot;
   onNavigate: (view: View) => void;
   notify: (message: string) => void;
+  onRefresh: () => Promise<void>;
 }) {
   const [taskFilter, setTaskFilter] = useState<TaskFilter>("all");
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [actionTask, setActionTask] = useState<GlobalTask | null>(null);
   const taskFilters = useMemo(
     () => buildTaskFilters(snapshot.tasks, snapshot.summary.taskCounts),
     [snapshot.tasks, snapshot.summary.taskCounts],
@@ -163,8 +171,12 @@ export function OverviewView({
       notify(task.action.unavailableReason ?? "当前角色没有执行此操作的权限");
       return;
     }
-    if (task.action.targetView) onNavigate(task.action.targetView);
-    else notify(task.action.successMessage ?? `${task.id} 详情已打开`);
+    if (["inspect_schedule", "inspect_run"].includes(task.action.id) &&
+      task.action.targetView) {
+      onNavigate(task.action.targetView);
+    } else {
+      setActionTask(task);
+    }
   };
 
   return (
@@ -216,6 +228,12 @@ export function OverviewView({
           <span>操作</span>
         </div>
         <div className="global-task-list">
+          {displayedTasks.length === 0 && (
+            <div className="workbench-empty-state" role="status">
+              <strong>{taskFilter === "all" ? "暂无可见任务，真实数据为空" : "当前筛选暂无可见任务"}</strong>
+              <span>已应用服务端权限范围和权威统计口径，可切换筛选或等待新的领域事件。</span>
+            </div>
+          )}
           {displayedTasks.map((task) => (
             <TaskRow
               key={task.id}
@@ -239,6 +257,16 @@ export function OverviewView({
           </div>
         </div>
       </section>
+      {actionTask && (
+        <TaskActionDialog
+          task={actionTask}
+          onClose={() => setActionTask(null)}
+          onCompleted={() => {
+            notify(`${displayTaskId(actionTask.id)} 异步命令已完成`);
+            void onRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }
