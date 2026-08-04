@@ -10,7 +10,7 @@
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "typecheck": "tsc -p tsconfig.ui.json && tsc -p tsconfig.server.json",
-    "test:unit": "node --experimental-strip-types --test tests/repository-layout.test.mjs tests/workbench-selectors.test.mjs tests/workbench-api-client.test.mjs tests/workbench-repository-factory.test.mjs tests/postgres-environment.test.mjs tests/postgres-connectivity.test.mjs tests/postgres-migration.test.mjs tests/postgres-workbench-repository.test.mjs tests/workbench-projection-writer.test.mjs",
+    "test:unit": "node --experimental-strip-types --test tests/repository-layout.test.mjs tests/workbench-selectors.test.mjs tests/workbench-api-client.test.mjs tests/workbench-repository-factory.test.mjs tests/postgres-environment.test.mjs tests/postgres-connectivity.test.mjs tests/postgres-migration.test.mjs tests/development-postgres-workbench.test.mjs tests/postgres-workbench-repository.test.mjs tests/workbench-projection-writer.test.mjs",
     "test": "npm run build && node --experimental-strip-types --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
@@ -18,7 +18,8 @@
     "db:migrate:postgres": "node --experimental-strip-types scripts/run-postgres-migrations.ts",
     "db:seed:postgres": "node --experimental-strip-types scripts/seed-workbench-postgres.ts",
     "db:check:postgres": "node --experimental-strip-types scripts/check-postgres-connectivity.ts",
-    "db:check:migration:postgres": "node --experimental-strip-types scripts/check-postgres-migration.ts"
+    "db:check:migration:postgres": "node --experimental-strip-types scripts/check-postgres-migration.ts",
+    "db:verify:development:postgres": "npm run build && node --experimental-strip-types scripts/verify-development-postgres-workbench.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

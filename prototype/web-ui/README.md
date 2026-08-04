@@ -109,6 +109,8 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
   and least-privilege grants without printing connection details
 - `npm run db:check:migration:postgres`: validate the development migration
   ledger, live schema, grants, and committed receipt
+- `npm run db:verify:development:postgres`: publish an isolated development
+  scope, verify PostgreSQL SSR/API behavior, and clean it up
 
 ## Workbench API
 
@@ -165,6 +167,8 @@ bundle.
 The one-time migration ledger setup, atomic and idempotent runner behavior,
 receipt contract, and verification command are defined in
 [`docs/postgres-migrations.md`](docs/postgres-migrations.md).
+The reproducible real-database SSR/API evidence is recorded in
+[`docs/p1-03-development-postgres-verification.md`](docs/p1-03-development-postgres-verification.md).
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls
