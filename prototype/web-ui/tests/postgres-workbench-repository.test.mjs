@@ -17,6 +17,12 @@ const summary = {
   },
 };
 
+const visibility = {
+  actorId: "actor-test",
+  organizationIds: ["10000000-0000-4000-8000-000000000001"],
+  projectIds: [],
+};
+
 const task = {
   id: "DEV-07",
   version: 12,
@@ -63,6 +69,7 @@ test("maps PostgreSQL projection rows into the workbench contract", async () => 
           revision: 21,
           generatedAt: new Date("2026-08-03T06:32:00.000Z"),
           summary,
+          cacheTag: "org/project:21",
         },
         tasks: [task, { ...task, id: "DEV-08" }],
         total: 6,
@@ -71,7 +78,7 @@ test("maps PostgreSQL projection rows into the workbench contract", async () => 
   };
   const repository = new PostgresWorkbenchReadRepository(store, "org_demo");
 
-  const result = await repository.getWorkbench({
+  const result = await repository.getWorkbench(visibility, {
     goalId: "GOAL-2407",
     filter: "attention",
     cursor: "wb1_2",
@@ -88,6 +95,7 @@ test("maps PostgreSQL projection rows into the workbench contract", async () => 
     method: "page",
     input: {
       scopeId: "org_demo",
+      visibility,
       goalId: "GOAL-2407",
       filter: "attention",
       offset: 2,
@@ -105,7 +113,7 @@ test("does not silently serve empty data when the projection is missing", async 
   const repository = new PostgresWorkbenchReadRepository(store, "org_missing");
 
   await assert.rejects(
-    () => repository.getWorkbench(),
+    () => repository.getWorkbench(visibility),
     /workbench snapshot is unavailable/i,
   );
 });

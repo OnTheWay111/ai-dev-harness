@@ -4,6 +4,7 @@ import type {
   WorkbenchQuery,
   WorkbenchSnapshot,
 } from "../contracts";
+import type { ActorVisibilityScope } from "../../auth/visibility-scope.ts";
 import {
   decodeWorkbenchCursor,
   encodeWorkbenchCursor,
@@ -16,10 +17,12 @@ export interface PersistedWorkbenchSnapshot {
   revision: number;
   generatedAt: Date;
   summary: WorkbenchSnapshot["summary"];
+  cacheTag: string;
 }
 
 export interface ReadPersistedTasksInput {
   scopeId: string;
+  visibility: ActorVisibilityScope;
   goalId?: string;
   filter?: TaskFilter;
   offset: number;
@@ -30,6 +33,62 @@ export interface PersistedWorkbenchPage {
   snapshot: PersistedWorkbenchSnapshot | null;
   tasks: GlobalTask[];
   total: number;
+}
+
+export interface WorkbenchSummaryCounts {
+  all: number;
+  attention: number;
+  running: number;
+  review: number;
+  blocked: number;
+  waiting: number;
+  activeWorkers: number;
+}
+
+export function buildScopedWorkbenchSummary(
+  counts: WorkbenchSummaryCounts,
+): WorkbenchSnapshot["summary"] {
+  return {
+    taskCounts: {
+      all: counts.all,
+      attention: counts.attention,
+      running: counts.running,
+      review: counts.review,
+      blocked: counts.blocked,
+      waiting: counts.waiting,
+    },
+    metrics: [
+      {
+        id: "attention",
+        label: "需处理",
+        value: String(counts.attention),
+        detail: "当前可见范围",
+        targetFilter: "attention",
+      },
+      {
+        id: "running",
+        label: "执行中",
+        value: String(counts.running),
+        detail: "当前可见范围",
+        targetFilter: "running",
+      },
+      {
+        id: "active_workers",
+        label: "活跃 Worker",
+        value: String(counts.activeWorkers),
+        detail: "当前可见范围",
+        targetView: "scheduler",
+      },
+      {
+        id: "blocked",
+        label: "阻塞",
+        value: String(counts.blocked),
+        detail: "当前可见范围",
+        tone: counts.blocked > 0 ? "danger" : "default",
+        targetFilter: "blocked",
+      },
+    ],
+  };
 }
 
 export interface PostgresWorkbenchReadStore {
@@ -50,7 +109,10 @@ export class PostgresWorkbenchReadRepository
     this.scopeId = scopeId;
   }
 
-  async getWorkbench(query: WorkbenchQuery = {}): Promise<WorkbenchPage> {
+  async getWorkbench(
+    visibility: ActorVisibilityScope,
+    query: WorkbenchQuery = {},
+  ): Promise<WorkbenchPage> {
     const limit = query.limit ?? 50;
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       throw new WorkbenchRepositoryError(
@@ -62,6 +124,7 @@ export class PostgresWorkbenchReadRepository
 
     const page = await this.store.readPage({
       scopeId: this.scopeId,
+      visibility,
       goalId: query.goalId,
       filter: query.filter,
       offset,
@@ -96,6 +159,7 @@ export class PostgresWorkbenchReadRepository
             : null,
         total: page.total,
       },
+      cacheTag: page.snapshot.cacheTag,
     };
   }
 }

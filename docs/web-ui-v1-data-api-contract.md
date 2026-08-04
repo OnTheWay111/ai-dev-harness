@@ -308,13 +308,15 @@ PostgreSQL 同时承载控制面权威表与工作台投影。P2-01 的 Organiza
 [控制面数据词典](control-plane-data-dictionary.md)。以下 `workbench_*` 表仍只是派生读模型，不能
 替代 Goal、Issue、Run 或 Scheduler 的事实表：
 
-- `workbench_snapshots`：每个 `scope_id` 保存 revision、生成时间和全局 summary；
-- `workbench_tasks`：每个 `scope_id + task_id` 保存稳定 rank、筛选列和完整 `GlobalTask` JSON；
+- `workbench_snapshots`：每个 `scope_id + organization_id + project_id` 保存 revision 和生成时间；
+- `workbench_tasks`：每个 `scope_id + organization_id + project_id + task_id` 保存稳定 rank、筛选列和完整 `GlobalTask` JSON；
 - 分页读取把 snapshot、任务页和 total 放在同一个 Neon/Drizzle batch 中，避免一次响应混用不同
   revision 的结果；
 - 投影发布由聚合器调用 `NeonWorkbenchProjectionWriter.replaceProjection()`，同一 scope 必须单写者
   串行发布，revision 必须单调递增；
-- scope 是租户/项目隔离键。上线前仍须在事实源、投影写入和 API 鉴权三层校验用户可见范围。
+- `scope_id` 是部署投影命名空间，不是授权输入。服务端从 OIDC actor 的活跃 RoleBinding 解析
+  Organization/Project 可见范围，并在 SQL 层同时过滤任务、total 和 summary；客户端查询参数不能
+  扩大范围。详细契约见 [服务端可见范围与隔离读取](visibility-scoped-reads.md)。
 
 运行配置：
 
@@ -330,6 +332,8 @@ PostgreSQL 同时承载控制面权威表与工作台投影。P2-01 的 Organiza
 cd prototype/web-ui
 export DATABASE_URL='postgresql://...'
 export WORKBENCH_SCOPE_ID='default'
+export WORKBENCH_ORGANIZATION_ID='<organization uuid>'
+export WORKBENCH_PROJECT_ID='<project uuid>'
 npm run db:migrate:postgres
 npm run db:seed:postgres
 WORKBENCH_DATA_SOURCE=postgres npm run dev

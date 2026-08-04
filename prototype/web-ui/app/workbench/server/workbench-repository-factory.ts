@@ -1,12 +1,15 @@
 import {
   createNeonWorkbenchDatabase,
+  NeonActorVisibilityResolver,
   NeonWorkbenchReadStore,
 } from "./neon-workbench-store.ts";
+import type { ActorVisibilityResolver } from "../../auth/visibility-scope.ts";
 import {
   resolveWorkbenchDeploymentConfig,
 } from "./postgres-environment.ts";
 import { PostgresWorkbenchReadRepository } from "./postgres-workbench-repository.ts";
 import {
+  DEMO_ORGANIZATION_ID,
   demoWorkbenchRepository,
   type WorkbenchReadRepository,
   type WorkbenchRepositoryKind,
@@ -94,10 +97,36 @@ export function readWorkbenchRepositoryConfig(
 }
 
 let repository: WorkbenchReadRepository | undefined;
+let visibilityResolver: ActorVisibilityResolver | undefined;
 
 export function getWorkbenchRepository(): WorkbenchReadRepository {
   repository ??= createWorkbenchRepository(
     readWorkbenchRepositoryConfig(process.env),
   );
   return repository;
+}
+
+export function getWorkbenchVisibilityResolver(): ActorVisibilityResolver {
+  if (visibilityResolver) return visibilityResolver;
+  const config = readWorkbenchRepositoryConfig(process.env);
+  if (selectWorkbenchDataSource(config) === "demo") {
+    visibilityResolver = {
+      async resolve(actorId) {
+        return {
+          actorId,
+          organizationIds: [DEMO_ORGANIZATION_ID],
+          projectIds: [],
+        };
+      },
+    };
+    return visibilityResolver;
+  }
+  const databaseUrl = config.databaseUrl?.trim();
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required for PostgreSQL visibility");
+  }
+  visibilityResolver = new NeonActorVisibilityResolver(
+    createNeonWorkbenchDatabase(databaseUrl),
+  );
+  return visibilityResolver;
 }

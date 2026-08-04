@@ -39,6 +39,8 @@ import {
   RoleBindingApplicationService,
 } from "../app/auth/role-binding-service.ts";
 import { assertGoalRepositoryContract } from "./goal-repository-contract.mjs";
+import { handleWorkbenchRequest } from
+  "../app/api/v1/workbench/route.ts";
 
 const databaseUrl = process.env.POSTGRES_INTEGRATION_DATABASE_URL;
 const integrationTest = databaseUrl ? test : test.skip;
@@ -47,6 +49,22 @@ const pool = databaseUrl
   ? new Pool({ connectionString: databaseUrl, max: 4 })
   : undefined;
 const scopePrefix = `p1_04_${process.pid}`;
+const projectionOrganizationId = "30000000-0000-4000-8000-000000000001";
+const projectionProjectId = "40000000-0000-4000-8000-000000000001";
+const projectionVisibility = {
+  actorId: "integration-viewer",
+  organizationIds: [projectionOrganizationId],
+  projectIds: [],
+};
+
+function projectionScope(scopeId, overrides = {}) {
+  return {
+    scopeId,
+    organizationId: projectionOrganizationId,
+    projectId: projectionProjectId,
+    ...overrides,
+  };
+}
 
 async function insertReliableGoal(label) {
   const organizationId = crypto.randomUUID();
@@ -132,7 +150,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 6);
+  assert.equal(migrations.length, 7);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -1175,9 +1193,12 @@ integrationTest(
       revision: 204,
       generatedAt: "2026-08-04T06:00:00.000Z",
     };
-    await writer.replaceProjection(scopeId, snapshot);
+    await writer.replaceProjection(projectionScope(scopeId), snapshot);
 
-    const firstPage = await repository.getWorkbench({ limit: 2 });
+    const firstPage = await repository.getWorkbench(
+      projectionVisibility,
+      { limit: 2 },
+    );
     assert.equal(firstPage.data.revision, 204);
     assert.deepEqual(
       firstPage.data.tasks.map((task) => task.id),
@@ -1185,11 +1206,11 @@ integrationTest(
     );
     assert.deepEqual(firstPage.page, { nextCursor: "wb1_2", total: 7 });
 
-    const attentionFirst = await repository.getWorkbench({
+    const attentionFirst = await repository.getWorkbench(projectionVisibility, {
       filter: "attention",
       limit: 2,
     });
-    const attentionSecond = await repository.getWorkbench({
+    const attentionSecond = await repository.getWorkbench(projectionVisibility, {
       filter: "attention",
       limit: 2,
       cursor: attentionFirst.page.nextCursor,
@@ -1204,15 +1225,24 @@ integrationTest(
     );
 
     assert.equal(
-      (await repository.getWorkbench({ goalId: "GOAL-2407" })).page.total,
+      (await repository.getWorkbench(
+        projectionVisibility,
+        { goalId: "GOAL-2407" },
+      )).page.total,
       4,
     );
     assert.equal(
-      (await repository.getWorkbench({ filter: "blocked" })).page.total,
+      (await repository.getWorkbench(
+        projectionVisibility,
+        { filter: "blocked" },
+      )).page.total,
       2,
     );
     assert.equal(
-      (await repository.getWorkbench({ filter: "running" })).page.total,
+      (await repository.getWorkbench(
+        projectionVisibility,
+        { filter: "running" },
+      )).page.total,
       1,
     );
   },
@@ -1225,8 +1255,8 @@ integrationTest("fails on empty projection and invalid cursors", async () => {
     `${scopePrefix}_empty`,
   );
   await assert.rejects(
-    () => empty.getWorkbench(),
-    /snapshot is unavailable/i,
+    () => empty.getWorkbench(projectionVisibility, { cursor: "invalid" }),
+    /cursor/i,
   );
 
   const populated = new PostgresWorkbenchReadRepository(
@@ -1234,14 +1264,95 @@ integrationTest("fails on empty projection and invalid cursors", async () => {
     `${scopePrefix}_projection`,
   );
   await assert.rejects(
-    () => populated.getWorkbench({ cursor: "invalid" }),
+    () => populated.getWorkbench(projectionVisibility, { cursor: "invalid" }),
     /cursor/i,
   );
   await assert.rejects(
-    () => populated.getWorkbench({ cursor: "wb1_999" }),
+    () => populated.getWorkbench(
+      projectionVisibility,
+      { cursor: "wb1_999" },
+    ),
     /cursor/i,
   );
 });
+
+integrationTest(
+  "isolates content, totals, summaries, Goal filters, and ETags across organizations",
+  async () => {
+    const scopeId = `${scopePrefix}_visibility`;
+    const organizationA = "50000000-0000-4000-8000-000000000001";
+    const organizationB = "50000000-0000-4000-8000-000000000002";
+    const projectA1 = "60000000-0000-4000-8000-000000000001";
+    const projectA2 = "60000000-0000-4000-8000-000000000002";
+    const projectB = "60000000-0000-4000-8000-000000000003";
+    const writer = new NodePostgresWorkbenchProjectionWriter(pool);
+    const repository = new PostgresWorkbenchReadRepository(
+      new NodePostgresWorkbenchReadStore(pool),
+      scopeId,
+    );
+    const scopedSnapshot = (revision, task, id, goalId, title) => ({
+      ...structuredClone(workbenchSnapshot),
+      revision,
+      tasks: [{ ...structuredClone(task), id, goalId, title }],
+    });
+    await writer.replaceProjection(
+      { scopeId, organizationId: organizationA, projectId: projectA1 },
+      scopedSnapshot(401, workbenchSnapshot.tasks[0], "A1-TASK", "GOAL-A1", "A1 visible"),
+    );
+    await writer.replaceProjection(
+      { scopeId, organizationId: organizationA, projectId: projectA2 },
+      scopedSnapshot(402, workbenchSnapshot.tasks[4], "A2-TASK", "GOAL-A2", "A2 visible"),
+    );
+    await writer.replaceProjection(
+      { scopeId, organizationId: organizationB, projectId: projectB },
+      scopedSnapshot(499, workbenchSnapshot.tasks[2], "B-TASK", "GOAL-B", "B secret"),
+    );
+
+    const visibilityA = {
+      actorId: "actor-a",
+      organizationIds: [organizationA],
+      projectIds: [],
+    };
+    const visibilityB = {
+      actorId: "actor-b",
+      organizationIds: [],
+      projectIds: [projectB],
+    };
+    const a = await repository.getWorkbench(visibilityA);
+    assert.deepEqual(a.data.tasks.map((task) => task.id), ["A1-TASK", "A2-TASK"]);
+    assert.equal(a.page.total, 2);
+    assert.equal(a.data.summary.taskCounts.all, 2);
+    assert.equal(a.data.summary.taskCounts.attention, 1);
+    assert.doesNotMatch(JSON.stringify(a), /B-TASK|B secret|GOAL-B/);
+
+    const guessedGoal = await repository.getWorkbench(
+      visibilityA,
+      { goalId: "GOAL-B" },
+    );
+    assert.equal(guessedGoal.page.total, 0);
+    assert.equal(guessedGoal.data.summary.taskCounts.all, 0);
+
+    const responseA = await handleWorkbenchRequest(
+      new Request("http://localhost/api/v1/workbench"),
+      () => repository,
+      async () => visibilityA,
+    );
+    const responseB = await handleWorkbenchRequest(
+      new Request("http://localhost/api/v1/workbench", {
+        headers: { "if-none-match": responseA.headers.get("etag") ?? "" },
+      }),
+      () => repository,
+      async () => visibilityB,
+    );
+    assert.equal(responseA.status, 200);
+    assert.equal(responseB.status, 200);
+    assert.notEqual(responseA.headers.get("etag"), responseB.headers.get("etag"));
+    const bodyB = await responseB.json();
+    assert.equal(bodyB.page.total, 1);
+    assert.equal(bodyB.data.summary.taskCounts.all, 1);
+    assert.deepEqual(bodyB.data.tasks.map((task) => task.id), ["B-TASK"]);
+  },
+);
 
 integrationTest("rolls back a partially failed projection replacement", async () => {
   const scopeId = `${scopePrefix}_rollback`;
@@ -1250,7 +1361,7 @@ integrationTest("rolls back a partially failed projection replacement", async ()
     new NodePostgresWorkbenchReadStore(pool),
     scopeId,
   );
-  await writer.replaceProjection(scopeId, {
+  await writer.replaceProjection(projectionScope(scopeId), {
     ...structuredClone(workbenchSnapshot),
     revision: 301,
   });
@@ -1258,9 +1369,11 @@ integrationTest("rolls back a partially failed projection replacement", async ()
   const invalid = structuredClone(workbenchSnapshot);
   invalid.revision = 302;
   invalid.tasks[0].progress.updatedAt = "not-a-timestamp";
-  await assert.rejects(() => writer.replaceProjection(scopeId, invalid));
+  await assert.rejects(() =>
+    writer.replaceProjection(projectionScope(scopeId), invalid)
+  );
 
-  const preserved = await repository.getWorkbench();
+  const preserved = await repository.getWorkbench(projectionVisibility);
   assert.equal(preserved.data.revision, 301);
   assert.equal(preserved.data.tasks.length, 7);
   assert.equal(preserved.data.tasks[0].id, "DEV-07");
@@ -1276,7 +1389,7 @@ integrationTest("surfaces a real PostgreSQL connection failure", async () => {
     "unavailable",
   );
   try {
-    await assert.rejects(() => repository.getWorkbench());
+    await assert.rejects(() => repository.getWorkbench(projectionVisibility));
   } finally {
     await unavailablePool.end();
   }

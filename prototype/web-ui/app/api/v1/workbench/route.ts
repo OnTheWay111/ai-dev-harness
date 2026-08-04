@@ -10,7 +10,15 @@ import {
 } from "../../../workbench/server/workbench-repository.ts";
 import {
   getWorkbenchRepository,
+  getWorkbenchVisibilityResolver,
 } from "../../../workbench/server/workbench-repository-factory.ts";
+import {
+  hasVisibleProjects,
+  visibilityScopeKey,
+  type ActorVisibilityScope,
+} from "../../../auth/visibility-scope.ts";
+import { readRequestPrincipal } from "../../../auth/oidc-http.ts";
+import { getOidcService } from "../../../auth/oidc-runtime.ts";
 
 const taskFilters = new Set<TaskFilter>([
   "all",
@@ -58,6 +66,26 @@ function internalError(requestIdValue: string): Response {
   return Response.json(body, { status: 500 });
 }
 
+function accessError(
+  requestIdValue: string,
+  status: 401 | 403,
+): Response {
+  const body: ApiErrorEnvelope = {
+    error: {
+      code: "forbidden",
+      message: status === 401 ? "需要有效登录会话" : "当前账号没有可见项目",
+      impact: "工作台数据未加载",
+      preservedState: "任何组织、项目或 Goal 数据均未返回",
+      nextAction: status === 401 ? "重新登录后再试" : "联系组织管理员分配角色",
+    },
+    requestId: requestIdValue,
+  };
+  return Response.json(body, {
+    status,
+    headers: { "cache-control": "private, no-store" },
+  });
+}
+
 function parseQuery(url: URL, id: string): WorkbenchQuery | Response {
   const filterValue = url.searchParams.get("filter");
   if (filterValue && !taskFilters.has(filterValue as TaskFilter)) {
@@ -87,13 +115,14 @@ function parseQuery(url: URL, id: string): WorkbenchQuery | Response {
   };
 }
 
-function queryHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
+async function responseHash(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function responseHeaders(etag: string, source: string): HeadersInit {
@@ -107,6 +136,17 @@ function responseHeaders(etag: string, source: string): HeadersInit {
 export async function handleWorkbenchRequest(
   request: Request,
   repositoryProvider: () => WorkbenchReadRepository = getWorkbenchRepository,
+  visibilityProvider: (
+    request: Request,
+  ) => Promise<ActorVisibilityScope | null> = async (currentRequest) => {
+    const principal = await readRequestPrincipal(
+      currentRequest,
+      getOidcService(),
+    );
+    return principal
+      ? await getWorkbenchVisibilityResolver().resolve(principal.actorId)
+      : null;
+  },
 ): Promise<Response> {
   const id = requestId();
   const url = new URL(request.url);
@@ -114,16 +154,27 @@ export async function handleWorkbenchRequest(
   if (query instanceof Response) return query;
 
   try {
+    const visibility = await visibilityProvider(request);
+    if (!visibility) return accessError(id, 401);
+    if (!hasVisibleProjects(visibility)) return accessError(id, 403);
     const workbenchRepository = repositoryProvider();
-    const result = await workbenchRepository.getWorkbench(query);
-    const etag = `"workbench-${result.data.revision}-${queryHash(url.searchParams.toString())}"`;
+    const result = await workbenchRepository.getWorkbench(visibility, query);
+    const etag = `"workbench-${await responseHash([
+      visibilityScopeKey(visibility),
+      result.cacheTag,
+      url.searchParams.toString(),
+    ].join("|"))}"`;
     const headers = responseHeaders(etag, workbenchRepository.kind);
 
     if (request.headers.get("if-none-match") === etag) {
       return new Response(null, { status: 304, headers });
     }
 
-    const body: WorkbenchResponse = { ...result, requestId: id };
+    const body: WorkbenchResponse = {
+      data: result.data,
+      page: result.page,
+      requestId: id,
+    };
     return Response.json(body, { headers });
   } catch (error) {
     if (error instanceof WorkbenchRepositoryError) {

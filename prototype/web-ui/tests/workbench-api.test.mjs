@@ -1,26 +1,34 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-async function createWorker() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${Math.random()}`);
-  const { default: worker } = await import(workerUrl.href);
-  return worker;
-}
+import { handleWorkbenchRequest } from
+  "../app/api/v1/workbench/route.ts";
+import {
+  DEMO_ORGANIZATION_ID,
+  demoWorkbenchRepository,
+} from "../app/workbench/server/workbench-repository.ts";
+
+const visibility = {
+  actorId: "actor-demo",
+  organizationIds: [DEMO_ORGANIZATION_ID],
+  projectIds: [],
+};
 
 async function requestWorkbench(path = "/api/v1/workbench", headers = {}) {
-  const worker = await createWorker();
-  return worker.fetch(
+  if (path === "/health/ready") {
+    const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+    workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${Math.random()}`);
+    const { default: worker } = await import(workerUrl.href);
+    return worker.fetch(
+      new Request(`http://localhost${path}`, { headers }),
+      { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+      { waitUntil() {}, passThroughOnException() {} },
+    );
+  }
+  return handleWorkbenchRequest(
     new Request(`http://localhost${path}`, { headers }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
+    () => demoWorkbenchRepository,
+    async () => visibility,
   );
 }
 
@@ -30,7 +38,7 @@ test("returns the V1 workbench snapshot and cache metadata", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/i);
   assert.equal(response.headers.get("cache-control"), "private, no-cache");
   assert.equal(response.headers.get("x-workbench-source"), "demo");
-  assert.match(response.headers.get("etag") ?? "", /^"workbench-21-/);
+  assert.match(response.headers.get("etag") ?? "", /^"workbench-[a-f0-9]{64}"$/);
 
   const body = await response.json();
   assert.equal(body.data.schemaVersion, "workbench.v1");

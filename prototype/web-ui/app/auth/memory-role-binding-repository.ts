@@ -31,6 +31,14 @@ export class MemoryRoleBindingRepository implements RoleBindingRepository {
     ));
   }
 
+  async listActorActive(actorId: string): Promise<readonly RoleBinding[]> {
+    return structuredClone(
+      this.bindings.filter((binding) =>
+        binding.actorId === actorId && binding.revokedAt === null
+      ),
+    );
+  }
+
   async get(id: string, organizationId: string): Promise<RoleBinding | null> {
     const binding = this.bindings.find((candidate) =>
       candidate.id === id && candidate.organizationId === organizationId

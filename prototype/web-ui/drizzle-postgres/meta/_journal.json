@@ -43,6 +43,13 @@
       "when": 1785832369382,
       "tag": "0005_previous_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785833472467,
+      "tag": "0006_absurd_thena",
+      "breakpoints": true
     }
   ]
 }

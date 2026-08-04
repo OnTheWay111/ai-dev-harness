@@ -101,9 +101,14 @@ async function main(): Promise<number> {
     }
     database = createNeonWorkbenchDatabase(connection.databaseUrl);
     scopeId = `p1_03_${crypto.randomUUID().replaceAll("-", "")}`;
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
     const writer = new NeonWorkbenchProjectionWriter(database);
     phase = "seed";
-    await writer.replaceProjection(scopeId, verificationSnapshot());
+    await writer.replaceProjection(
+      { scopeId, organizationId, projectId },
+      verificationSnapshot(),
+    );
 
     delete process.env.HARNESS_DEPLOYMENT_ENV;
     process.env.WORKBENCH_DATA_SOURCE = "postgres";

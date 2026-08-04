@@ -1274,28 +1274,45 @@ export type NewOutboxEvent = typeof outboxEvents.$inferInsert;
 export type IdempotencyRecord = typeof idempotencyRecords.$inferSelect;
 export type NewIdempotencyRecord = typeof idempotencyRecords.$inferInsert;
 
-export const workbenchSnapshots = pgTable("workbench_snapshots", {
-  scopeId: text("scope_id").primaryKey(),
-  revision: bigint("revision", { mode: "number" }).notNull(),
-  generatedAt: timestamp("generated_at", {
-    withTimezone: true,
-    mode: "date",
-  }).notNull(),
-  summary: jsonb("summary")
-    .$type<WorkbenchSnapshot["summary"]>()
-    .notNull(),
-  updatedAt: timestamp("updated_at", {
-    withTimezone: true,
-    mode: "date",
-  })
-    .defaultNow()
-    .notNull(),
-});
+export const workbenchSnapshots = pgTable(
+  "workbench_snapshots",
+  {
+    scopeId: text("scope_id").notNull(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    revision: bigint("revision", { mode: "number" }).notNull(),
+    generatedAt: timestamp("generated_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    summary: jsonb("summary")
+      .$type<WorkbenchSnapshot["summary"]>()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.scopeId, table.organizationId, table.projectId],
+    }),
+    index("workbench_snapshots_visibility_idx").on(
+      table.scopeId,
+      table.organizationId,
+      table.projectId,
+    ),
+  ],
+);
 
 export const workbenchTasks = pgTable(
   "workbench_tasks",
   {
     scopeId: text("scope_id").notNull(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
     taskId: text("task_id").notNull(),
     goalId: text("goal_id").notNull(),
     priority: text("priority").$type<TaskPriority>().notNull(),
@@ -1311,12 +1328,36 @@ export const workbenchTasks = pgTable(
       .notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.scopeId, table.taskId] }),
-    index("workbench_tasks_scope_rank_idx").on(table.scopeId, table.rank),
-    index("workbench_tasks_scope_goal_idx").on(table.scopeId, table.goalId),
-    index("workbench_tasks_scope_stage_idx").on(table.scopeId, table.stage),
+    primaryKey({
+      columns: [
+        table.scopeId,
+        table.organizationId,
+        table.projectId,
+        table.taskId,
+      ],
+    }),
+    index("workbench_tasks_scope_rank_idx").on(
+      table.scopeId,
+      table.organizationId,
+      table.projectId,
+      table.rank,
+    ),
+    index("workbench_tasks_scope_goal_idx").on(
+      table.scopeId,
+      table.organizationId,
+      table.projectId,
+      table.goalId,
+    ),
+    index("workbench_tasks_scope_stage_idx").on(
+      table.scopeId,
+      table.organizationId,
+      table.projectId,
+      table.stage,
+    ),
     index("workbench_tasks_scope_attention_idx").on(
       table.scopeId,
+      table.organizationId,
+      table.projectId,
       table.attentionRequired,
     ),
   ],

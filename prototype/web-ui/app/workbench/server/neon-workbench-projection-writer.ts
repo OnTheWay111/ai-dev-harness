@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import {
   workbenchSnapshots,
@@ -7,12 +7,18 @@ import {
 import type { WorkbenchSnapshot } from "../contracts";
 import type { NeonWorkbenchDatabase } from "./neon-workbench-store.ts";
 
+export interface WorkbenchProjectionScope {
+  scopeId: string;
+  organizationId: string;
+  projectId: string;
+}
+
 export function buildWorkbenchTaskRows(
-  scopeId: string,
+  projection: WorkbenchProjectionScope,
   snapshot: WorkbenchSnapshot,
 ) {
   return snapshot.tasks.map((task, rank) => ({
-    scopeId,
+    ...projection,
     taskId: task.id,
     goalId: task.goalId,
     priority: task.priority,
@@ -32,7 +38,7 @@ export class NeonWorkbenchProjectionWriter {
   }
 
   async replaceProjection(
-    scopeId: string,
+    projection: WorkbenchProjectionScope,
     snapshot: WorkbenchSnapshot,
   ): Promise<void> {
     const generatedAt = new Date(snapshot.generatedAt);
@@ -43,14 +49,18 @@ export class NeonWorkbenchProjectionWriter {
     const upsertSnapshot = this.database
       .insert(workbenchSnapshots)
       .values({
-        scopeId,
+        ...projection,
         revision: snapshot.revision,
         generatedAt,
         summary: snapshot.summary,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
-        target: workbenchSnapshots.scopeId,
+        target: [
+          workbenchSnapshots.scopeId,
+          workbenchSnapshots.organizationId,
+          workbenchSnapshots.projectId,
+        ],
         set: {
           revision: snapshot.revision,
           generatedAt,
@@ -60,8 +70,12 @@ export class NeonWorkbenchProjectionWriter {
       });
     const deleteTasks = this.database
       .delete(workbenchTasks)
-      .where(eq(workbenchTasks.scopeId, scopeId));
-    const taskRows = buildWorkbenchTaskRows(scopeId, snapshot);
+      .where(and(
+        eq(workbenchTasks.scopeId, projection.scopeId),
+        eq(workbenchTasks.organizationId, projection.organizationId),
+        eq(workbenchTasks.projectId, projection.projectId),
+      ));
+    const taskRows = buildWorkbenchTaskRows(projection, snapshot);
 
     if (taskRows.length === 0) {
       await this.database.batch([upsertSnapshot, deleteTasks]);

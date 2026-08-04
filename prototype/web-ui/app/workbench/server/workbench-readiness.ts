@@ -8,6 +8,12 @@ import type {
   WorkbenchReadRepository,
 } from "./workbench-repository.ts";
 
+const readinessVisibility = {
+  actorId: "system:readiness",
+  organizationIds: [],
+  projectIds: [],
+} as const;
+
 type ReadinessCheck = "pass" | "fail" | "skipped";
 
 export interface WorkbenchReadiness {
@@ -46,7 +52,7 @@ export async function checkWorkbenchReadiness(
   try {
     const repository = repositoryFactory(config);
     if (repository.kind !== "postgres") return configurationFailure;
-    await repository.getWorkbench({ limit: 1 });
+    await repository.getWorkbench(readinessVisibility, { limit: 1 });
     return {
       ready: true,
       source: "postgres",

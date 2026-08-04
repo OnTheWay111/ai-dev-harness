@@ -3,7 +3,7 @@ import type { OidcService } from "./oidc-service.ts";
 export const TRANSACTION_COOKIE = "__Host-harness_oidc_tx";
 export const SESSION_COOKIE = "__Host-harness_session";
 
-function cookieValue(request: Request, name: string): string | null {
+export function cookieValue(request: Request, name: string): string | null {
   const cookie = request.headers.get("cookie");
   if (!cookie) return null;
   for (const part of cookie.split(";")) {
@@ -11,6 +11,13 @@ function cookieValue(request: Request, name: string): string | null {
     if (key === name) return value.join("=") || null;
   }
   return null;
+}
+
+export async function readRequestPrincipal(
+  request: Request,
+  service: OidcService,
+) {
+  return await service.readSession(cookieValue(request, SESSION_COOKIE));
 }
 
 function secureCookie(name: string, value: string, maxAge: number): string {
@@ -104,7 +111,7 @@ export async function handleOidcSession(
   service: OidcService,
 ): Promise<Response> {
   if (request.method !== "GET") return new Response(null, { status: 405 });
-  const principal = await service.readSession(cookieValue(request, SESSION_COOKIE));
+  const principal = await readRequestPrincipal(request, service);
   if (!principal) {
     return Response.json({
       error: {

@@ -47,6 +47,7 @@ export interface RoleChangeAudit {
 
 export interface RoleBindingReader {
   listActive(scope: RoleScope): Promise<readonly RoleBinding[]>;
+  listActorActive(actorId: string): Promise<readonly RoleBinding[]>;
 }
 
 export interface RoleBindingRepository extends RoleBindingReader {

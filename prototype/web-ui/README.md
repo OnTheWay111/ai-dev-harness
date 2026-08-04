@@ -153,8 +153,10 @@ Managed development, test, and staging deployments set
 must use explicit `postgres` mode. Their Neon endpoint, database, role, and
 scope mapping is validated before repository creation, so a missing or
 cross-environment Secret cannot silently expose demo data.
-`WORKBENCH_SCOPE_ID` selects the tenant/project projection and defaults to
-`default` only for unmanaged local use.
+`WORKBENCH_SCOPE_ID` selects the deployment projection namespace and defaults
+to `default` only for unmanaged local use. Authorization comes only from the
+server-derived Organization/Project visibility scope, never from this value or
+an HTTP query parameter.
 
 ### PostgreSQL setup
 
@@ -167,7 +169,7 @@ that injects only the value needed by each child process:
 npm run db:migrate:postgres
 
 # DATABASE_URL is injected only for these commands.
-npm run db:seed:postgres
+WORKBENCH_ORGANIZATION_ID=<uuid> WORKBENCH_PROJECT_ID=<uuid> npm run db:seed:postgres
 WORKBENCH_DATA_SOURCE=postgres WORKBENCH_SCOPE_ID=default npm run dev
 ```
 
@@ -198,12 +200,16 @@ Goal, SpecRevision, Issue, and Run lifecycle rules are listed in
 The Goal write-module interface, Repository seam, adapters, and HTTP mapping are
 documented in
 [`../../docs/control-plane-write-architecture.md`](../../docs/control-plane-write-architecture.md).
+OIDC actor visibility, SQL-scoped task/summary reads, and cache isolation are
+documented in
+[`../../docs/visibility-scoped-reads.md`](../../docs/visibility-scoped-reads.md).
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls
 `NeonWorkbenchProjectionWriter.replaceProjection()` once per revision and
-scope. Projection writes for one scope must be serialized; the writer replaces
-the snapshot and its ordered task rows in one database batch.
+Organization/Project scope. Projection writes for one composite scope must be
+serialized; the writer replaces that Project snapshot and its ordered task rows
+in one database batch.
 
 ## Learn More
 

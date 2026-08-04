@@ -17,6 +17,11 @@ test("ordinary API failures stay structured and suppress internal errors", async
           "connection failed for postgresql://app:do-not-expose@example.test/workbench",
         );
       },
+      async () => ({
+        actorId: "actor-test",
+        organizationIds: ["10000000-0000-4000-8000-000000000001"],
+        projectIds: [],
+      }),
     );
     assert.equal(response.status, 500);
     const body = await response.json();

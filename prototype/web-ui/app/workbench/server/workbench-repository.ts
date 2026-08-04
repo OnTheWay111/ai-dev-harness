@@ -3,15 +3,22 @@ import type {
   WorkbenchQuery,
   WorkbenchResponse,
 } from "../contracts";
+import type { ActorVisibilityScope } from "../../auth/visibility-scope.ts";
 import { filterGlobalTasks } from "../selectors.ts";
 import { workbenchSnapshot } from "./demo-workbench-snapshot.ts";
 
-export type WorkbenchPage = Omit<WorkbenchResponse, "requestId">;
+export type WorkbenchPage = Omit<WorkbenchResponse, "requestId"> & {
+  /** Server-only cache identity; API handlers must not serialize it. */
+  cacheTag: string;
+};
 export type WorkbenchRepositoryKind = "demo" | "postgres";
 
 export interface WorkbenchReadRepository {
   readonly kind: WorkbenchRepositoryKind;
-  getWorkbench(query?: WorkbenchQuery): Promise<WorkbenchPage>;
+  getWorkbench(
+    visibility: ActorVisibilityScope,
+    query?: WorkbenchQuery,
+  ): Promise<WorkbenchPage>;
 }
 
 export class WorkbenchRepositoryError extends Error {
@@ -49,7 +56,20 @@ function normalizeFilter(filter?: TaskFilter): TaskFilter {
 export class DemoWorkbenchReadRepository implements WorkbenchReadRepository {
   readonly kind = "demo" as const;
 
-  async getWorkbench(query: WorkbenchQuery = {}): Promise<WorkbenchPage> {
+  async getWorkbench(
+    visibility: ActorVisibilityScope,
+    query: WorkbenchQuery = {},
+  ): Promise<WorkbenchPage> {
+    if (
+      !visibility.organizationIds.includes(DEMO_ORGANIZATION_ID) &&
+      !visibility.projectIds.includes(DEMO_PROJECT_ID)
+    ) {
+      return {
+        data: emptyWorkbenchSnapshot,
+        page: { nextCursor: null, total: 0 },
+        cacheTag: `demo-empty:${visibility.actorId}`,
+      };
+    }
     const limit = query.limit ?? defaultLimit;
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       throw new WorkbenchRepositoryError("limit 必须是 1 到 100 的整数", "limit");
@@ -82,9 +102,32 @@ export class DemoWorkbenchReadRepository implements WorkbenchReadRepository {
             : null,
         total: filteredTasks.length,
       },
+      cacheTag: `demo:${workbenchSnapshot.revision}`,
     };
   }
 }
+
+export const DEMO_ORGANIZATION_ID =
+  "00000000-0000-4000-8000-000000000001";
+export const DEMO_PROJECT_ID =
+  "00000000-0000-4000-8000-000000000002";
+
+const emptyWorkbenchSnapshot = {
+  ...workbenchSnapshot,
+  revision: 0,
+  summary: {
+    metrics: [],
+    taskCounts: {
+      all: 0,
+      attention: 0,
+      running: 0,
+      review: 0,
+      blocked: 0,
+      waiting: 0,
+    },
+  },
+  tasks: [],
+};
 
 export const demoWorkbenchRepository: WorkbenchReadRepository =
   new DemoWorkbenchReadRepository();

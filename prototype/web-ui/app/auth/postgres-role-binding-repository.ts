@@ -103,6 +103,18 @@ export class PostgresRoleBindingRepository implements RoleBindingRepository {
     return result.rows.map(mapBinding);
   }
 
+  async listActorActive(actorId: string): Promise<readonly RoleBinding[]> {
+    const result = await this.pool.query<RoleBindingRow>(
+      `SELECT id, organization_id, project_id, actor_id, role, version,
+              created_at, revoked_at
+         FROM role_bindings
+        WHERE actor_id = $1 AND revoked_at IS NULL
+        ORDER BY organization_id, project_id NULLS FIRST, role, id`,
+      [actorId],
+    );
+    return result.rows.map(mapBinding);
+  }
+
   async get(id: string, organizationId: string): Promise<RoleBinding | null> {
     const result = await this.pool.query<RoleBindingRow>(
       `SELECT id, organization_id, project_id, actor_id, role, version,
