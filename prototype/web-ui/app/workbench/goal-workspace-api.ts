@@ -13,6 +13,10 @@ import type {
   ClassificationReceipt,
   ClassificationTimeline,
 } from "../control-plane/domain/classification";
+import type {
+  SpecGenerationReceipt,
+  SpecRevisionViewTimeline,
+} from "../control-plane/application/spec-generation-service";
 
 export interface GoalWorkspaceScope {
   organizationId: string;
@@ -178,6 +182,37 @@ export const goalWorkspaceApi = {
   ): Promise<ClassificationReceipt> {
     return await responseData(await fetch(
       `/api/v1/goals/${encodeURIComponent(goalId)}/classifications`,
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: writeHeaders(),
+        body: JSON.stringify({ ...scope, expectedGoalVersion, reason }),
+      },
+    ));
+  },
+
+  async specTimeline(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+  ): Promise<SpecRevisionViewTimeline> {
+    const query = new URLSearchParams({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+    });
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/specs?${query}`,
+      { credentials: "same-origin", cache: "no-store" },
+    ));
+  },
+
+  async generateSpec(
+    scope: GoalWorkspaceScope,
+    goalId: string,
+    expectedGoalVersion: number,
+    reason: string,
+  ): Promise<SpecGenerationReceipt> {
+    return await responseData(await fetch(
+      `/api/v1/goals/${encodeURIComponent(goalId)}/specs`,
       {
         method: "POST",
         credentials: "same-origin",

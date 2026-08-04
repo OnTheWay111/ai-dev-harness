@@ -802,6 +802,13 @@ export const specRevisions = pgTable(
       .$type<import("../app/control-plane/domain/spec-artifact.ts").PlannerConfiguration>()
       .default(sql`'{"adapter":"legacy","modelProfile":"unknown","schemaVersion":"spec-bundle.v1"}'::jsonb`)
       .notNull(),
+    overdesignPolicyRevision: text("overdesign_policy_revision")
+      .default("overdesign-policy.v1")
+      .notNull(),
+    overdesignReview: jsonb("overdesign_review")
+      .$type<import("../app/control-plane/domain/overdesign-review.ts").OverdesignReview>()
+      .default(sql`'{"schemaVersion":"overdesign-review.v1","policyRevision":"overdesign-policy.v1","counts":{"Required":0,"Helpful":0,"Speculative":0},"items":[]}'::jsonb`)
+      .notNull(),
     generatedAt: timestamp("generated_at", {
       withTimezone: true,
       mode: "date",
@@ -871,7 +878,7 @@ export const specRevisions = pgTable(
     ),
     check(
       "spec_revisions_planner_metadata_chk",
-      sql`char_length(btrim(${table.plannerRunId})) BETWEEN 1 AND 200 AND ${table.generatedAt} >= ${table.createdAt}`,
+      sql`char_length(btrim(${table.plannerRunId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.overdesignPolicyRevision})) BETWEEN 1 AND 100 AND ${table.generatedAt} >= ${table.createdAt}`,
     ),
     check(
       "spec_revisions_versions_chk",

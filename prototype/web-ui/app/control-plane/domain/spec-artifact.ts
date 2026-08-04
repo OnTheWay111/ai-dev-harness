@@ -1,4 +1,5 @@
 import type { SpecRevisionStatus } from "./state-machines.ts";
+import type { OverdesignReview } from "./overdesign-review.ts";
 
 export const specBundleSchemaVersion = "spec-bundle.v1" as const;
 
@@ -87,6 +88,8 @@ export interface SpecRevision {
   artifactSizeBytes: number;
   plannerRunId: string;
   plannerConfiguration: PlannerConfiguration;
+  overdesignPolicyRevision: string;
+  overdesignReview: OverdesignReview;
   generatedAt: string;
   version: number;
   createdAt: string;

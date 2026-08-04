@@ -78,6 +78,13 @@
       "when": 1785843118262,
       "tag": "0010_long_blue_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785843589977,
+      "tag": "0011_tricky_king_cobra",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,14 @@ PRD, architecture, migration, rollback, and traceable solution-element drafts.
 Planner output never becomes an approval: the server validates the closed JSON
 Schema and referential integrity before storing anything.
 
+Each validated solution element is then classified by
+`overdesign-policy.v1`. A valid acceptance-criterion reference is Required; an
+evidenced reference to a declared Goal constraint is Helpful; everything else
+is Speculative and removed by default at approval. Unknown references never
+become Required. The immutable review records valid references, estimated cost,
+removal impact, evidence, rationale, category counts, and policy revision next
+to the SpecRevision metadata.
+
 ## Persistence boundary
 
 `SpecGenerationService` writes content through the `ArtifactStore` port before

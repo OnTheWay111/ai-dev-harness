@@ -4,6 +4,7 @@ import type {
   PlannerConfiguration,
   SpecRevision,
 } from "../domain/spec-artifact.ts";
+import type { OverdesignReview } from "../domain/overdesign-review.ts";
 import type {
   SpecRevisionRepository,
   SpecRevisionScope,
@@ -25,6 +26,8 @@ interface SpecRevisionRow {
   artifact_size_bytes: number | string;
   planner_run_id: string;
   planner_configuration: PlannerConfiguration;
+  overdesign_policy_revision: string;
+  overdesign_review: OverdesignReview;
   generated_at: Date;
   version: number;
   created_at: Date;
@@ -51,6 +54,8 @@ function mapRevision(row: SpecRevisionRow): SpecRevision {
     artifactSizeBytes: Number(row.artifact_size_bytes),
     plannerRunId: row.planner_run_id,
     plannerConfiguration: row.planner_configuration,
+    overdesignPolicyRevision: row.overdesign_policy_revision,
+    overdesignReview: row.overdesign_review,
     generatedAt: row.generated_at.toISOString(),
     version: row.version,
     createdAt: row.created_at.toISOString(),
@@ -103,10 +108,11 @@ export class PostgresSpecRevisionRepository implements SpecRevisionRepository {
           (id, organization_id, project_id, goal_id, revision,
            previous_revision_id, status, source_goal_version, artifact_ref,
            artifact_digest, artifact_media_type, artifact_size_bytes,
-           planner_run_id, planner_configuration, generated_at, version,
+           planner_run_id, planner_configuration, overdesign_policy_revision,
+           overdesign_review, generated_at, version,
            created_at, updated_at)
          VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18)`,
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16::jsonb,$17,$18,$19,$20)`,
         [
           revision.id,
           revision.organizationId,
@@ -122,6 +128,8 @@ export class PostgresSpecRevisionRepository implements SpecRevisionRepository {
           revision.artifactSizeBytes,
           revision.plannerRunId,
           JSON.stringify(revision.plannerConfiguration),
+          revision.overdesignPolicyRevision,
+          JSON.stringify(revision.overdesignReview),
           new Date(revision.generatedAt),
           revision.version,
           new Date(revision.createdAt),

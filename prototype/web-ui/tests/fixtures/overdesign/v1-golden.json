@@ -1,0 +1,42 @@
+{
+  "goal": {
+    "acceptanceCriterionIds": ["ac-1", "ac-2"],
+    "constraints": ["Zero downtime", "Audit every decision"]
+  },
+  "elements": [
+    {
+      "id": "EL-REQ",
+      "title": "Approval gate",
+      "kind": "product",
+      "description": "Require approval before compilation.",
+      "acceptanceCriterionRefs": ["ac-1"],
+      "constraintRefs": [],
+      "estimatedCost": "medium",
+      "removalImpact": "Unapproved plans could compile.",
+      "evidence": ["REQ-1"]
+    },
+    {
+      "id": "EL-HELP",
+      "title": "Drain during rollout",
+      "kind": "migration",
+      "description": "Drain active work before rollout.",
+      "acceptanceCriterionRefs": [],
+      "constraintRefs": ["Zero downtime"],
+      "estimatedCost": "low",
+      "removalImpact": "Rollout may interrupt active work.",
+      "evidence": ["Architecture decision 2"]
+    },
+    {
+      "id": "EL-SPEC",
+      "title": "Generic workflow designer",
+      "kind": "architecture",
+      "description": "Allow arbitrary workflows.",
+      "acceptanceCriterionRefs": ["unknown-ac"],
+      "constraintRefs": ["Unknown constraint"],
+      "estimatedCost": "high",
+      "removalImpact": "No approved requirement changes.",
+      "evidence": []
+    }
+  ],
+  "expectedCategories": ["Required", "Helpful", "Speculative"]
+}

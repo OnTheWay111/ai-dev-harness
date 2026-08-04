@@ -7,6 +7,10 @@ import {
   type SpecBundle,
   type SpecRevision,
 } from "../domain/spec-artifact.ts";
+import {
+  classifySolutionElements,
+  overdesignPolicyRevision,
+} from "../domain/overdesign-review.ts";
 import type { GoalWorkspaceRepository } from "../ports/goal-workspace-repository.ts";
 import type { ArtifactStore, ImmutableArtifact } from "../ports/artifact-store.ts";
 import type { PlannerPort } from "../ports/planner-port.ts";
@@ -127,6 +131,10 @@ export class SpecGenerationService {
       createdAt: occurredAt,
       createdBy: command.actorId,
     });
+    const overdesignReview = classifySolutionElements({
+      acceptanceCriterionIds: goal.acceptanceCriteria.map(({ id }) => id),
+      constraints: goal.constraints,
+    }, content.solutionElements);
     const revision: SpecRevision = {
       id: this.idGenerator(),
       organizationId: command.organizationId,
@@ -142,6 +150,8 @@ export class SpecGenerationService {
       artifactSizeBytes: artifact.sizeBytes,
       plannerRunId: planned.plannerRunId,
       plannerConfiguration: this.plannerConfiguration,
+      overdesignPolicyRevision,
+      overdesignReview,
       generatedAt: occurredAt,
       version: 1,
       createdAt: occurredAt,

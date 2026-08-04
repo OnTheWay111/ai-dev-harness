@@ -8,6 +8,8 @@ import type { ClarificationTimeline } from
   "../../control-plane/domain/clarification-history";
 import type { ClassificationTimeline } from
   "../../control-plane/domain/classification";
+import type { SpecRevisionViewTimeline } from
+  "../../control-plane/application/spec-generation-service";
 import {
   goalWorkspaceApi,
   GoalWorkspaceApiError,
@@ -19,6 +21,7 @@ import {
   serializeGoalDraft,
 } from "../goal-workspace-draft";
 import { StatusPill, Stepper } from "./ui";
+import { OverdesignReviewPanel } from "./overdesign-review-panel";
 
 const emptyDraft: GoalContractDraft = {
   title: "",
@@ -74,6 +77,7 @@ export function ClarifyView({
   const [classifications, setClassifications] = useState<ClassificationTimeline>({
     policies: [], classifications: [],
   });
+  const [specs, setSpecs] = useState<SpecRevisionViewTimeline>({ revisions: [] });
   const storageKey = useMemo(() => goalDraftStorageKey(scope), [scope]);
   const lastGoalKey = `${storageKey}:last-goal`;
 
@@ -94,13 +98,15 @@ export function ClarifyView({
         if (!active) return;
         setGoal(loaded);
         if (!saved) setDraft(editableDraft(loaded));
-        const [history, classificationHistory] = await Promise.all([
+        const [history, classificationHistory, specHistory] = await Promise.all([
           goalWorkspaceApi.clarificationTimeline(scope, loaded.id),
           goalWorkspaceApi.classificationTimeline(scope, loaded.id),
+          goalWorkspaceApi.specTimeline(scope, loaded.id),
         ]);
         if (active) {
           setTimeline(history);
           setClassifications(classificationHistory);
+          setSpecs(specHistory);
         }
       } catch {
         window.localStorage.removeItem(lastGoalKey);
@@ -232,6 +238,31 @@ export function ClarifyView({
     } finally { setPlanning(false); }
   }
 
+  async function generateSpec() {
+    if (!goal) return;
+    setPlanning(true);
+    setError("");
+    try {
+      await goalWorkspaceApi.generateSpec(
+        scope,
+        goal.id,
+        goal.version,
+        specs.revisions.length === 0
+          ? "Generate the first Proposal and PRD revision"
+          : "Regenerate the Proposal and PRD after review",
+      );
+      setSpecs(await goalWorkspaceApi.specTimeline(scope, goal.id));
+      notify("已生成不可变 Proposal/PRD 修订与过度设计评审");
+    } catch (caught) {
+      const message = caught instanceof GoalWorkspaceApiError &&
+          caught.code === "version_conflict"
+        ? "Goal 版本已变化，请刷新后重新生成规格。"
+        : "规格生成失败；既有不可变修订保持不变。";
+      setError(message);
+      notify(message);
+    } finally { setPlanning(false); }
+  }
+
   const latestRound = timeline.rounds.at(-1);
   const latestQuestions = [...timeline.questions]
     .filter(({ roundId }) => roundId === latestRound?.id)
@@ -243,6 +274,7 @@ export function ClarifyView({
       return items;
     }, new Map<string, ClarificationTimeline["questions"][number]>());
   const latestClassification = classifications.classifications.at(-1);
+  const latestSpec = specs.revisions.at(-1);
 
   return (
     <div className="screen detail-screen">
@@ -422,6 +454,36 @@ export function ClarifyView({
                     </div>
                   ))}
                 </div>
+              )}
+            </section>
+          )}
+          {goal && (
+            <section className="panel contract-panel" aria-labelledby="spec-draft-heading">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">PROPOSAL / PRD</p>
+                  <h3 id="spec-draft-heading">不可变规格草稿</h3>
+                  <p>每次生成都追加修订，并用确定性规则标注过度设计。</p>
+                </div>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={planning || goal.status !== "planning"}
+                  onClick={generateSpec}
+                  title={goal.status === "planning" ? undefined : "Goal 进入 planning 后可生成"}
+                >
+                  {latestSpec ? "重新生成新修订" : "生成 Proposal / PRD"}
+                </button>
+              </div>
+              {latestSpec ? (
+                <>
+                  <p>
+                    Revision {latestSpec.specRevision.revision} · digest {latestSpec.specRevision.artifactDigest.slice(0, 12)} · Goal v{latestSpec.specRevision.sourceGoalVersion}
+                  </p>
+                  <OverdesignReviewPanel review={latestSpec.specRevision.overdesignReview} />
+                </>
+              ) : (
+                <p>当前尚无规格修订。Planner 只会生成草稿，不能自动批准。</p>
               )}
             </section>
           )}

@@ -146,6 +146,12 @@ test("generates and saves an immutable artifact-backed SpecRevision", async () =
   assert.equal(receipt.specRevision.sourceGoalVersion, 4);
   assert.match(receipt.specRevision.artifactDigest, /^[0-9a-f]{64}$/);
   assert.equal(receipt.specRevision.generatedAt, "2026-08-04T02:00:00.000Z");
+  assert.equal(receipt.specRevision.overdesignPolicyRevision, "overdesign-policy.v1");
+  assert.deepEqual(receipt.specRevision.overdesignReview.counts, {
+    Required: 1,
+    Helpful: 0,
+    Speculative: 0,
+  });
   assert.deepEqual(receipt.artifact.content, validBundle);
   assert.equal(
     (await artifacts.get(receipt.specRevision.artifactRef))?.digest,
@@ -285,6 +291,13 @@ test("PostgreSQL append locks the Goal and revision chain before insertion", asy
       adapter: "fake",
       modelProfile: "planner-test",
       schemaVersion: "spec-bundle.v1",
+    },
+    overdesignPolicyRevision: "overdesign-policy.v1",
+    overdesignReview: {
+      schemaVersion: "overdesign-review.v1",
+      policyRevision: "overdesign-policy.v1",
+      counts: { Required: 1, Helpful: 0, Speculative: 0 },
+      items: [],
     },
     generatedAt: "2026-08-04T02:00:00.000Z",
     version: 1,

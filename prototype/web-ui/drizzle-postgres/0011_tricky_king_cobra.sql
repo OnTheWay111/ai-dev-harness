@@ -1,0 +1,4 @@
+ALTER TABLE "spec_revisions" DROP CONSTRAINT "spec_revisions_planner_metadata_chk";--> statement-breakpoint
+ALTER TABLE "spec_revisions" ADD COLUMN "overdesign_policy_revision" text DEFAULT 'overdesign-policy.v1' NOT NULL;--> statement-breakpoint
+ALTER TABLE "spec_revisions" ADD COLUMN "overdesign_review" jsonb DEFAULT '{"schemaVersion":"overdesign-review.v1","policyRevision":"overdesign-policy.v1","counts":{"Required":0,"Helpful":0,"Speculative":0},"items":[]}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "spec_revisions" ADD CONSTRAINT "spec_revisions_planner_metadata_chk" CHECK (char_length(btrim("spec_revisions"."planner_run_id")) BETWEEN 1 AND 200 AND char_length(btrim("spec_revisions"."overdesign_policy_revision")) BETWEEN 1 AND 100 AND "spec_revisions"."generated_at" >= "spec_revisions"."created_at");
