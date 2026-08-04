@@ -402,7 +402,7 @@ P2-05 为 `[x]（已完成）`并提交、push 路线图。
 
 </details>
 
-- [ ] **P2-06** 为写命令增加幂等、事务、Outbox 和状态机单元/集成测试。
+- [x] **P2-06** 为写命令增加幂等、事务、Outbox 和状态机单元/集成测试。（已完成：2026-08-04；实现提交：ai-dev-harness@2bdaa39042fb6459d8d96cc21822e126bff43134）
 
 <details>
 <summary>快捷复制开发提示词 P2-06 · gpt-5.6-sol(深度) · high(高)</summary>
