@@ -488,7 +488,7 @@ Task 和 summary，禁止先全量读取再在客户端过滤；scope 不能来�
 
 </details>
 
-- [ ] **P3-04** 增加 CSRF、输入 Schema、请求大小、限流和安全响应头。
+- [x] **P3-04** 增加 CSRF、输入 Schema、请求大小、限流和安全响应头。（已完成：2026-08-04；实现提交：ai-dev-harness@1201afecc95379ae204b58b42fe2e523077a410b）
 
 <details>
 <summary>快捷复制开发提示词 P3-04 · gpt-5.6-sol(深度) · high(高)</summary>
