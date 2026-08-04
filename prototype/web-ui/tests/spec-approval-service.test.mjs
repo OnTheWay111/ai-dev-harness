@@ -101,8 +101,8 @@ async function setup(options = {}) {
 
 function command(overrides = {}) {
   return {
-    ...scope,
-    specRevisionId: spec().id,
+    scope,
+    target: { type: "spec_revision", id: spec().id },
     expectedVersion: 1,
     actorId: "approver-1",
     reason: "Approve the minimum execution contract",
@@ -110,9 +110,11 @@ function command(overrides = {}) {
     idempotencyKey: "idempotency-1",
     policyRevision: "overdesign-policy.v1",
     decision: "approve",
-    affectedElementIds: ["EL-REQ", "EL-HELP", "EL-SPEC"],
-    helpfulExceptionElementIds: ["EL-HELP"],
-    scopeChanges: [],
+    affectedItemIds: ["EL-REQ", "EL-HELP", "EL-SPEC"],
+    payload: {
+      helpfulExceptionElementIds: ["EL-HELP"],
+      scopeChanges: [],
+    },
     ...overrides,
   };
 }
@@ -120,12 +122,19 @@ function command(overrides = {}) {
 test("approval retains Required and explicit Helpful exceptions but always deletes Speculative", async () => {
   const { repository, service } = await setup();
   const receipt = await service.decide(command());
-  assert.equal(receipt.specRevision.status, "approved");
-  assert.equal(receipt.specRevision.version, 2);
-  assert.deepEqual(receipt.retainedElementIds, ["EL-REQ", "EL-HELP"]);
-  assert.deepEqual(receipt.removedElementIds, ["EL-SPEC"]);
-  assert.equal(receipt.decision.actorId, "approver-1");
-  assert.equal(receipt.decision.reason, command().reason);
+  assert.equal(receipt.target.type, "spec_revision");
+  assert.equal(receipt.previousVersion, 1);
+  assert.equal(receipt.currentVersion, 2);
+  assert.equal(receipt.result.specRevision.status, "approved");
+  assert.equal(receipt.result.specRevision.version, 2);
+  assert.deepEqual(receipt.result.retainedElementIds, ["EL-REQ", "EL-HELP"]);
+  assert.deepEqual(receipt.result.removedElementIds, ["EL-SPEC"]);
+  assert.equal(receipt.actorId, "approver-1");
+  assert.equal(receipt.reason, command().reason);
+  assert.equal(receipt.requestId, "request-1");
+  assert.equal(receipt.policyRevision, "overdesign-policy.v1");
+  assert.match(receipt.receiptId, /^[0-9a-f-]{36}$/);
+  assert.equal(receipt.result.decisionRecord.actorId, "approver-1");
   assert.equal(repository.committedAuditEvents.length, 1);
   assert.equal(repository.committedEvents.length, 1);
 });
@@ -136,26 +145,26 @@ test("a draft can be submitted for review before the human decision", async () =
   const receipt = await service.decide(command({
     decision: "submit_for_review",
     reason: "Artifact digest and deterministic review are ready",
-    helpfulExceptionElementIds: [],
+    payload: { helpfulExceptionElementIds: [], scopeChanges: [] },
   }));
-  assert.equal(receipt.specRevision.status, "in_review");
-  assert.deepEqual(receipt.retainedElementIds, []);
-  assert.deepEqual(receipt.removedElementIds, []);
-  assert.equal(receipt.decision.decision, "submit_for_review");
+  assert.equal(receipt.result.specRevision.status, "in_review");
+  assert.deepEqual(receipt.result.retainedElementIds, []);
+  assert.deepEqual(receipt.result.removedElementIds, []);
+  assert.equal(receipt.decision, "submit_for_review");
 });
 
 test("Helpful is removed without an exception and Speculative cannot be retained", async () => {
   const first = await setup();
   const receipt = await first.service.decide(command({
-    helpfulExceptionElementIds: [],
+    payload: { helpfulExceptionElementIds: [], scopeChanges: [] },
   }));
-  assert.deepEqual(receipt.retainedElementIds, ["EL-REQ"]);
-  assert.deepEqual(receipt.removedElementIds, ["EL-HELP", "EL-SPEC"]);
+  assert.deepEqual(receipt.result.retainedElementIds, ["EL-REQ"]);
+  assert.deepEqual(receipt.result.removedElementIds, ["EL-HELP", "EL-SPEC"]);
 
   const second = await setup();
   await assert.rejects(
     () => second.service.decide(command({
-      helpfulExceptionElementIds: ["EL-SPEC"],
+      payload: { helpfulExceptionElementIds: ["EL-SPEC"], scopeChanges: [] },
     })),
     (error) => error instanceof SpecApprovalValidationError,
   );
@@ -170,13 +179,15 @@ test("scope change and rejection decisions append reasons and affected items", a
     const receipt = await service.decide(command({
       decision,
       idempotencyKey: `idempotency-${decision}`,
-      scopeChanges,
-      helpfulExceptionElementIds: [],
+      payload: { scopeChanges, helpfulExceptionElementIds: [] },
     }));
-    assert.equal(receipt.specRevision.status, "rejected");
-    assert.equal(receipt.decision.decision, decision);
-    assert.deepEqual(receipt.decision.scopeChanges, scopeChanges);
-    assert.deepEqual(receipt.decision.affectedElementIds, command().affectedElementIds);
+    assert.equal(receipt.result.specRevision.status, "rejected");
+    assert.equal(receipt.decision, decision);
+    assert.deepEqual(receipt.result.decisionRecord.scopeChanges, scopeChanges);
+    assert.deepEqual(
+      receipt.result.decisionRecord.affectedElementIds,
+      command().affectedItemIds,
+    );
   }
 });
 
@@ -200,6 +211,30 @@ test("authorization, blank reasons, stale versions, and changed policy fail clos
       () => service.decide(command(overrides)),
       (error) => error instanceof SpecApprovalValidationError ||
         error instanceof VersionConflictError,
+    );
+  }
+});
+
+test("the unified approval command fails closed when any mandatory field is missing", async () => {
+  for (const field of [
+    "target",
+    "expectedVersion",
+    "actorId",
+    "reason",
+    "requestId",
+    "idempotencyKey",
+    "policyRevision",
+    "decision",
+    "affectedItemIds",
+    "payload",
+  ]) {
+    const invalid = command();
+    delete invalid[field];
+    const { service } = await setup();
+    await assert.rejects(
+      () => service.decide(invalid),
+      (error) => error instanceof SpecApprovalValidationError,
+      field,
     );
   }
 });

@@ -1,4 +1,9 @@
 import type { SpecRevision } from "./spec-artifact.ts";
+import type {
+  ApprovalCommand,
+  ApprovalReceipt,
+  ApprovalTarget,
+} from "./approval.ts";
 
 export const specApprovalDecisions = [
   "submit_for_review",
@@ -21,6 +26,17 @@ export interface ScopeChange {
   value: string;
 }
 
+export interface SpecApprovalPayload extends Readonly<Record<string, unknown>> {
+  helpfulExceptionElementIds: readonly string[];
+  scopeChanges: readonly ScopeChange[];
+}
+
+export type SpecApprovalCommand = ApprovalCommand<
+  SpecApprovalDecision,
+  SpecApprovalPayload,
+  ApprovalTarget<"spec_revision">
+>;
+
 export interface SpecApprovalDecisionRecord {
   id: string;
   organizationId: string;
@@ -41,12 +57,18 @@ export interface SpecApprovalDecisionRecord {
   createdAt: string;
 }
 
-export interface SpecApprovalReceipt {
+export interface SpecApprovalResult {
   specRevision: SpecRevision;
-  decision: SpecApprovalDecisionRecord;
+  decisionRecord: SpecApprovalDecisionRecord;
   retainedElementIds: readonly string[];
   removedElementIds: readonly string[];
 }
+
+export type SpecApprovalReceipt = ApprovalReceipt<
+  SpecApprovalDecision,
+  SpecApprovalResult,
+  ApprovalTarget<"spec_revision">
+>;
 
 export interface SpecApprovalTimeline {
   decisions: readonly SpecApprovalDecisionRecord[];

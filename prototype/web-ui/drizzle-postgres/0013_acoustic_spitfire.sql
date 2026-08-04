@@ -1,0 +1,3 @@
+ALTER TABLE "audit_events" DROP CONSTRAINT "audit_events_identity_chk";--> statement-breakpoint
+ALTER TABLE "audit_events" ADD COLUMN "policy_revision" text DEFAULT 'legacy-policy' NOT NULL;--> statement-breakpoint
+ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_identity_chk" CHECK (char_length(btrim("audit_events"."actor_id")) BETWEEN 1 AND 200 AND char_length(btrim("audit_events"."action")) BETWEEN 1 AND 200 AND char_length(btrim("audit_events"."entity_type")) BETWEEN 1 AND 100 AND "audit_events"."entity_version" > 0 AND char_length(btrim("audit_events"."reason")) BETWEEN 1 AND 4000 AND char_length(btrim("audit_events"."request_id")) BETWEEN 1 AND 200 AND char_length(btrim("audit_events"."policy_revision")) BETWEEN 1 AND 100);

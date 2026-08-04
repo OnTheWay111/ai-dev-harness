@@ -210,6 +210,21 @@ A versioned, artifact-backed proposal derived from a particular Goal version.
 | `version` | Positive optimistic state-machine version |
 | `created_at`, `updated_at` | Ordered lifecycle timestamps |
 
+## Approval command and receipt
+
+Planning approvals use one write-boundary shape: scoped target type and ID,
+`expectedVersion`, server-derived actor, non-blank reason, request ID,
+idempotency key, exact policy revision, decision, affected item IDs, and a
+bounded decision-specific payload. The matching receipt repeats the target,
+previous/current versions, actor, reason, request ID, policy revision,
+decision, timestamp, and immutable result. This prevents a domain adapter from
+silently omitting concurrency or policy context.
+
+Approval Audit events persist `policy_revision` in addition to actor, reason,
+request ID, entity, and version. Legacy non-approval writers receive the
+explicit `legacy-policy` database default until they migrate to a versioned
+policy.
+
 ## `issues`
 
 A versioned delivery unit sourced from one SpecRevision.

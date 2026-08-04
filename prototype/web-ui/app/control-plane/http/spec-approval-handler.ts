@@ -16,9 +16,10 @@ import {
   IdempotencyInProgressError,
   VersionConflictError,
 } from "../domain/errors.ts";
-import type {
-  ScopeChange,
-  SpecApprovalDecision,
+import {
+  specApprovalDecisions,
+  type ScopeChange,
+  type SpecApprovalDecision,
 } from "../domain/spec-approval.ts";
 
 function failure(code: string, status: number) {
@@ -101,9 +102,8 @@ export function createSpecApprovalHandler(input: {
         "reason",
         "policyRevision",
         "decision",
-        "affectedElementIds",
-        "helpfulExceptionElementIds",
-        "scopeChanges",
+        "affectedItemIds",
+        "payload",
       ];
       if (Object.keys(body).some((key) => !allowed.includes(key))) {
         throw new SpecApprovalValidationError("unknown body field");
@@ -112,26 +112,48 @@ export function createSpecApprovalHandler(input: {
         !validId(goalId) || !validId(specRevisionId)) {
         throw new SpecApprovalValidationError("valid scope is required");
       }
+      if (!body.payload || typeof body.payload !== "object" ||
+        Array.isArray(body.payload) ||
+        Object.keys(body.payload).some((key) =>
+          !["helpfulExceptionElementIds", "scopeChanges"].includes(key)
+        )) {
+        throw new SpecApprovalValidationError("valid approval payload is required");
+      }
+      const payload = body.payload as Record<string, unknown>;
+      if (!Number.isInteger(body.expectedVersion) ||
+        typeof body.reason !== "string" ||
+        typeof body.policyRevision !== "string" ||
+        !specApprovalDecisions.includes(body.decision as SpecApprovalDecision) ||
+        !Array.isArray(body.affectedItemIds) ||
+        !Array.isArray(payload.helpfulExceptionElementIds) ||
+        !Array.isArray(payload.scopeChanges)) {
+        throw new SpecApprovalValidationError("complete approval command is required");
+      }
       (input.rateLimiter ?? defaultWriteRateLimiter).consume({
         actorId: actor.actorId,
         organizationId: body.organizationId,
         endpoint: "spec.approval",
       });
       const receipt = await input.service.decide({
-        organizationId: body.organizationId,
-        projectId: body.projectId,
-        goalId,
-        specRevisionId,
-        expectedVersion: Number(body.expectedVersion),
+        scope: {
+          organizationId: body.organizationId,
+          projectId: body.projectId,
+          goalId,
+        },
+        target: { type: "spec_revision", id: specRevisionId },
+        expectedVersion: body.expectedVersion as number,
         actorId: actor.actorId,
-        reason: String(body.reason ?? ""),
+        reason: body.reason,
         requestId,
         idempotencyKey,
-        policyRevision: String(body.policyRevision ?? ""),
+        policyRevision: body.policyRevision,
         decision: body.decision as SpecApprovalDecision,
-        affectedElementIds: body.affectedElementIds as readonly string[],
-        helpfulExceptionElementIds: body.helpfulExceptionElementIds as readonly string[],
-        scopeChanges: body.scopeChanges as readonly ScopeChange[],
+        affectedItemIds: body.affectedItemIds as readonly string[],
+        payload: {
+          helpfulExceptionElementIds:
+            payload.helpfulExceptionElementIds as readonly string[],
+          scopeChanges: payload.scopeChanges as readonly ScopeChange[],
+        },
       });
       return withSecurityHeaders(Response.json({ data: receipt }));
     } catch (error) {

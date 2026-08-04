@@ -1247,6 +1247,7 @@ export const auditEvents = pgTable(
     entityVersion: integer("entity_version").notNull(),
     reason: text("reason").notNull(),
     requestId: text("request_id").notNull(),
+    policyRevision: text("policy_revision").default("legacy-policy").notNull(),
     detailsRef: text("details_ref"),
     detailsDigest: text("details_digest"),
     retentionUntil: timestamp("retention_until", {
@@ -1291,7 +1292,7 @@ export const auditEvents = pgTable(
     ),
     check(
       "audit_events_identity_chk",
-      sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.action})) BETWEEN 1 AND 200 AND char_length(btrim(${table.entityType})) BETWEEN 1 AND 100 AND ${table.entityVersion} > 0 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200`,
+      sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.action})) BETWEEN 1 AND 200 AND char_length(btrim(${table.entityType})) BETWEEN 1 AND 100 AND ${table.entityVersion} > 0 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000 AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.policyRevision})) BETWEEN 1 AND 100`,
     ),
     check(
       "audit_events_details_chk",

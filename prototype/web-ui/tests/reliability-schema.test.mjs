@@ -85,6 +85,7 @@ test("makes AuditEvent append-only and traceable without embedding artifacts", (
     "entity_version",
     "reason",
     "request_id",
+    "policy_revision",
     "details_ref",
     "details_digest",
     "retention_until",

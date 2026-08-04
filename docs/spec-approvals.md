@@ -12,11 +12,18 @@ then approve, reject, or request changes. Approval produces `approved`; rejectio
 and change requests produce `rejected`, so regeneration appends a new immutable
 revision instead of rewriting the reviewed artifact.
 
-Every command carries the expected SpecRevision version, non-blank reason,
-request ID, idempotency key, overdesign policy revision, and affected element
-identities. The authenticated server context supplies the actor. A stale version,
-changed policy, invalid lifecycle state, unknown element, blank reason, or missing
-permission fails closed.
+Every command implements the shared `ApprovalCommand`: scoped target type and
+ID, expected SpecRevision version, non-blank reason, request ID, idempotency
+key, overdesign policy revision, decision, affected element identities, and a
+bounded domain payload. The authenticated server context supplies the actor.
+A stale version, changed policy, invalid lifecycle state, unknown element,
+blank reason, or missing permission fails closed.
+
+Every success returns the shared `ApprovalReceipt`, including receipt and target
+IDs, prior/current versions, server actor, reason, request ID, policy revision,
+decision, recorded timestamp, and specification-specific result. The same
+receipt is stored with the Outbox event for exact idempotent replay. Approval
+Audit events also persist the evaluated policy revision.
 
 ## Overdesign and scope rules
 
@@ -50,10 +57,13 @@ decision, policy, affected elements, and scope changes.
 - `GET /api/v1/goals/{goalId}/specs/{specRevisionId}/approvals` lists the
   server-authorized approval timeline.
 - `POST /api/v1/goals/{goalId}/specs/{specRevisionId}/approvals` records one
-  transition. It requires same-origin protection, `X-Request-Id`, and
-  `Idempotency-Key`; unknown body fields and any client `actorId` are rejected.
+  transition. The route supplies the target and authenticated actor; the body
+  supplies the remaining command fields. It requires same-origin protection,
+  `X-Request-Id`, and `Idempotency-Key`; unknown body fields and any client
+  `actorId` or target override are rejected.
 
 The implementation has in-memory unit coverage for permission denial, empty
-reasons, optimistic concurrency, policy changes, default Speculative removal,
+reasons, missing command fields, optimistic concurrency, policy changes,
+unified receipts, default Speculative removal,
 Helpful exceptions, scope changes, replay, and history. The PostgreSQL suite
 also verifies the transaction and persisted receipt against the real schema.

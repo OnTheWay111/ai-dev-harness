@@ -302,14 +302,16 @@ export function ClarifyView({
           reason: approvalReason,
           policyRevision: latestSpec.specRevision.overdesignPolicyRevision,
           decision,
-          affectedElementIds: latestSpec.specRevision.overdesignReview.items
+          affectedItemIds: latestSpec.specRevision.overdesignReview.items
             .map(({ elementId }) => elementId),
-          helpfulExceptionElementIds: decision === "approve"
-            ? helpfulExceptions
-            : [],
-          scopeChanges: decision === "request_changes" && scopeChange.value.trim()
-            ? [{ ...scopeChange, value: scopeChange.value.trim() }]
-            : [],
+          payload: {
+            helpfulExceptionElementIds: decision === "approve"
+              ? helpfulExceptions
+              : [],
+            scopeChanges: decision === "request_changes" && scopeChange.value.trim()
+              ? [{ ...scopeChange, value: scopeChange.value.trim() }]
+              : [],
+          },
         },
       );
       const nextSpecs = await goalWorkspaceApi.specTimeline(scope, goal.id);

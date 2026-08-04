@@ -4,8 +4,8 @@ import {
   scopeChangeOperations,
   specApprovalDecisions,
   type ScopeChange,
+  type SpecApprovalCommand,
   type SpecApprovalAuditEvent,
-  type SpecApprovalDecision,
   type SpecApprovalDecisionRecord,
   type SpecApprovalEvent,
   type SpecApprovalReceipt,
@@ -18,23 +18,6 @@ export class SpecApprovalValidationError extends Error {
     super(message);
     this.name = "SpecApprovalValidationError";
   }
-}
-
-export interface SpecApprovalCommand {
-  organizationId: string;
-  projectId: string;
-  goalId: string;
-  specRevisionId: string;
-  expectedVersion: number;
-  actorId: string;
-  reason: string;
-  requestId: string;
-  idempotencyKey: string;
-  policyRevision: string;
-  decision: SpecApprovalDecision;
-  affectedElementIds: readonly string[];
-  helpfulExceptionElementIds: readonly string[];
-  scopeChanges: readonly ScopeChange[];
 }
 
 export interface SpecApprovalAuthorizer {
@@ -92,6 +75,7 @@ async function sha256(value: string): Promise<string> {
 }
 
 function canonical(command: SpecApprovalCommand, normalized: {
+  actorId: string;
   reason: string;
   requestId: string;
   policyRevision: string;
@@ -101,12 +85,9 @@ function canonical(command: SpecApprovalCommand, normalized: {
 }): string {
   return JSON.stringify({
     endpoint: "spec.approval",
-    organizationId: command.organizationId,
-    projectId: command.projectId,
-    goalId: command.goalId,
-    specRevisionId: command.specRevisionId,
+    scope: command.scope,
+    target: command.target,
     expectedVersion: command.expectedVersion,
-    actorId: command.actorId,
     decision: command.decision,
     ...normalized,
   });
@@ -148,8 +129,8 @@ export class SpecApprovalService {
   async decide(command: SpecApprovalCommand): Promise<SpecApprovalReceipt> {
     await this.authorizer.authorize({
       actorId: command.actorId,
-      organizationId: command.organizationId,
-      projectId: command.projectId,
+      organizationId: command.scope.organizationId,
+      projectId: command.scope.projectId,
       permission: "spec.approve",
     });
     if (!Number.isInteger(command.expectedVersion) || command.expectedVersion < 1) {
@@ -158,16 +139,24 @@ export class SpecApprovalService {
     if (!specApprovalDecisions.includes(command.decision)) {
       throw new SpecApprovalValidationError("decision is invalid");
     }
+    if (command.target?.type !== "spec_revision" || !command.target.id) {
+      throw new SpecApprovalValidationError("target must identify a SpecRevision");
+    }
+    if (!command.payload || typeof command.payload !== "object" ||
+      Array.isArray(command.payload)) {
+      throw new SpecApprovalValidationError("payload must be an object");
+    }
     const normalized = {
+      actorId: text(command.actorId, "actorId", 200),
       reason: text(command.reason, "reason"),
       requestId: text(command.requestId, "requestId", 200),
       policyRevision: text(command.policyRevision, "policyRevision", 100),
-      affectedElementIds: ids(command.affectedElementIds, "affectedElementIds"),
+      affectedElementIds: ids(command.affectedItemIds, "affectedItemIds"),
       helpfulExceptionElementIds: ids(
-        command.helpfulExceptionElementIds,
+        command.payload.helpfulExceptionElementIds,
         "helpfulExceptionElementIds",
       ),
-      scopeChanges: changes(command.scopeChanges),
+      scopeChanges: changes(command.payload.scopeChanges),
     };
     const idempotencyKey = text(command.idempotencyKey, "idempotencyKey", 200);
     if (command.decision !== "request_changes" && normalized.scopeChanges.length > 0) {
@@ -175,15 +164,18 @@ export class SpecApprovalService {
     }
     const requestHash = await sha256(canonical(command, normalized));
     const lookup = {
-      organizationId: command.organizationId,
-      actorId: command.actorId,
+      organizationId: command.scope.organizationId,
+      actorId: normalized.actorId,
       endpoint: "spec.approval" as const,
       key: idempotencyKey,
       requestHash,
     };
     const replay = await this.repository.findApprovalReceipt(lookup);
     if (replay) return replay;
-    const current = await this.repository.get(command);
+    const current = await this.repository.get({
+      ...command.scope,
+      specRevisionId: command.target.id,
+    });
     if (!current) throw new SpecApprovalValidationError("SpecRevision was not found");
     if (current.version !== command.expectedVersion) throw new VersionConflictError();
     const expectedStatus = command.decision === "submit_for_review"
@@ -242,13 +234,13 @@ export class SpecApprovalService {
     };
     const decision: SpecApprovalDecisionRecord = {
       id: this.idGenerator(),
-      organizationId: command.organizationId,
-      projectId: command.projectId,
-      goalId: command.goalId,
+      organizationId: command.scope.organizationId,
+      projectId: command.scope.projectId,
+      goalId: command.scope.goalId,
       specRevisionId: current.id,
       subjectVersion: current.version,
       decision: command.decision,
-      actorId: command.actorId,
+      actorId: normalized.actorId,
       reason: normalized.reason,
       requestId: normalized.requestId,
       policyRevision: normalized.policyRevision,
@@ -260,10 +252,22 @@ export class SpecApprovalService {
       createdAt: occurredAtIso,
     };
     const receipt: SpecApprovalReceipt = {
-      specRevision: next,
-      decision,
-      retainedElementIds,
-      removedElementIds,
+      receiptId: this.idGenerator(),
+      target: command.target,
+      previousVersion: current.version,
+      currentVersion: next.version,
+      decision: command.decision,
+      actorId: normalized.actorId,
+      reason: normalized.reason,
+      requestId: normalized.requestId,
+      policyRevision: normalized.policyRevision,
+      recordedAt: occurredAtIso,
+      result: {
+        specRevision: next,
+        decisionRecord: decision,
+        retainedElementIds,
+        removedElementIds,
+      },
     };
     const action = command.decision === "submit_for_review"
       ? "spec.review_submitted" as const
@@ -274,10 +278,10 @@ export class SpecApprovalService {
       : "spec.changes_requested" as const;
     const audit: SpecApprovalAuditEvent = {
       id: this.idGenerator(),
-      organizationId: command.organizationId,
-      projectId: command.projectId,
-      goalId: command.goalId,
-      actorId: command.actorId,
+      organizationId: command.scope.organizationId,
+      projectId: command.scope.projectId,
+      goalId: command.scope.goalId,
+      actorId: normalized.actorId,
       action,
       entityId: current.id,
       entityVersion: next.version,
@@ -288,7 +292,7 @@ export class SpecApprovalService {
     };
     const event: SpecApprovalEvent = {
       id: this.idGenerator(),
-      organizationId: command.organizationId,
+      organizationId: command.scope.organizationId,
       aggregateId: current.id,
       aggregateVersion: next.version,
       type: "spec.approval.recorded",

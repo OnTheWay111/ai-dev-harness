@@ -178,7 +178,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 13);
+  assert.equal(migrations.length, 14);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -516,17 +516,14 @@ integrationTest(
       authorizer: { async authorize() {} },
     });
     const common = {
-      organizationId,
-      projectId,
-      goalId,
-      specRevisionId: generated.specRevision.id,
+      scope: { organizationId, projectId, goalId },
+      target: { type: "spec_revision", id: generated.specRevision.id },
       actorId: "integration-approver",
       reason: "Review exact immutable content",
       requestId: "integration-spec-approval",
       policyRevision: generated.specRevision.overdesignPolicyRevision,
-      affectedElementIds: ["EL-1", "EL-2"],
-      helpfulExceptionElementIds: [],
-      scopeChanges: [],
+      affectedItemIds: ["EL-1", "EL-2"],
+      payload: { helpfulExceptionElementIds: [], scopeChanges: [] },
     };
     const submitted = await approvals.decide({
       ...common,
@@ -534,16 +531,16 @@ integrationTest(
       idempotencyKey: `submit-${suffix}`,
       decision: "submit_for_review",
     });
-    assert.equal(submitted.specRevision.status, "in_review");
+    assert.equal(submitted.result.specRevision.status, "in_review");
     const approved = await approvals.decide({
       ...common,
       expectedVersion: 2,
       idempotencyKey: `approve-${suffix}`,
       decision: "approve",
-      helpfulExceptionElementIds: ["EL-2"],
+      payload: { helpfulExceptionElementIds: ["EL-2"], scopeChanges: [] },
     });
-    assert.equal(approved.specRevision.status, "approved");
-    assert.deepEqual(approved.retainedElementIds, ["EL-1", "EL-2"]);
+    assert.equal(approved.result.specRevision.status, "approved");
+    assert.deepEqual(approved.result.retainedElementIds, ["EL-1", "EL-2"]);
     assert.equal((await approvals.timeline({
       organizationId,
       projectId,

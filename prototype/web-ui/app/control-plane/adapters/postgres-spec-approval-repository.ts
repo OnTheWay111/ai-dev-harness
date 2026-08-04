@@ -237,8 +237,8 @@ export class PostgresSpecApprovalRepository implements SpecApprovalRepository {
         `INSERT INTO audit_events
           (id, organization_id, project_id, goal_id, actor_id, action,
            entity_type, entity_id, entity_version, reason, request_id,
-           retention_until, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'spec_revision',$7,$8,$9,$10,$11,$12)`,
+           policy_revision, retention_until, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,'spec_revision',$7,$8,$9,$10,$11,$12,$13)`,
         [
           audit.id,
           audit.organizationId,
@@ -250,6 +250,7 @@ export class PostgresSpecApprovalRepository implements SpecApprovalRepository {
           audit.entityVersion,
           audit.reason,
           audit.requestId,
+          audit.policyRevision,
           new Date(new Date(audit.createdAt).getTime() + 365 * 24 * 60 * 60 * 1_000),
           new Date(audit.createdAt),
         ],

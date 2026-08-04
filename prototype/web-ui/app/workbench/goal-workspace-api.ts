@@ -252,9 +252,11 @@ export const goalWorkspaceApi = {
       reason: string;
       policyRevision: string;
       decision: SpecApprovalDecision;
-      affectedElementIds: readonly string[];
-      helpfulExceptionElementIds: readonly string[];
-      scopeChanges: readonly ScopeChange[];
+      affectedItemIds: readonly string[];
+      payload: {
+        helpfulExceptionElementIds: readonly string[];
+        scopeChanges: readonly ScopeChange[];
+      };
     },
   ): Promise<SpecApprovalReceipt> {
     return await responseData(await fetch(

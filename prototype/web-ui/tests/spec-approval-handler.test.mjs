@@ -39,15 +39,19 @@ test("approval HTTP boundary requires trusted actor, request ID, idempotency, an
         reason: "Approve the minimum contract",
         policyRevision: "overdesign-policy.v1",
         decision: "approve",
-        affectedElementIds: ["EL-1"],
-        helpfulExceptionElementIds: [],
-        scopeChanges: [],
+        affectedItemIds: ["EL-1"],
+        payload: { helpfulExceptionElementIds: [], scopeChanges: [] },
       }),
     },
   ), ids.goalId, ids.specRevisionId);
   assert.equal(response.status, 200);
   assert.deepEqual(calls, [{
-    ...ids,
+    scope: {
+      organizationId: ids.organizationId,
+      projectId: ids.projectId,
+      goalId: ids.goalId,
+    },
+    target: { type: "spec_revision", id: ids.specRevisionId },
     expectedVersion: 1,
     actorId: "session-approver",
     reason: "Approve the minimum contract",
@@ -55,9 +59,8 @@ test("approval HTTP boundary requires trusted actor, request ID, idempotency, an
     idempotencyKey: "idem-1",
     policyRevision: "overdesign-policy.v1",
     decision: "approve",
-    affectedElementIds: ["EL-1"],
-    helpfulExceptionElementIds: [],
-    scopeChanges: [],
+    affectedItemIds: ["EL-1"],
+    payload: { helpfulExceptionElementIds: [], scopeChanges: [] },
   }]);
 });
 
@@ -110,14 +113,75 @@ test("missing headers, forged actor, and stale versions fail with stable errors"
         reason: "Approve",
         policyRevision: "overdesign-policy.v1",
         decision: "approve",
-        affectedElementIds: [],
-        helpfulExceptionElementIds: [],
-        scopeChanges: [],
+        affectedItemIds: [],
+        payload: { helpfulExceptionElementIds: [], scopeChanges: [] },
       }),
     },
   ), ids.goalId, ids.specRevisionId);
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, "validation_failed");
+  assert.equal(calls, 0);
+});
+
+test("an incomplete or weakly typed approval command never reaches the service", async () => {
+  let calls = 0;
+  const handler = createSpecApprovalHandler({
+    service: {
+      async decide() { calls += 1; },
+      async timeline() { return { decisions: [] }; },
+    },
+    actorResolver: async () => ({ actorId: "session-approver" }),
+    rateLimiter: { consume() {} },
+  });
+  const base = {
+    organizationId: ids.organizationId,
+    projectId: ids.projectId,
+    expectedVersion: 1,
+    reason: "Approve",
+    policyRevision: "overdesign-policy.v1",
+    decision: "approve",
+    affectedItemIds: [],
+    payload: { helpfulExceptionElementIds: [], scopeChanges: [] },
+  };
+  for (const field of [
+    "expectedVersion",
+    "reason",
+    "policyRevision",
+    "decision",
+    "affectedItemIds",
+    "payload",
+  ]) {
+    const body = structuredClone(base);
+    delete body[field];
+    const response = await handler(new Request(
+      `https://control.invalid/api/v1/goals/${ids.goalId}/specs/${ids.specRevisionId}/approvals`,
+      {
+        method: "POST",
+        headers: {
+          origin: "https://control.invalid",
+          "content-type": "application/json",
+          "idempotency-key": `missing-${field}`,
+          "x-request-id": `missing-${field}`,
+        },
+        body: JSON.stringify(body),
+      },
+    ), ids.goalId, ids.specRevisionId);
+    assert.equal(response.status, 400, field);
+  }
+  const weakType = await handler(new Request(
+    `https://control.invalid/api/v1/goals/${ids.goalId}/specs/${ids.specRevisionId}/approvals`,
+    {
+      method: "POST",
+      headers: {
+        origin: "https://control.invalid",
+        "content-type": "application/json",
+        "idempotency-key": "weak-type",
+        "x-request-id": "weak-type",
+      },
+      body: JSON.stringify({ ...base, expectedVersion: "1" }),
+    },
+  ), ids.goalId, ids.specRevisionId);
+  assert.equal(weakType.status, 400);
   assert.equal(calls, 0);
 });
 
