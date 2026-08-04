@@ -181,6 +181,8 @@ documented in [`docs/continuous-integration.md`](docs/continuous-integration.md)
 Authoritative control-plane entities are defined in
 [`../../docs/control-plane-data-dictionary.md`](../../docs/control-plane-data-dictionary.md),
 separately from the replaceable workbench projection.
+Goal, SpecRevision, Issue, and Run lifecycle rules are listed in
+[`../../docs/control-plane-state-machines.md`](../../docs/control-plane-state-machines.md).
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation and calls

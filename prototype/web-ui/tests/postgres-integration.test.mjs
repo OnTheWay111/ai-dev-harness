@@ -11,6 +11,17 @@ import {
 import { PostgresWorkbenchReadRepository } from
   "../app/workbench/server/postgres-workbench-repository.ts";
 import { loadPostgresMigrations } from "../scripts/postgres-migration.ts";
+import {
+  goalStateMachine,
+  issueStateMachine,
+  runStateMachine,
+  specRevisionStateMachine,
+  transitionState,
+} from "../app/control-plane/domain/state-machines.ts";
+import {
+  PostgresVersionedStateStore,
+  VersionConflictError,
+} from "../app/control-plane/adapters/postgres-versioned-state-store.ts";
 
 const databaseUrl = process.env.POSTGRES_INTEGRATION_DATABASE_URL;
 const integrationTest = databaseUrl ? test : test.skip;
@@ -49,7 +60,7 @@ integrationTest("migrates an empty temporary PostgreSQL database", async () => {
   const migrations = loadPostgresMigrations(
     new URL("../drizzle-postgres/", import.meta.url),
   );
-  assert.equal(migrations.length, 4);
+  assert.equal(migrations.length, 5);
   const ledger = await pool.query(
     "SELECT hash, created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at",
   );
@@ -591,6 +602,181 @@ integrationTest(
          VALUES ($1, 'actor-2', '/goals/actions', 'idem-1', $2,
                  '2030-01-01T00:00:00Z')`,
         [organizationId, digest],
+      );
+    } finally {
+      await client.query("ROLLBACK").catch(() => undefined);
+      client.release();
+    }
+  },
+);
+
+integrationTest(
+  "persists guarded state transitions with optimistic versions",
+  async () => {
+    const client = await pool.connect();
+    const store = new PostgresVersionedStateStore(client);
+    const organizationId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+    const goalId = crypto.randomUUID();
+    const specRevisionId = crypto.randomUUID();
+    const issueId = crypto.randomUUID();
+    const runId = crypto.randomUUID();
+    const digest = "c".repeat(64);
+    const occurredAt = new Date("2026-08-04T09:30:00.000Z");
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO organizations (id, slug, name)
+         VALUES ($1, $2, 'State Organization')`,
+        [organizationId, `state-${process.pid}`],
+      );
+      await client.query(
+        `INSERT INTO projects (id, organization_id, slug, name)
+         VALUES ($1, $2, $3, 'State Project')`,
+        [projectId, organizationId, `state-${process.pid}`],
+      );
+      await client.query(
+        `INSERT INTO goals
+           (id, organization_id, project_id, title,
+            problem_statement, desired_outcome)
+         VALUES ($1, $2, $3, 'State Goal', 'Prevent races', 'One transition')`,
+        [goalId, organizationId, projectId],
+      );
+      await client.query(
+        `INSERT INTO spec_revisions
+           (id, organization_id, project_id, goal_id, revision,
+            source_goal_version, artifact_ref, artifact_digest)
+         VALUES ($1, $2, $3, $4, 1, 1, 'artifact://spec/state', $5)`,
+        [specRevisionId, organizationId, projectId, goalId, digest],
+      );
+      await client.query(
+        `INSERT INTO issues
+           (id, organization_id, project_id, goal_id, spec_revision_id,
+            issue_key, revision, title, body_ref, body_digest)
+         VALUES ($1, $2, $3, $4, $5, 'STATE-1', 1,
+                 'State issue', 'artifact://issue/state', $6)`,
+        [issueId, organizationId, projectId, goalId, specRevisionId, digest],
+      );
+      await client.query(
+        `INSERT INTO runs
+           (id, organization_id, project_id, goal_id, issue_id,
+            attempt, request_id)
+         VALUES ($1, $2, $3, $4, $5, 1, 'req-state')`,
+        [runId, organizationId, projectId, goalId, issueId],
+      );
+
+      const goalTransition = transitionState({
+        machine: goalStateMachine,
+        currentState: "draft",
+        currentVersion: 1,
+        expectedVersion: 1,
+        nextState: "clarifying",
+        guards: {},
+      });
+      assert.deepEqual(
+        await store.persist({
+          entity: "goal",
+          id: goalId,
+          organizationId,
+          projectId,
+          expectedVersion: goalTransition.previousVersion,
+          nextState: goalTransition.state,
+          occurredAt,
+        }),
+        { state: "clarifying", version: 2 },
+      );
+      await assert.rejects(
+        () =>
+          store.persist({
+            entity: "goal",
+            id: goalId,
+            organizationId,
+            projectId,
+            expectedVersion: 1,
+            nextState: "planning",
+            occurredAt,
+          }),
+        (error) => error instanceof VersionConflictError,
+      );
+
+      for (const transition of [
+        {
+          machine: specRevisionStateMachine,
+          currentState: "draft",
+          nextState: "in_review",
+          guards: { artifactDigestVerified: true },
+          entity: "specRevision",
+          id: specRevisionId,
+        },
+        {
+          machine: issueStateMachine,
+          currentState: "draft",
+          nextState: "approved",
+          guards: { specApproved: true },
+          entity: "issue",
+          id: issueId,
+        },
+        {
+          machine: runStateMachine,
+          currentState: "queued",
+          nextState: "running",
+          guards: {},
+          entity: "run",
+          id: runId,
+        },
+      ]) {
+        const result = transitionState({
+          machine: transition.machine,
+          currentState: transition.currentState,
+          currentVersion: 1,
+          expectedVersion: 1,
+          nextState: transition.nextState,
+          guards: transition.guards,
+        });
+        assert.equal(
+          (await store.persist({
+            entity: transition.entity,
+            id: transition.id,
+            organizationId,
+            projectId,
+            goalId,
+            expectedVersion: result.previousVersion,
+            nextState: result.state,
+            occurredAt,
+          })).version,
+          2,
+        );
+      }
+      const persisted = await client.query(
+        `SELECT g.status AS goal_status, g.version AS goal_version,
+                sr.status AS spec_status, i.status AS issue_status,
+                r.status AS run_status, r.started_at, r.finished_at
+           FROM goals g
+           JOIN spec_revisions sr ON sr.goal_id = g.id
+           JOIN issues i ON i.spec_revision_id = sr.id
+           JOIN runs r ON r.issue_id = i.id
+          WHERE g.id = $1`,
+        [goalId],
+      );
+      assert.deepEqual(
+        {
+          goalStatus: persisted.rows[0].goal_status,
+          goalVersion: persisted.rows[0].goal_version,
+          specStatus: persisted.rows[0].spec_status,
+          issueStatus: persisted.rows[0].issue_status,
+          runStatus: persisted.rows[0].run_status,
+          hasStarted: persisted.rows[0].started_at instanceof Date,
+          finishedAt: persisted.rows[0].finished_at,
+        },
+        {
+          goalStatus: "clarifying",
+          goalVersion: 2,
+          specStatus: "in_review",
+          issueStatus: "approved",
+          runStatus: "running",
+          hasStarted: true,
+          finishedAt: null,
+        },
       );
     } finally {
       await client.query("ROLLBACK").catch(() => undefined);

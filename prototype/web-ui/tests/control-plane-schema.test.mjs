@@ -78,6 +78,7 @@ test("defines only the P2-01 authoritative control-plane tables", () => {
     "title",
     "problem_statement",
     "desired_outcome",
+    "status",
     "version",
     "created_at",
     "updated_at",

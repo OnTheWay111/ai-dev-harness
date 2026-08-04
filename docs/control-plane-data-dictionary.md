@@ -94,11 +94,15 @@ The authoritative Goal contract core for one Project.
 | `title` | Concise Goal name |
 | `problem_statement` | Problem the Goal exists to address |
 | `desired_outcome` | Observable result the Goal seeks |
+| `status` | `draft`, `clarifying`, `planning`, `approved`, `executing`, `verifying`, `completed`, or `cancelled` |
 | `version` | Positive optimistic-lock version |
 | `created_at`, `updated_at` | Ordered lifecycle timestamps |
 
 `(organization_id, project_id, id)` is unique and is the target of
 AcceptanceCriterion foreign keys.
+
+Allowed transitions, guards, terminal states, and optimistic persistence are
+defined in [Control-plane state machines](control-plane-state-machines.md).
 
 ## `acceptance_criteria`
 

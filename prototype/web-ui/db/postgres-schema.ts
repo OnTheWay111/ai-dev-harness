@@ -22,6 +22,26 @@ import type {
   TaskStage,
   WorkbenchSnapshot,
 } from "../app/workbench/contracts";
+import {
+  goalStatuses,
+  issueStatuses,
+  runStatuses,
+  specRevisionStatuses,
+} from "../app/control-plane/domain/state-machines.ts";
+import type {
+  GoalStatus,
+  IssueStatus,
+  RunStatus,
+  SpecRevisionStatus,
+} from "../app/control-plane/domain/state-machines.ts";
+
+export {
+  goalStatuses,
+  issueStatuses,
+  runStatuses,
+  specRevisionStatuses,
+};
+export type { GoalStatus, IssueStatus, RunStatus, SpecRevisionStatus };
 
 export const repositoryProviders = ["github"] as const;
 export type RepositoryProvider = (typeof repositoryProviders)[number];
@@ -47,35 +67,6 @@ export const decisionSubjectTypes = [
   "issue_plan",
 ] as const;
 export type DecisionSubjectType = (typeof decisionSubjectTypes)[number];
-
-export const specRevisionStatuses = [
-  "draft",
-  "in_review",
-  "approved",
-  "rejected",
-  "superseded",
-] as const;
-export type SpecRevisionStatus = (typeof specRevisionStatuses)[number];
-
-export const issueStatuses = [
-  "draft",
-  "approved",
-  "ready",
-  "in_progress",
-  "blocked",
-  "completed",
-  "cancelled",
-] as const;
-export type IssueStatus = (typeof issueStatuses)[number];
-
-export const runStatuses = [
-  "queued",
-  "running",
-  "succeeded",
-  "failed",
-  "cancelled",
-] as const;
-export type RunStatus = (typeof runStatuses)[number];
 
 export const evidenceKinds = [
   "artifact",
@@ -271,6 +262,7 @@ export const goals = pgTable(
     title: text("title").notNull(),
     problemStatement: text("problem_statement").notNull(),
     desiredOutcome: text("desired_outcome").notNull(),
+    status: text("status").$type<GoalStatus>().default("draft").notNull(),
     version: integer("version").default(1).notNull(),
     createdAt: timestamp("created_at", {
       withTimezone: true,
@@ -309,6 +301,10 @@ export const goals = pgTable(
     check(
       "goals_outcome_length_chk",
       sql`char_length(btrim(${table.desiredOutcome})) BETWEEN 1 AND 10000`,
+    ),
+    check(
+      "goals_status_chk",
+      sql`${table.status} IN ('draft', 'clarifying', 'planning', 'approved', 'executing', 'verifying', 'completed', 'cancelled')`,
     ),
     check("goals_version_positive_chk", sql`${table.version} > 0`),
     check(

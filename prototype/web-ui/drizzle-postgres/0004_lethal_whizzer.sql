@@ -1,0 +1,2 @@
+ALTER TABLE "goals" ADD COLUMN "status" text DEFAULT 'draft' NOT NULL;--> statement-breakpoint
+ALTER TABLE "goals" ADD CONSTRAINT "goals_status_chk" CHECK ("goals"."status" IN ('draft', 'clarifying', 'planning', 'approved', 'executing', 'verifying', 'completed', 'cancelled'));
