@@ -158,7 +158,7 @@ root docs commit        ac233f2
 
 目标：让当前页面在真实数据库上运行，并把数据库接入变成可重复验证的工程能力。
 
-- [ ] **P1-01** 确定开发、测试、预发布三套 PostgreSQL 实例和 Secret 注入方式。
+- [x] **P1-01** 确定开发、测试、预发布三套 PostgreSQL 实例和 Secret 注入方式。（已完成：2026-08-04；实现提交：ai-dev-harness@653d290f0d23e37879341b20f9be30cf02a64ebf）
 
 <details>
 <summary>快捷复制开发提示词 P1-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
