@@ -263,7 +263,7 @@ push 路线图。
 
 </details>
 
-- [ ] **P1-06** 在 CI 中执行 migration drift、数据库集成测试和客户端 Secret 泄漏检查。
+- [x] **P1-06** 在 CI 中执行 migration drift、数据库集成测试和客户端 Secret 泄漏检查。（已完成：2026-08-04；实现提交：ai-dev-harness@a413f40731a2be71601632c8c1fabb5db73837a3）
 
 <details>
 <summary>快捷复制开发提示词 P1-06 · gpt-5.6-terra(均衡) · medium(中等)</summary>
