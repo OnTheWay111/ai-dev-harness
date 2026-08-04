@@ -242,7 +242,7 @@ Lint、构建和全量测试后，按第 2.1 自动 commit/push `main`，再标�
 
 </details>
 
-- [ ] **P1-05** 增加 `/health/ready` 数据库检查和生产环境禁止 Demo 回退的部署校验。
+- [x] **P1-05** 增加 `/health/ready` 数据库检查和生产环境禁止 Demo 回退的部署校验。（已完成：2026-08-04；实现提交：ai-dev-harness@3967572874bc0c612c0579f4f094d844417cb3ab）
 
 <details>
 <summary>快捷复制开发提示词 P1-05 · gpt-5.6-sol(深度) · high(高)</summary>
