@@ -534,7 +534,7 @@ Idempotency-Key 跨用户复用、审计缺字段和被篡改历史；测试必�
 
 目标：在 Web 中把模糊需求转成版本化 Goal Contract。
 
-- [ ] **P4-01** 实现 Goal 创建、编辑、验收标准、非目标和约束 API/UI。
+- [x] **P4-01** 实现 Goal 创建、编辑、验收标准、非目标和约束 API/UI。（已完成：2026-08-04；实现提交：ai-dev-harness@2f2ad88a4486f65b63b6c854b1c4df9e4194a5de）
 
 <details>
 <summary>快捷复制开发提示词 P4-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
