@@ -119,6 +119,10 @@ deny behavior, and role-change Audit transaction are documented in
 - `npm run test:browser:spec-review`: run the HTTPS Chromium review path (run
   `npx playwright install chromium` once on a new development machine)
 - `npm run test:p8`: run projection, task action, realtime, and UI state tests
+- `npm run test:p9`: run immutable Object Store, redaction, independent Review,
+  delivery policy, real isolated Git remote, PR/Landing, and schema tests
+- `npm run test:p9:postgres`: migrate an isolated real PostgreSQL database and
+  verify P9 append-only metadata, Review, delivery receipts, Audit, and replay
 - `npm run test:browser:p8`: run retained-data, empty-state, conflict, and duplicate-click Chromium paths
 - `npm run projector:p8`: run the independent Outbox-driven workbench projector (server-side `DATABASE_URL` required)
 - `npm run test:postgres:integration`: create, migrate, test, and destroy a
@@ -152,11 +156,15 @@ GET  /api/v1/workbench/events?afterRevision=<revision>
 GET  /api/v1/tasks/{taskId}
 POST /api/v1/tasks/{taskId}/actions
 GET  /api/v1/receipts/{receiptId}
+POST /api/v1/artifacts/{artifactId}/download
 ```
 
 SSE contains revision-only invalidation summaries. The browser retains the last successful snapshot, reconnects with
 exponential backoff, and performs an ETag-backed full read after invalidation instead of rebuilding authority locally.
 Task writes return `202` Receipt records without waiting for execution.
+Artifact downloads require a separate authorized POST and return an Object Store
+URL that expires in at most five minutes; object keys are never exposed in the
+workbench projection.
 
 Supported query parameters are `goalId`, `filter`, `cursor`, and `limit`. The
 response implements `workbench.v1`, emits an ETag, identifies the active source
@@ -251,6 +259,9 @@ CSRF/同源校验、严格请求 Schema、大小上限、限流、安全响应�
 [`../../docs/web-security-baseline.md`](../../docs/web-security-baseline.md)。
 真实 PostgreSQL 的匿名、越权、跨项目数量、重复审批、跨用户幂等和 Audit 防篡改覆盖见
 [`../../docs/security-regression-matrix.md`](../../docs/security-regression-matrix.md)。
+P9 的对象存储、证据脱敏、独立 Review、Push 策略、短期凭证和
+Commit→PR→Landing 审计状态流记录在
+[`../../docs/p9-artifact-evidence-git-delivery.md`](../../docs/p9-artifact-evidence-git-delivery.md)。
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation. The P8 Projector

@@ -1,5 +1,6 @@
 import type {
   ApiErrorEnvelope,
+  ArtifactDownloadGrant,
   CommandReceipt,
   ExecuteTaskActionRequest,
   TaskDetailResponse,
@@ -143,6 +144,20 @@ export class HttpWorkbenchApi implements WorkbenchApi {
     );
     if (!response.ok) throw await readError(response);
     return (await response.json()) as CommandReceipt;
+  }
+
+  async createArtifactDownload(
+    artifactId: string,
+  ): Promise<ArtifactDownloadGrant> {
+    const response = await this.fetcher(
+      `${this.basePath}/api/v1/artifacts/${encodeURIComponent(artifactId)}/download`,
+      {
+        method: "POST",
+        headers: { accept: "application/json" },
+      },
+    );
+    if (!response.ok) throw await readError(response);
+    return (await response.json()) as ArtifactDownloadGrant;
   }
 }
 

@@ -1,6 +1,9 @@
 import type { PostgresPool } from
   "../../control-plane/adapters/postgres-goal-repository.ts";
-import type { WorkbenchSnapshot } from "../contracts.ts";
+import type {
+  DeliveryEvidenceSummary,
+  WorkbenchSnapshot,
+} from "../contracts.ts";
 import type {
   WorkbenchProjectionCursor,
   WorkbenchProjectionPublisher,
@@ -107,6 +110,39 @@ interface EvidenceCountRow {
   issue_id: string;
   count: string | number;
   updated_at: Date;
+}
+
+interface ArtifactSummaryRow {
+  issue_id: string;
+  id: string;
+  artifact_kind: DeliveryEvidenceSummary["artifacts"][number]["kind"];
+  digest: string;
+  media_type: string;
+  size_bytes: string | number;
+  created_at: Date;
+}
+
+interface ReviewSummaryRow {
+  issue_id: string;
+  verdict: NonNullable<DeliveryEvidenceSummary["latestReview"]>["verdict"];
+  reviewer_type: NonNullable<DeliveryEvidenceSummary["latestReview"]>["reviewerType"];
+  reviewer_version: string;
+  target_commit_sha: string;
+  reviewed_at: Date;
+}
+
+interface DeliverySummaryRow {
+  issue_id: string;
+  commit_sha: string | null;
+  updated_at: Date;
+  remote_branch: string | null;
+  push_commit_sha: string | null;
+  pushed_at: Date | null;
+  pr_external_id: string | null;
+  pr_url: string | null;
+  pr_status: "open" | "merged" | "closed" | null;
+  landing_commit_sha: string | null;
+  landed_at: Date | null;
 }
 
 interface ProjectionRow {
@@ -247,7 +283,10 @@ export class PostgresWorkbenchProjectionSource
     scope: WorkbenchProjectionScope,
   ): Promise<WorkbenchProjectionFacts> {
     const parameters = [scope.organizationId, scope.projectId];
-    const [goals, issues, dependencies, runs, jobs, nodes, leases, controls, evidence] =
+    const [
+      goals, issues, dependencies, runs, jobs, nodes, leases, controls,
+      evidence, artifactSummaries, reviewSummaries, deliverySummaries,
+    ] =
       await Promise.all([
         this.pool.query<GoalRow>(
           `SELECT id,title,status,version,created_at,updated_at
@@ -326,7 +365,63 @@ export class PostgresWorkbenchProjectionSource
             ORDER BY issue_id`,
           parameters,
         ),
+        this.pool.query<ArtifactSummaryRow>(
+          `SELECT evidence.issue_id,object.id,object.artifact_kind,
+                  object.digest,object.media_type,object.size_bytes,
+                  object.created_at
+             FROM evidence evidence
+             JOIN artifact_objects object
+               ON object.organization_id=evidence.organization_id
+              AND object.project_id=evidence.project_id
+              AND object.object_key=evidence.artifact_ref
+            WHERE evidence.organization_id=$1 AND evidence.project_id=$2
+            ORDER BY evidence.issue_id,object.created_at,object.id`,
+          parameters,
+        ),
+        this.pool.query<ReviewSummaryRow>(
+          `SELECT DISTINCT ON (issue_id)
+                  issue_id,verdict,reviewer_type,reviewer_version,
+                  target_commit_sha,reviewed_at
+             FROM reviews
+            WHERE organization_id=$1 AND project_id=$2
+            ORDER BY issue_id,reviewed_at DESC,id DESC`,
+          parameters,
+        ),
+        this.pool.query<DeliverySummaryRow>(
+          `SELECT DISTINCT ON (candidate.issue_id)
+                  candidate.issue_id,candidate.commit_sha,candidate.updated_at,
+                  push.remote_branch,push.commit_sha AS push_commit_sha,
+                  push.pushed_at,pr.external_id AS pr_external_id,
+                  pr.url AS pr_url,pr.status AS pr_status,
+                  landing.landing_commit_sha,landing.landed_at
+             FROM delivery_candidates candidate
+             LEFT JOIN push_receipts push ON push.candidate_id=candidate.id
+             LEFT JOIN pull_request_receipts pr ON pr.candidate_id=candidate.id
+             LEFT JOIN landing_receipts landing ON landing.candidate_id=candidate.id
+            WHERE candidate.organization_id=$1 AND candidate.project_id=$2
+            ORDER BY candidate.issue_id,candidate.updated_at DESC,candidate.id DESC`,
+          parameters,
+        ),
       ]);
+
+    const artifactMap = new Map<string, DeliveryEvidenceSummary["artifacts"][number][]>();
+    for (const row of artifactSummaries.rows) {
+      const items = artifactMap.get(row.issue_id) ?? [];
+      items.push({
+        id: row.id,
+        kind: row.artifact_kind,
+        digest: row.digest,
+        mediaType: row.media_type,
+        sizeBytes: Number(row.size_bytes),
+        createdAt: row.created_at.toISOString(),
+      });
+      artifactMap.set(row.issue_id, items);
+    }
+    const reviewMap = new Map(reviewSummaries.rows.map((row) => [row.issue_id, row]));
+    const deliveryMap = new Map(deliverySummaries.rows.map((row) => [row.issue_id, row]));
+    const deliveryIssueIds = new Set([
+      ...artifactMap.keys(), ...reviewMap.keys(), ...deliveryMap.keys(),
+    ]);
 
     return {
       scope,
@@ -406,6 +501,55 @@ export class PostgresWorkbenchProjectionSource
         count: Number(row.count),
         updatedAt: row.updated_at.toISOString(),
       })),
+      deliveryEvidence: [...deliveryIssueIds].sort().map((issueId) => {
+        const review = reviewMap.get(issueId);
+        const delivery = deliveryMap.get(issueId);
+        const artifacts = artifactMap.get(issueId) ?? [];
+        const timestamps = [
+          ...artifacts.map((artifact) => artifact.createdAt),
+          review?.reviewed_at.toISOString(),
+          delivery?.updated_at.toISOString(),
+          delivery?.pushed_at?.toISOString(),
+          delivery?.landed_at?.toISOString(),
+        ].filter((value): value is string => Boolean(value)).sort().reverse();
+        return {
+          issueId,
+          updatedAt: timestamps[0] ?? new Date(0).toISOString(),
+          summary: {
+            artifacts,
+            latestReview: review ? {
+              verdict: review.verdict,
+              reviewerType: review.reviewer_type,
+              reviewerVersion: review.reviewer_version,
+              targetCommitSha: review.target_commit_sha,
+              reviewedAt: review.reviewed_at.toISOString(),
+            } : undefined,
+            commitSha: delivery?.commit_sha ?? undefined,
+            push: delivery?.remote_branch && delivery.push_commit_sha &&
+                delivery.pushed_at
+              ? {
+                  remoteBranch: delivery.remote_branch,
+                  commitSha: delivery.push_commit_sha,
+                  pushedAt: delivery.pushed_at.toISOString(),
+                }
+              : undefined,
+            pullRequest: delivery?.pr_external_id && delivery.pr_url &&
+                delivery.pr_status
+              ? {
+                  externalId: delivery.pr_external_id,
+                  url: delivery.pr_url,
+                  status: delivery.pr_status,
+                }
+              : undefined,
+            landing: delivery?.landing_commit_sha && delivery.landed_at
+              ? {
+                  commitSha: delivery.landing_commit_sha,
+                  landedAt: delivery.landed_at.toISOString(),
+                }
+              : undefined,
+          },
+        };
+      }),
     };
   }
 }

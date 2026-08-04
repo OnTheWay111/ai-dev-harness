@@ -93,9 +93,16 @@ export class SchedulerSupervisor {
       external = await this.gateway.start({
         externalTaskId: claimed.externalTaskId,
         externalRunId,
-        selectedSecrets: this.selectedSecrets,
-        timeoutMs: gatewayTimeoutMs(claimed, now),
-      });
+      selectedSecrets: this.selectedSecrets,
+      timeoutMs: gatewayTimeoutMs(claimed, now),
+      artifactContext: claimed.issueId ? {
+        organizationId: claimed.organizationId,
+        projectId: claimed.projectId,
+        goalId: claimed.goalId,
+        issueId: claimed.issueId,
+        runId: claimed.runId,
+      } : undefined,
+    });
     } catch (error) {
       await this.repository.handleStartFailure({
         jobId: claimed.id,

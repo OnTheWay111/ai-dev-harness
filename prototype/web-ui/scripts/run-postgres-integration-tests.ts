@@ -95,7 +95,27 @@ function safeIdentifier(value: string): string {
   return `"${value}"`;
 }
 
-async function runIntegrationTest(url: string): Promise<number> {
+const defaultIntegrationTestFiles = [
+  "tests/postgres-integration.test.mjs",
+  "tests/p7-postgres-integration.test.mjs",
+  "tests/p8-postgres-integration.test.mjs",
+  "tests/p9-postgres-integration.test.mjs",
+  "tests/security-regression-postgres.test.mjs",
+] as const;
+
+function selectIntegrationTestFiles(arguments_: string[]): string[] {
+  if (arguments_.length === 0) return [...defaultIntegrationTestFiles];
+  const allowed = new Set<string>(defaultIntegrationTestFiles);
+  if (arguments_.some((file) => !allowed.has(file))) {
+    throw new Error("Requested PostgreSQL integration test is not allowlisted");
+  }
+  return [...new Set(arguments_)];
+}
+
+async function runIntegrationTest(
+  url: string,
+  testFiles: string[],
+): Promise<number> {
   return await new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
@@ -103,10 +123,7 @@ async function runIntegrationTest(url: string): Promise<number> {
         "--experimental-strip-types",
         "--test",
         "--test-concurrency=1",
-        "tests/postgres-integration.test.mjs",
-        "tests/p7-postgres-integration.test.mjs",
-        "tests/p8-postgres-integration.test.mjs",
-        "tests/security-regression-postgres.test.mjs",
+        ...testFiles,
       ],
       {
         cwd: new URL("..", import.meta.url),
@@ -129,6 +146,8 @@ async function runIntegrationTest(url: string): Promise<number> {
 }
 
 async function main(): Promise<number> {
+  let phase = "startup";
+  const testFiles = selectIntegrationTestFiles(process.argv.slice(2));
   let dataDirectory: string | undefined;
   let adminPool: InstanceType<typeof Pool> | undefined;
   let testPool: InstanceType<typeof Pool> | undefined;
@@ -139,12 +158,14 @@ async function main(): Promise<number> {
   try {
     let adminUrl = process.env.POSTGRES_TEST_ADMIN_URL?.trim();
     if (!adminUrl) {
+      phase = "local_postgres_start";
       const local = await startLocalPostgres();
       adminUrl = local.adminUrl;
       dataDirectory = local.dataDirectory;
     }
     databaseName = `p1_04_${process.pid}_${Date.now()}`;
     const identifier = safeIdentifier(databaseName);
+    phase = "temporary_database_create";
     adminPool = new Pool({ connectionString: adminUrl, max: 1 });
     await adminPool.query(`CREATE DATABASE ${identifier}`);
     testUrl = databaseUrl(adminUrl, databaseName);
@@ -155,6 +176,7 @@ async function main(): Promise<number> {
     if (Number(before.rows[0]?.count) !== 0) {
       throw new Error("Temporary PostgreSQL database is not empty");
     }
+    phase = "schema_migration";
     await testPool.query("CREATE SCHEMA drizzle");
     await testPool.query(`CREATE TABLE drizzle.__drizzle_migrations (
       id serial PRIMARY KEY,
@@ -164,7 +186,8 @@ async function main(): Promise<number> {
     const migrations = loadPostgresMigrations(migrationsDirectory);
     await testPool.query(buildAtomicMigrationSql(migrations));
 
-    const status = await runIntegrationTest(testUrl);
+    phase = "integration_tests";
+    const status = await runIntegrationTest(testUrl, testFiles);
     if (status !== 0) {
       throw new Error("PostgreSQL integration suite failed");
     }
@@ -180,9 +203,10 @@ async function main(): Promise<number> {
       throw new Error("PostgreSQL integration scope cleanup failed");
     }
     passed = true;
+    phase = "complete";
   } catch {
     console.error(
-      "PostgreSQL integration suite failed; connection details were suppressed",
+      `PostgreSQL integration suite failed at ${phase}; connection details were suppressed`,
     );
   } finally {
     if (testPool) {

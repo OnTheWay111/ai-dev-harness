@@ -1,4 +1,5 @@
 import type {
+  DeliveryEvidenceSummary,
   GlobalTask,
   TaskFilterCounts,
   TaskPriority,
@@ -103,6 +104,11 @@ export interface WorkbenchProjectionFacts {
   leases: readonly ExecutionLeaseProjectionFact[];
   controls: readonly ExecutionControlProjectionFact[];
   evidenceCounts: readonly { issueId: string; count: number; updatedAt: string }[];
+  deliveryEvidence?: readonly {
+    issueId: string;
+    summary: DeliveryEvidenceSummary;
+    updatedAt: string;
+  }[];
 }
 
 export interface BuildWorkbenchSnapshotOptions {
@@ -124,6 +130,7 @@ export function workbenchFactsWatermark(
     ...facts.leases.map((fact) => fact.heartbeatAt),
     ...facts.controls.map((fact) => fact.updatedAt),
     ...facts.evidenceCounts.map((fact) => fact.updatedAt),
+    ...(facts.deliveryEvidence ?? []).map((fact) => fact.updatedAt),
   ].filter((value) => Number.isFinite(Date.parse(value)));
   return timestamps.sort(
     (left, right) => Date.parse(right) - Date.parse(left),
@@ -220,6 +227,9 @@ function issueTask(
     ? facts.nodes.find((candidate) => candidate.id === job.nodeId)
     : undefined;
   const evidenceCount = facts.evidenceCounts.find((entry) => entry.issueId === issue.id)?.count ?? 0;
+  const deliveryEvidence = facts.deliveryEvidence?.find((entry) =>
+    entry.issueId === issue.id
+  )?.summary;
   const rankingParts = [
     dueAt ? `截止 ${new Date(dueAt).toISOString()}` : "无明确截止时间",
     blockedTaskCount > 0 ? `阻塞影响 ${blockedTaskCount} 项` : "无下游阻塞",
@@ -295,6 +305,7 @@ function issueTask(
       evidence: `${evidenceCount} 项持久化证据`,
       workspace: node ? `执行节点 ${node.name}` : "未分配隔离工作区",
     },
+    ...(deliveryEvidence ? { deliveryEvidence } : {}),
   };
 }
 

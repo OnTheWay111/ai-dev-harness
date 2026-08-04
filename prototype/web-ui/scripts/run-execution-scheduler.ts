@@ -2,10 +2,14 @@ import pg from "pg";
 
 import { AutoDevCliExecutionGateway } from
   "../app/control-plane/adapters/autodev-cli-execution-gateway.ts";
+import { ArtifactIngestionExecutionSink } from
+  "../app/control-plane/adapters/artifact-ingestion-execution-sink.ts";
 import { AutoDevEventPoller } from
   "../app/control-plane/adapters/autodev-event-poller.ts";
 import { PostgresExecutionEventRepository } from
   "../app/control-plane/adapters/postgres-execution-event-repository.ts";
+import { PostgresEvidenceRepository } from
+  "../app/control-plane/adapters/postgres-evidence-repository.ts";
 import { PostgresSchedulerAdmissionRepository } from
   "../app/control-plane/adapters/postgres-scheduler-admission-repository.ts";
 import { PostgresSchedulerAdmissionSource } from
@@ -18,6 +22,10 @@ import { SchedulerAdmissionService } from
   "../app/control-plane/application/scheduler-admission-service.ts";
 import { SchedulerSupervisor } from
   "../app/control-plane/application/scheduler-supervisor.ts";
+import { ArtifactIngestionService } from
+  "../app/control-plane/application/artifact-ingestion-service.ts";
+import { getArtifactObjectStore } from
+  "../app/control-plane/runtime/artifact-runtime.ts";
 import { resolvePostgresConnection } from
   "../app/workbench/server/postgres-environment.ts";
 
@@ -107,6 +115,12 @@ async function main(): Promise<void> {
       if (!value) throw new Error(`Execution Secret ${name} is not injected`);
       return [name, value];
     })),
+    artifactSink: new ArtifactIngestionExecutionSink(
+      new ArtifactIngestionService({
+        objectStore: getArtifactObjectStore(),
+        repository: new PostgresEvidenceRepository(pool),
+      }),
+    ),
   });
   const intervalMs = positiveInteger("SCHEDULER_INTERVAL_MS", 2_000);
   const heartbeatMs = positiveInteger("EXECUTION_NODE_HEARTBEAT_MS", 15_000);

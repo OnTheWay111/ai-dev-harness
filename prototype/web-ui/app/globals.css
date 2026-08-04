@@ -4804,3 +4804,95 @@ kbd {
   color: var(--teal-700);
   font-weight: 700;
 }
+
+.delivery-evidence-panel {
+  margin-top: 18px;
+}
+
+.delivery-evidence-empty {
+  margin: 0;
+  color: var(--ink-650);
+}
+
+.delivery-evidence-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+  gap: 24px;
+}
+
+.delivery-evidence-grid h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.artifact-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.artifact-list li {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(160px, auto) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.artifact-list span,
+.artifact-list small {
+  display: block;
+}
+
+.artifact-list small,
+.artifact-list code,
+.delivery-chain dd {
+  color: var(--ink-650);
+  font-size: 12px;
+}
+
+.artifact-list button {
+  border: 0;
+  background: transparent;
+  color: var(--teal-700);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.delivery-chain dl {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--line);
+}
+
+.delivery-chain dl > div {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-raised);
+}
+
+.delivery-chain dt,
+.delivery-chain dd {
+  margin: 0;
+}
+
+.delivery-chain dt {
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .delivery-evidence-grid,
+  .artifact-list li {
+    grid-template-columns: 1fr;
+  }
+}

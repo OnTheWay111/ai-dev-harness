@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { ProgressBar, StatusPill } from "./ui";
+import type { GlobalTask } from "../contracts";
+import { DeliveryEvidencePanel } from "./delivery-evidence-panel";
 
 const timelineEvents = [
   { time: "14:32:18", title: "DEV-06 测试进入第 84 项", detail: "worker W1 · npm test", tone: "info" },
@@ -13,9 +15,13 @@ const timelineEvents = [
 export function RunCenterView({
   onVerify,
   notify,
+  tasks,
+  onDownloadArtifact,
 }: {
   onVerify: () => void;
   notify: (message: string) => void;
+  tasks: readonly GlobalTask[];
+  onDownloadArtifact: (artifactId: string) => void;
 }) {
   const [running, setRunning] = useState(true);
   const [progress, setProgress] = useState(62);
@@ -29,6 +35,8 @@ export function RunCenterView({
   }, [running, progress]);
 
   const completed = progress >= 80 ? 6 : 5;
+  const deliveryEvidence = tasks.find((task) => task.deliveryEvidence)
+    ?.deliveryEvidence;
 
   return (
     <div className="screen detail-screen">
@@ -132,6 +140,10 @@ export function RunCenterView({
               <span className="model-badge">强上下文 · 高</span>
             </div>
           </section>
+          <DeliveryEvidencePanel
+            evidence={deliveryEvidence}
+            onDownload={onDownloadArtifact}
+          />
         </main>
 
         <aside className="panel timeline-panel">

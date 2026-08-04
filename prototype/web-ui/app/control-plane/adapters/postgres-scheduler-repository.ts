@@ -16,6 +16,7 @@ interface JobRow {
   project_id: string;
   goal_id: string;
   run_id: string;
+  issue_id: string;
   external_task_id: string;
   required_capability: CapabilityTier;
   state: SchedulerJobState;
@@ -66,7 +67,7 @@ interface LeaseRow {
 }
 
 const jobColumns = `
-  id, organization_id, project_id, goal_id, run_id, external_task_id, required_capability,
+  id, organization_id, project_id, goal_id, issue_id, run_id, external_task_id, required_capability,
   state, phase, priority, attempt, max_attempts, budget, deadline_at, next_attempt_at,
   external_run_id, node_id, lease_token_digest, lease_expires_at, heartbeat_at,
   last_event_sequence, reconciliation_required, failure_code, failure_reason,
@@ -79,6 +80,7 @@ function mapJob(row: JobRow): SchedulerJob {
     projectId: row.project_id,
     goalId: row.goal_id,
     runId: row.run_id,
+    issueId: row.issue_id,
     externalTaskId: row.external_task_id,
     requiredCapability: row.required_capability,
     state: row.state,

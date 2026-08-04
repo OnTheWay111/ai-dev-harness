@@ -10,6 +10,8 @@ import type {
   ExternalExecutionState,
   ExternalExecutionStatus,
 } from "../ports/execution-gateway-port.ts";
+import type { ExecutionArtifactSink } from
+  "../ports/execution-artifact-port.ts";
 
 const SAFE_ENVIRONMENT_KEYS = new Set([
   "PATH",
@@ -66,6 +68,7 @@ export interface AutoDevCliExecutionGatewayOptions {
     create(): Promise<string>;
     cleanup(path: string): Promise<void>;
   };
+  artifactSink?: ExecutionArtifactSink;
 }
 
 function safeEnvironment(
@@ -233,7 +236,7 @@ export class AutoDevCliExecutionGateway implements ExecutionGatewayPort {
       workingDirectory,
     };
     if (!this.customRunner) {
-      this.launchProcess(processRequest, Object.values(secrets));
+      this.launchProcess(processRequest, request, Object.values(secrets));
       return {
         externalRunId: request.externalRunId,
         state: "starting",
@@ -244,6 +247,7 @@ export class AutoDevCliExecutionGateway implements ExecutionGatewayPort {
     let result: ProcessResult;
     try {
       result = await this.runner(processRequest);
+      await this.captureArtifacts(request, result, Object.values(secrets));
     } finally {
       try {
         await this.workspaceManager.cleanup(workingDirectory);
@@ -333,6 +337,7 @@ export class AutoDevCliExecutionGateway implements ExecutionGatewayPort {
 
   private launchProcess(
     request: ProcessRequest,
+    startRequest: ExecutionStartRequest,
     secrets: readonly string[],
   ): void {
     const child = spawn(request.executable, [...request.arguments], {
@@ -370,36 +375,80 @@ export class AutoDevCliExecutionGateway implements ExecutionGatewayPort {
     child.once("close", (code) => {
       clearTimeout(timer);
       this.active.delete(request.cancellationKey);
-      try {
-        this.completed.set(request.cancellationKey, parseStatus(
-          request.cancellationKey,
-          {
-            exitCode: code ?? 1,
-            stdout: stdout.toString("utf8"),
-            stderr: stderr.toString("utf8"),
-            timedOut,
-          },
-          secrets,
-        ));
-      } catch (error) {
-        this.completed.set(request.cancellationKey, {
-          externalRunId: request.cancellationKey,
-          state: "failed",
-          phase: "result",
-          message: redact(
-            error instanceof Error ? error.message : "AutoDev result invalid",
+      const result: ProcessResult = {
+        exitCode: code ?? 1,
+        stdout: stdout.toString("utf8"),
+        stderr: stderr.toString("utf8"),
+        timedOut,
+      };
+      void (async () => {
+        try {
+          await this.captureArtifacts(startRequest, result, secrets);
+          this.completed.set(request.cancellationKey, parseStatus(
+            request.cancellationKey,
+            result,
             secrets,
-          ),
-        });
-      }
-      void this.workspaceManager.cleanup(request.workingDirectory).catch(() => {
-        this.completed.set(request.cancellationKey, {
-          externalRunId: request.cancellationKey,
-          state: "failed",
-          phase: "cleanup",
-          message: "Execution workspace cleanup failed",
-        });
-      });
+          ));
+        } catch (error) {
+          this.completed.set(request.cancellationKey, {
+            externalRunId: request.cancellationKey,
+            state: "failed",
+            phase: "evidence",
+            message: redact(
+              error instanceof Error ? error.message : "Execution evidence failed",
+              secrets,
+            ),
+          });
+        }
+        try {
+          await this.workspaceManager.cleanup(request.workingDirectory);
+        } catch {
+          this.completed.set(request.cancellationKey, {
+            externalRunId: request.cancellationKey,
+            state: "failed",
+            phase: "cleanup",
+            message: "Execution workspace cleanup failed",
+          });
+        }
+      })();
     });
+  }
+
+  private async captureArtifacts(
+    request: ExecutionStartRequest,
+    result: ProcessResult,
+    secrets: readonly string[],
+  ): Promise<void> {
+    const sink = this.options.artifactSink;
+    if (!sink) return;
+    if (!request.artifactContext) {
+      throw new ExecutionPolicyError(
+        "Artifact capture requires authoritative Run context",
+      );
+    }
+    const captures: Promise<void>[] = [];
+    if (result.stdout) {
+      captures.push(sink.capture({
+        context: request.artifactContext,
+        kind: "run_log",
+        mediaType: "text/plain; charset=utf-8",
+        content: result.stdout,
+        createdBy: "execution-gateway",
+        secretValues: secrets,
+      }));
+    }
+    if (result.stderr) {
+      captures.push(sink.capture({
+        context: request.artifactContext,
+        kind: result.exitCode === 0 && !result.timedOut
+          ? "run_log"
+          : "failure_evidence",
+        mediaType: "text/plain; charset=utf-8",
+        content: result.stderr,
+        createdBy: "execution-gateway",
+        secretValues: secrets,
+      }));
+    }
+    await Promise.all(captures);
   }
 }

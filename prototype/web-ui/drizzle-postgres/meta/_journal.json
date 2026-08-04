@@ -127,6 +127,13 @@
       "when": 1785860669111,
       "tag": "0017_superb_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785885264537,
+      "tag": "0018_pale_big_bertha",
+      "breakpoints": true
     }
   ]
 }

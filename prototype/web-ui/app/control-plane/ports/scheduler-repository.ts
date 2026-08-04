@@ -18,6 +18,7 @@ export interface SchedulerJob {
   projectId: string;
   goalId: string;
   runId: string;
+  issueId?: string;
   externalTaskId: string;
   requiredCapability: CapabilityTier;
   state: SchedulerJobState;

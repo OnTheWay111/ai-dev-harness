@@ -92,6 +92,42 @@ export interface GlobalTask {
     evidence: string;
     workspace: string;
   };
+  deliveryEvidence?: DeliveryEvidenceSummary;
+}
+
+export interface DeliveryEvidenceArtifactSummary {
+  id: string;
+  kind: "prompt" | "run_log" | "test_output" | "build_result" | "failure_evidence";
+  digest: string;
+  mediaType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface DeliveryEvidenceSummary {
+  artifacts: readonly DeliveryEvidenceArtifactSummary[];
+  latestReview?: {
+    verdict: "approved" | "request_changes" | "rejected";
+    reviewerType: "human" | "model";
+    reviewerVersion: string;
+    targetCommitSha: string;
+    reviewedAt: string;
+  };
+  commitSha?: string;
+  push?: {
+    remoteBranch: string;
+    commitSha: string;
+    pushedAt: string;
+  };
+  pullRequest?: {
+    externalId: string;
+    url: string;
+    status: "open" | "merged" | "closed";
+  };
+  landing?: {
+    commitSha: string;
+    landedAt: string;
+  };
 }
 
 export type WorkbenchMetricId =
@@ -169,6 +205,13 @@ export interface CommandReceipt {
   };
 }
 
+export interface ArtifactDownloadGrant {
+  artifact: DeliveryEvidenceArtifactSummary;
+  downloadUrl: string;
+  expiresAt: string;
+  requestId: string;
+}
+
 export interface ApiErrorEnvelope {
   error: {
     code:
@@ -199,6 +242,7 @@ export interface WorkbenchApi {
     idempotencyKey: string,
   ): Promise<CommandReceipt>;
   getReceipt(receiptId: string): Promise<CommandReceipt>;
+  createArtifactDownload(artifactId: string): Promise<ArtifactDownloadGrant>;
 }
 
 export interface NavItem {

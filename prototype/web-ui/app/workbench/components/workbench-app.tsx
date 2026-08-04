@@ -61,6 +61,25 @@ export function WorkbenchApp({
     }
   }, []);
 
+  const downloadArtifact = useCallback(async (artifactId: string) => {
+    notify("正在申请最长 5 分钟的授权下载链接");
+    try {
+      const grant = await workbenchApi.createArtifactDownload(artifactId);
+      const anchor = document.createElement("a");
+      anchor.href = grant.downloadUrl;
+      anchor.rel = "noreferrer";
+      anchor.download = "";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      notify("下载授权已创建，链接将在 5 分钟内失效");
+    } catch (error) {
+      notify(error instanceof WorkbenchApiError
+        ? error.envelope.error.message
+        : "Artifact 下载授权创建失败");
+    }
+  }, [notify]);
+
   useEffect(() => {
     let active = true;
     const realtime = new WorkbenchRealtimeClient({
@@ -163,7 +182,14 @@ export function WorkbenchApp({
             notify={notify}
           />
         )}
-        {view === "run" && <RunCenterView onVerify={() => setView("verify")} notify={notify} />}
+        {view === "run" && (
+          <RunCenterView
+            onVerify={() => setView("verify")}
+            notify={notify}
+            tasks={snapshot.tasks}
+            onDownloadArtifact={(artifactId) => void downloadArtifact(artifactId)}
+          />
+        )}
         {view === "verify" && <VerifyView notify={notify} />}
       </div>
       {toast && (

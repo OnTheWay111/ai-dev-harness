@@ -35,6 +35,36 @@ import type {
   SpecRevisionStatus,
 } from "../app/control-plane/domain/state-machines.ts";
 import type { Role } from "../app/auth/role-binding-repository.ts";
+import {
+  artifactKinds,
+  type ArtifactKind,
+} from "../app/control-plane/domain/artifact-evidence.ts";
+import {
+  deliveryCandidateStates,
+  type DeliveryCandidateState,
+} from "../app/control-plane/domain/delivery.ts";
+import {
+  gitCredentialScopes,
+  pushModes,
+  type GitCredentialScope,
+  type PushMode,
+} from "../app/control-plane/domain/delivery-policy.ts";
+import {
+  reviewVerdicts,
+  type ReviewFinding,
+  type ReviewVerdict,
+} from "../app/control-plane/domain/review.ts";
+import type {
+  ArtifactRetentionPolicy,
+} from "../app/control-plane/ports/object-store-port.ts";
+
+export {
+  artifactKinds,
+  deliveryCandidateStates,
+  gitCredentialScopes,
+  pushModes,
+  reviewVerdicts,
+};
 
 export {
   goalStatuses,
@@ -1850,6 +1880,497 @@ export const taskActionReceipts = pgTable(
   ],
 );
 
+export const artifactObjects = pgTable(
+  "artifact_objects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    objectKey: text("object_key").notNull(),
+    digest: text("digest").notNull(),
+    artifactKind: text("artifact_kind").$type<ArtifactKind>().notNull(),
+    mediaType: text("media_type").notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    createdByActorId: text("created_by_actor_id").notNull(),
+    retentionPolicy: text("retention_policy")
+      .$type<ArtifactRetentionPolicy>().notNull(),
+    retentionUntil: timestamp("retention_until", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "artifact_objects_project_fk",
+      columns: [table.organizationId, table.projectId],
+      foreignColumns: [projects.organizationId, projects.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("artifact_objects_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.id,
+    ),
+    uniqueIndex("artifact_objects_scope_digest_uidx").on(
+      table.organizationId, table.projectId, table.artifactKind, table.digest,
+    ),
+    uniqueIndex("artifact_objects_scope_key_uidx").on(
+      table.organizationId, table.projectId, table.objectKey,
+    ),
+    index("artifact_objects_retention_idx").on(
+      table.organizationId, table.retentionUntil,
+    ),
+    check(
+      "artifact_objects_digest_chk",
+      sql`${table.digest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "artifact_objects_kind_chk",
+      sql`${table.artifactKind} IN ('prompt','run_log','test_output','build_result','failure_evidence')`,
+    ),
+    check(
+      "artifact_objects_retention_policy_chk",
+      sql`${table.retentionPolicy} IN ('standard_180d','extended_365d','legal_hold')`,
+    ),
+    check(
+      "artifact_objects_metadata_chk",
+      sql`char_length(btrim(${table.objectKey})) BETWEEN 1 AND 1000 AND char_length(btrim(${table.mediaType})) BETWEEN 1 AND 200 AND char_length(btrim(${table.createdByActorId})) BETWEEN 1 AND 200 AND ${table.sizeBytes} >= 0 AND ${table.retentionUntil} > ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    runId: uuid("run_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    targetCommitSha: text("target_commit_sha").notNull(),
+    verdict: text("verdict").$type<ReviewVerdict>().notNull(),
+    findings: jsonb("findings").$type<ReviewFinding[]>()
+      .default(sql`'[]'::jsonb`).notNull(),
+    builderIdentity: text("builder_identity").notNull(),
+    reviewerType: text("reviewer_type").$type<"human" | "model">().notNull(),
+    reviewerIdentity: text("reviewer_identity").notNull(),
+    reviewerVersion: text("reviewer_version").notNull(),
+    modelCapability: text("model_capability"),
+    reasoningEffort: text("reasoning_effort"),
+    inputArtifactDigests: jsonb("input_artifact_digests").$type<string[]>()
+      .default(sql`'[]'::jsonb`).notNull(),
+    reviewedAt: timestamp("reviewed_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "reviews_run_issue_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.issueId,
+        table.runId,
+      ],
+      foreignColumns: [
+        runs.organizationId, runs.projectId, runs.goalId, runs.issueId, runs.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("reviews_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.issueId,
+      table.runId, table.id,
+    ),
+    uniqueIndex("reviews_run_idempotency_uidx").on(
+      table.organizationId, table.runId, table.idempotencyKey,
+    ),
+    index("reviews_commit_verdict_idx").on(
+      table.organizationId, table.projectId, table.issueId,
+      table.targetCommitSha, table.verdict,
+    ),
+    check(
+      "reviews_commit_digest_chk",
+      sql`${table.targetCommitSha} ~ '^([0-9a-f]{40}|[0-9a-f]{64})$' AND ${table.requestHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "reviews_verdict_chk",
+      sql`${table.verdict} IN ('approved','request_changes','rejected')`,
+    ),
+    check(
+      "reviews_reviewer_chk",
+      sql`${table.reviewerType} IN ('human','model') AND char_length(btrim(${table.builderIdentity})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reviewerIdentity})) BETWEEN 1 AND 200 AND lower(btrim(${table.builderIdentity})) <> lower(btrim(${table.reviewerIdentity})) AND char_length(btrim(${table.reviewerVersion})) BETWEEN 1 AND 200 AND ((${table.reviewerType}='human' AND ${table.modelCapability} IS NULL AND ${table.reasoningEffort} IS NULL) OR (${table.reviewerType}='model' AND ${table.modelCapability} IN ('cost_optimized','general_coding','advanced_coding','frontier') AND ${table.reasoningEffort} IN ('low','medium','high','highest')))`,
+    ),
+    check(
+      "reviews_evidence_chk",
+      sql`jsonb_typeof(${table.findings})='array' AND jsonb_typeof(${table.inputArtifactDigests})='array' AND jsonb_array_length(${table.inputArtifactDigests}) > 0`,
+    ),
+    check(
+      "reviews_identity_version_chk",
+      sql`char_length(btrim(${table.idempotencyKey})) BETWEEN 8 AND 200 AND ${table.version} > 0 AND ${table.reviewedAt} >= ${table.createdAt} AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const credentialReferences = pgTable(
+  "credential_references",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    repositoryId: uuid("repository_id").notNull(),
+    provider: text("provider").$type<"github_app" | "git_token">().notNull(),
+    externalReference: text("external_reference").notNull(),
+    allowedScopes: jsonb("allowed_scopes").$type<GitCredentialScope[]>()
+      .default(sql`'[]'::jsonb`).notNull(),
+    active: boolean("active").default(true).notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "credential_references_repository_fk",
+      columns: [table.organizationId, table.projectId, table.repositoryId],
+      foreignColumns: [
+        repositories.organizationId, repositories.projectId, repositories.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("credential_references_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.repositoryId, table.id,
+    ),
+    uniqueIndex("credential_references_external_uidx").on(
+      table.organizationId, table.projectId, table.repositoryId,
+      table.externalReference,
+    ),
+    check(
+      "credential_references_provider_chk",
+      sql`${table.provider} IN ('github_app','git_token')`,
+    ),
+    check(
+      "credential_references_metadata_chk",
+      sql`char_length(${table.externalReference}) BETWEEN 18 AND 1000 AND ${table.externalReference} ~ '^secret-manager://[A-Za-z0-9][A-Za-z0-9._:/-]*$' AND jsonb_typeof(${table.allowedScopes})='array' AND ${table.version} > 0 AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const deliveryPolicies = pgTable(
+  "delivery_policies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    repositoryId: uuid("repository_id").notNull(),
+    pushMode: text("push_mode").$type<PushMode>()
+      .default("push_disabled").notNull(),
+    baselineBranch: text("baseline_branch").notNull(),
+    branchPrefix: text("branch_prefix").default("autodev/").notNull(),
+    protectedBranches: jsonb("protected_branches").$type<string[]>()
+      .default(sql`'["main"]'::jsonb`).notNull(),
+    credentialReferenceId: uuid("credential_reference_id"),
+    revision: integer("revision").notNull(),
+    changedByActorId: text("changed_by_actor_id").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "delivery_policies_repository_fk",
+      columns: [table.organizationId, table.projectId, table.repositoryId],
+      foreignColumns: [
+        repositories.organizationId, repositories.projectId, repositories.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "delivery_policies_credential_fk",
+      columns: [
+        table.organizationId, table.projectId, table.repositoryId,
+        table.credentialReferenceId,
+      ],
+      foreignColumns: [
+        credentialReferences.organizationId, credentialReferences.projectId,
+        credentialReferences.repositoryId, credentialReferences.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("delivery_policies_repository_revision_uidx").on(
+      table.organizationId, table.projectId, table.repositoryId, table.revision,
+    ),
+    check(
+      "delivery_policies_mode_chk",
+      sql`${table.pushMode} IN ('push_disabled','push_branch','push_and_open_pr')`,
+    ),
+    check(
+      "delivery_policies_credential_chk",
+      sql`(${table.pushMode}='push_disabled' AND ${table.credentialReferenceId} IS NULL) OR (${table.pushMode}<>'push_disabled' AND ${table.credentialReferenceId} IS NOT NULL)`,
+    ),
+    check(
+      "delivery_policies_metadata_chk",
+      sql`char_length(btrim(${table.baselineBranch})) BETWEEN 1 AND 255 AND char_length(btrim(${table.branchPrefix})) BETWEEN 1 AND 255 AND jsonb_typeof(${table.protectedBranches})='array' AND ${table.revision} > 0 AND char_length(btrim(${table.changedByActorId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reason})) BETWEEN 1 AND 4000 AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const deliveryCandidates = pgTable(
+  "delivery_candidates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    repositoryId: uuid("repository_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    issueId: uuid("issue_id").notNull(),
+    runId: uuid("run_id").notNull(),
+    worktreeRef: text("worktree_ref").notNull(),
+    baselineBranch: text("baseline_branch").notNull(),
+    baselineSha: text("baseline_sha").notNull(),
+    branch: text("branch").notNull(),
+    commitMessage: text("commit_message").notNull(),
+    commitSha: text("commit_sha"),
+    reviewId: uuid("review_id"),
+    state: text("state").$type<DeliveryCandidateState>()
+      .default("verified").notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "delivery_candidates_repository_fk",
+      columns: [table.organizationId, table.projectId, table.repositoryId],
+      foreignColumns: [
+        repositories.organizationId, repositories.projectId, repositories.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "delivery_candidates_run_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.issueId,
+        table.runId,
+      ],
+      foreignColumns: [
+        runs.organizationId, runs.projectId, runs.goalId, runs.issueId, runs.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "delivery_candidates_review_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.issueId,
+        table.runId, table.reviewId,
+      ],
+      foreignColumns: [
+        reviews.organizationId, reviews.projectId, reviews.goalId,
+        reviews.issueId, reviews.runId, reviews.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("delivery_candidates_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.id,
+    ),
+    uniqueIndex("delivery_candidates_run_uidx").on(table.runId),
+    uniqueIndex("delivery_candidates_branch_uidx").on(
+      table.organizationId, table.projectId, table.repositoryId, table.branch,
+    ),
+    check(
+      "delivery_candidates_state_chk",
+      sql`${table.state} IN ('verified','committed','reviewed','local_ready','branch_pushed','pr_open','landing','landed','failed')`,
+    ),
+    check(
+      "delivery_candidates_sha_chk",
+      sql`${table.baselineSha} ~ '^([0-9a-f]{40}|[0-9a-f]{64})$' AND (${table.commitSha} IS NULL OR ${table.commitSha} ~ '^([0-9a-f]{40}|[0-9a-f]{64})$')`,
+    ),
+    check(
+      "delivery_candidates_commit_state_chk",
+      sql`(${table.state}='verified' AND ${table.commitSha} IS NULL AND ${table.reviewId} IS NULL) OR (${table.state}<>'verified' AND ${table.commitSha} IS NOT NULL)`,
+    ),
+    check(
+      "delivery_candidates_metadata_chk",
+      sql`char_length(btrim(${table.worktreeRef})) BETWEEN 1 AND 1000 AND char_length(btrim(${table.baselineBranch})) BETWEEN 1 AND 255 AND char_length(btrim(${table.branch})) BETWEEN 1 AND 255 AND char_length(btrim(${table.commitMessage})) BETWEEN 1 AND 4000 AND ${table.version} > 0 AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const pushReceipts = pgTable(
+  "push_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    candidateId: uuid("candidate_id").notNull(),
+    operationKey: text("operation_key").notNull(),
+    externalReceiptId: text("external_receipt_id").notNull(),
+    remoteName: text("remote_name").notNull(),
+    remoteBranch: text("remote_branch").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    pushedAt: timestamp("pushed_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "push_receipts_candidate_fk",
+      columns: [table.organizationId, table.projectId, table.candidateId],
+      foreignColumns: [
+        deliveryCandidates.organizationId, deliveryCandidates.projectId,
+        deliveryCandidates.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("push_receipts_candidate_operation_uidx").on(
+      table.candidateId, table.operationKey,
+    ),
+    uniqueIndex("push_receipts_candidate_uidx").on(table.candidateId),
+    check("push_receipts_sha_chk", sql`${table.commitSha} ~ '^([0-9a-f]{40}|[0-9a-f]{64})$'`),
+    check("push_receipts_metadata_chk", sql`char_length(btrim(${table.operationKey})) BETWEEN 8 AND 300 AND char_length(btrim(${table.externalReceiptId})) BETWEEN 1 AND 300 AND char_length(btrim(${table.remoteName})) BETWEEN 1 AND 100 AND char_length(btrim(${table.remoteBranch})) BETWEEN 1 AND 255 AND ${table.pushedAt} >= ${table.createdAt}`),
+  ],
+);
+
+export const pullRequestReceipts = pgTable(
+  "pull_request_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    candidateId: uuid("candidate_id").notNull(),
+    operationKey: text("operation_key").notNull(),
+    externalId: text("external_id").notNull(),
+    url: text("url").notNull(),
+    headBranch: text("head_branch").notNull(),
+    baseBranch: text("base_branch").notNull(),
+    status: text("status").default("open").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "pull_request_receipts_candidate_fk",
+      columns: [table.organizationId, table.projectId, table.candidateId],
+      foreignColumns: [
+        deliveryCandidates.organizationId, deliveryCandidates.projectId,
+        deliveryCandidates.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("pull_request_receipts_candidate_operation_uidx").on(
+      table.candidateId, table.operationKey,
+    ),
+    uniqueIndex("pull_request_receipts_external_uidx").on(
+      table.organizationId, table.externalId,
+    ),
+    check("pull_request_receipts_status_chk", sql`${table.status} IN ('open','merged','closed')`),
+    check("pull_request_receipts_metadata_chk", sql`char_length(btrim(${table.operationKey})) BETWEEN 8 AND 300 AND char_length(btrim(${table.externalId})) BETWEEN 1 AND 300 AND ${table.url} ~ '^https://' AND char_length(btrim(${table.headBranch})) BETWEEN 1 AND 255 AND char_length(btrim(${table.baseBranch})) BETWEEN 1 AND 255 AND ${table.updatedAt} >= ${table.createdAt}`),
+  ],
+);
+
+export const landingReceipts = pgTable(
+  "landing_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    candidateId: uuid("candidate_id").notNull(),
+    operationKey: text("operation_key").notNull(),
+    externalId: text("external_id").notNull(),
+    landingCommitSha: text("landing_commit_sha").notNull(),
+    landedAt: timestamp("landed_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "landing_receipts_candidate_fk",
+      columns: [table.organizationId, table.projectId, table.candidateId],
+      foreignColumns: [
+        deliveryCandidates.organizationId, deliveryCandidates.projectId,
+        deliveryCandidates.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("landing_receipts_candidate_operation_uidx").on(
+      table.candidateId, table.operationKey,
+    ),
+    uniqueIndex("landing_receipts_candidate_uidx").on(table.candidateId),
+    check("landing_receipts_sha_chk", sql`${table.landingCommitSha} ~ '^([0-9a-f]{40}|[0-9a-f]{64})$'`),
+    check("landing_receipts_metadata_chk", sql`char_length(btrim(${table.operationKey})) BETWEEN 8 AND 300 AND char_length(btrim(${table.externalId})) BETWEEN 1 AND 300 AND ${table.landedAt} >= ${table.createdAt}`),
+  ],
+);
+
+export const deliveryOperationReceipts = pgTable(
+  "delivery_operation_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    candidateId: uuid("candidate_id").notNull(),
+    operationKey: text("operation_key").notNull(),
+    candidateVersion: integer("candidate_version").notNull(),
+    candidateSnapshot: jsonb("candidate_snapshot")
+      .$type<import("../app/control-plane/domain/delivery.ts").DeliveryCandidate>()
+      .notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "delivery_operation_receipts_candidate_fk",
+      columns: [table.organizationId, table.projectId, table.candidateId],
+      foreignColumns: [
+        deliveryCandidates.organizationId, deliveryCandidates.projectId,
+        deliveryCandidates.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("delivery_operation_receipts_candidate_key_uidx").on(
+      table.candidateId, table.operationKey,
+    ),
+    check(
+      "delivery_operation_receipts_identity_chk",
+      sql`char_length(btrim(${table.operationKey})) BETWEEN 8 AND 300 AND ${table.candidateVersion} > 0`,
+    ),
+  ],
+);
+
 export const evidence = pgTable(
   "evidence",
   {
@@ -2167,6 +2688,24 @@ export type IssueDependency = typeof issueDependencies.$inferSelect;
 export type NewIssueDependency = typeof issueDependencies.$inferInsert;
 export type Run = typeof runs.$inferSelect;
 export type NewRun = typeof runs.$inferInsert;
+export type ArtifactObject = typeof artifactObjects.$inferSelect;
+export type NewArtifactObject = typeof artifactObjects.$inferInsert;
+export type Review = typeof reviews.$inferSelect;
+export type NewReview = typeof reviews.$inferInsert;
+export type CredentialReferenceRecord = typeof credentialReferences.$inferSelect;
+export type NewCredentialReferenceRecord = typeof credentialReferences.$inferInsert;
+export type DeliveryPolicyRecord = typeof deliveryPolicies.$inferSelect;
+export type NewDeliveryPolicyRecord = typeof deliveryPolicies.$inferInsert;
+export type DeliveryCandidateRecord = typeof deliveryCandidates.$inferSelect;
+export type NewDeliveryCandidateRecord = typeof deliveryCandidates.$inferInsert;
+export type PushReceiptRecord = typeof pushReceipts.$inferSelect;
+export type NewPushReceiptRecord = typeof pushReceipts.$inferInsert;
+export type PullRequestReceiptRecord = typeof pullRequestReceipts.$inferSelect;
+export type NewPullRequestReceiptRecord = typeof pullRequestReceipts.$inferInsert;
+export type LandingReceiptRecord = typeof landingReceipts.$inferSelect;
+export type NewLandingReceiptRecord = typeof landingReceipts.$inferInsert;
+export type DeliveryOperationReceiptRecord = typeof deliveryOperationReceipts.$inferSelect;
+export type NewDeliveryOperationReceiptRecord = typeof deliveryOperationReceipts.$inferInsert;
 export type Evidence = typeof evidence.$inferSelect;
 export type NewEvidence = typeof evidence.$inferInsert;
 export type AuditEvent = typeof auditEvents.$inferSelect;
