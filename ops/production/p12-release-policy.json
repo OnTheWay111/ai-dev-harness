@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "harness.p12-release-policy.v1",
+  "canary": {
+    "minimumContinuousHours": 48,
+    "maximumEvidenceWindowMinutes": 60,
+    "projectClassification": "internal-low-risk",
+    "stopOnSeverities": ["P0", "P1"],
+    "requiresGoalVerification": true,
+    "restartClockAfterStop": true
+  },
+  "productionGates": [
+    "browser-e2e",
+    "identity-security",
+    "autodev-authorization",
+    "model-routing-write",
+    "supply-chain",
+    "git-traceability",
+    "recovery-stop",
+    "observability-oncall",
+    "canary-goal-verification",
+    "defect-budget"
+  ],
+  "signatureRoles": [
+    "security",
+    "operations",
+    "product",
+    "project-owner"
+  ],
+  "signature": {
+    "authenticationMethod": "oidc",
+    "bindsCanonicalEvidenceDigest": true,
+    "requiresAuditReceipt": true,
+    "distinctSignerPerRole": true
+  },
+  "defects": {
+    "p0Maximum": 0,
+    "p1Maximum": 0,
+    "p2RequiresOwner": true,
+    "p2RequiresWorkaround": true
+  }
+}
