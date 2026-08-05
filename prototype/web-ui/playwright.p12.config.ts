@@ -4,7 +4,7 @@ const baseURL = "https://localhost:4175";
 
 export default defineConfig({
   testDir: "./tests/browser",
-  testMatch: "p12-main-path.spec.ts",
+  testMatch: "p12-*.spec.ts",
   fullyParallel: false,
   workers: 1,
   timeout: 90_000,

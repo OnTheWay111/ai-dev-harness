@@ -70,6 +70,7 @@ async function startPostgresBridge(
   const port = await freePort();
   const token = randomUUID();
   const sessions = new Map<string, PoolClient>();
+  let transientFailures = 0;
   const server: HttpServer = createHttpServer((request, response) => {
     void (async () => {
       response.setHeader("content-type", "application/json");
@@ -98,6 +99,11 @@ async function startPostgresBridge(
         response.end(JSON.stringify({ result: { sessionId } }));
         return;
       }
+      if (body.operation === "fail_next_query") {
+        transientFailures += 1;
+        response.end(JSON.stringify({ result: { pending: transientFailures } }));
+        return;
+      }
       if (body.operation === "release" && typeof body.sessionId === "string") {
         const client = sessions.get(body.sessionId);
         if (client) {
@@ -109,6 +115,13 @@ async function startPostgresBridge(
       }
       if (body.operation === "query" && typeof body.text === "string" &&
         Array.isArray(body.values)) {
+        if (transientFailures > 0) {
+          transientFailures -= 1;
+          response.writeHead(503).end(JSON.stringify({
+            error: "simulated transient database failure",
+          }));
+          return;
+        }
         const executor = typeof body.sessionId === "string"
           ? sessions.get(body.sessionId)
           : pool;
