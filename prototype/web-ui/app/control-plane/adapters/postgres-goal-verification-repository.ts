@@ -594,12 +594,14 @@ implements GoalVerificationRepository {
       }
       await client.query(
         `INSERT INTO idempotency_records
-         (id,organization_id,actor_id,endpoint,key,request_hash,status,expires_at)
-         VALUES ($1,$2,$3,'delivery_report.accept',$4,$5,'in_progress',$6)`,
+         (id,organization_id,actor_id,endpoint,key,request_hash,status,expires_at,
+          created_at,updated_at)
+         VALUES ($1,$2,$3,'delivery_report.accept',$4,$5,'in_progress',$6,$7,$7)`,
         [
           randomUUID(), input.current.organizationId, actorId,
           input.idempotencyKey, input.requestHash,
           new Date(Date.parse(input.accepted.generatedAt) + 24 * 60 * 60 * 1_000),
+          input.accepted.generatedAt,
         ],
       );
       const latest = await client.query<ReportRow>(

@@ -53,6 +53,8 @@ import {
   getIssuePlanRepository,
   getIssuePlanService,
 } from "./issue-plan-runtime.ts";
+import { usesP12ContractAdapters } from
+  "../testing/p12-runtime-config.ts";
 
 let repository: GoalVerificationRepository | undefined;
 let planService: AcceptanceVerificationPlanService | undefined;
@@ -122,12 +124,13 @@ export function getGoalVerificationRepository(): GoalVerificationRepository {
 export function getAcceptanceVerificationPlanService() {
   if (planService) return planService;
   const demo = usesDemoGoalWorkspace();
-  const commands = demo ? [] : verificationCommands();
+  const deterministic = demo || usesP12ContractAdapters();
+  const commands = deterministic ? [] : verificationCommands();
   planService = new AcceptanceVerificationPlanService({
     repository: getGoalVerificationRepository(),
     goals: getGoalWorkspaceRepository(),
     issuePlans: getIssuePlanRepository(),
-    catalog: demo
+    catalog: deterministic
       ? new StaticVerificationReferenceCatalog({
           command: ["command:test:p10"],
           query: builtInVerificationQueries,
@@ -145,28 +148,32 @@ export function getAcceptanceVerificationPlanService() {
 export function getGoalVerificationService() {
   if (verificationService) return verificationService;
   const demo = usesDemoGoalWorkspace();
-  const commands = demo ? [] : verificationCommands();
+  const contract = usesP12ContractAdapters();
+  const deterministic = demo || contract;
+  const commands = deterministic ? [] : verificationCommands();
   verificationService = new GoalVerificationService({
     repository: getGoalVerificationRepository(),
     goals: getGoalWorkspaceRepository(),
-    deterministicVerifier: demo
+    deterministicVerifier: deterministic
       ? new DemoDeterministicVerifierAdapter()
       : new PostgresDeterministicVerifier({
           pool: getGoalWorkspacePool(),
           commands,
         }),
-    verifier: demo
+    verifier: deterministic
       ? new DemoGoalVerifierAdapter()
       : new CodexGoalVerifierAdapter({
           model: process.env.CODEX_GOAL_VERIFIER_MODEL?.trim() || undefined,
         }),
     issuePlans: getIssuePlanRepository(),
     authorizer: authorizer(),
-    builderIdentitySource: demo
-      ? { async list() { return ["demo-builder"]; } }
+    builderIdentitySource: deterministic
+      ? { async list() { return ["p12-contract-builder"]; } }
       : new PostgresBuilderIdentitySource(getGoalWorkspacePool()),
     verifierIdentity: process.env.GOAL_VERIFIER_IDENTITY?.trim() ||
-      (demo ? "demo-goal-verifier" : "codex-goal-verifier"),
+      (contract
+        ? "p12-contract-goal-verifier"
+        : demo ? "demo-goal-verifier" : "codex-goal-verifier"),
     verifierVersion: "goal-verifier.v1",
   });
   return verificationService;
@@ -186,9 +193,10 @@ export function getVerificationGapService() {
 
 export function getDeliveryReportService() {
   const demo = usesDemoGoalWorkspace();
+  const deterministic = demo || usesP12ContractAdapters();
   reportService ??= new DeliveryReportService({
     repository: getGoalVerificationRepository(),
-    source: demo
+    source: deterministic
       ? new DemoDeliveryReportSource({
           goals: getGoalWorkspaceRepository(),
           issuePlans: getIssuePlanRepository(),

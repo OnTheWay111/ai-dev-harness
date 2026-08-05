@@ -1,4 +1,4 @@
-import { Pool } from "@neondatabase/serverless";
+import { Pool as NeonPool } from "@neondatabase/serverless";
 
 import { PostgresRoleBindingRepository } from "../../auth/postgres-role-binding-repository.ts";
 import { PolicyEvaluator } from "../../auth/rbac-policy.ts";
@@ -22,6 +22,10 @@ import type {
   GoalWorkspaceAuthorizer,
   GoalWorkspaceRepository,
 } from "../ports/goal-workspace-repository.ts";
+import { usesP12ContractAdapters } from
+  "../testing/p12-runtime-config.ts";
+import { P12PostgresHttpPool } from
+  "../testing/p12-postgres-http-pool.ts";
 
 export interface DefaultGoalWorkspaceScope {
   organizationId: string;
@@ -41,7 +45,9 @@ function getPool(): GoalWorkspacePool {
   if (pool) return pool;
   const databaseUrl = runtimeConfig().databaseUrl?.trim();
   if (!databaseUrl) throw new Error("DATABASE_URL is required for Goal Workspace");
-  pool = new Pool({ connectionString: databaseUrl }) as unknown as GoalWorkspacePool;
+  pool = usesP12ContractAdapters()
+    ? new P12PostgresHttpPool() as unknown as GoalWorkspacePool
+    : new NeonPool({ connectionString: databaseUrl }) as unknown as GoalWorkspacePool;
   return pool;
 }
 

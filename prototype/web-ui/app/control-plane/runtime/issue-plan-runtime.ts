@@ -38,6 +38,8 @@ import {
   getSpecArtifactStore,
   getSpecRevisionRepository,
 } from "./spec-generation-runtime.ts";
+import { usesP12ContractAdapters } from
+  "../testing/p12-runtime-config.ts";
 
 let repository: IssuePlanRepository | undefined;
 let planService: IssuePlanService | undefined;
@@ -86,19 +88,21 @@ export function getIssuePlanService(): IssuePlanService {
 export function getIssuePlanGenerationService(): IssuePlanGenerationService {
   if (!generationService) {
     const demo = usesDemoGoalWorkspace();
+    const contract = usesP12ContractAdapters();
+    const deterministic = demo || contract;
     generationService = new IssuePlanGenerationService({
       goals: getGoalWorkspaceRepository(),
       specifications: specificationRepository(),
       artifacts: getSpecArtifactStore(),
-      planner: demo
+      planner: deterministic
         ? new DemoIssuePlannerAdapter()
         : new CodexPlannerAdapter({ model: process.env.CODEX_PLANNER_MODEL?.trim() }),
       plans: getIssuePlanService(),
       authorizer: authorizer(),
       plannerConfiguration: {
-        adapter: demo ? "demo" : "codex",
-        modelProfile: demo
-          ? "deterministic-demo"
+        adapter: contract ? "p12-contract" : demo ? "demo" : "codex",
+        modelProfile: deterministic
+          ? "deterministic-contract"
           : process.env.CODEX_PLANNER_MODEL?.trim() || "configured-planner",
         schemaVersion: "issue-plan-draft.v1",
       },

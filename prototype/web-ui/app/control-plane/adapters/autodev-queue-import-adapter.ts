@@ -36,7 +36,7 @@ function waveFor(plan: IssuePlan, issueKey: string): number {
 export class AutoDevQueueImportAdapter implements QueueProjectionPort {
   private readonly endpoint: string;
   private readonly token: string;
-  private readonly fetcher: typeof fetch;
+  private readonly fetcher?: typeof fetch;
   private readonly clock: () => Date;
 
   constructor(input: {
@@ -47,7 +47,7 @@ export class AutoDevQueueImportAdapter implements QueueProjectionPort {
   }) {
     this.endpoint = input.endpoint.trim();
     this.token = input.token.trim();
-    this.fetcher = input.fetch ?? fetch;
+    this.fetcher = input.fetch;
     this.clock = input.clock ?? (() => new Date());
   }
 
@@ -67,7 +67,7 @@ export class AutoDevQueueImportAdapter implements QueueProjectionPort {
     ]));
     let response: Response;
     try {
-      response = await this.fetcher(this.endpoint, {
+      response = await (this.fetcher ?? globalThis.fetch)(this.endpoint, {
         method: "POST",
         headers: {
           authorization: `Bearer ${this.token}`,

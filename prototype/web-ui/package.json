@@ -19,6 +19,7 @@
     "monitor:p11": "node --experimental-strip-types scripts/run-alert-monitor.ts",
     "test:p11": "node --experimental-strip-types --test tests/p11-*.test.mjs",
     "test:p12:contracts": "node --experimental-strip-types --test tests/p12-contract-environment.test.mjs",
+    "test:p12:browser": "node --experimental-strip-types scripts/run-p12-browser-e2e.ts",
     "recovery:fixture:p11": "node --experimental-strip-types scripts/prepare-recovery-drill-fixture.ts",
     "recovery:drill:p11": "node --experimental-strip-types scripts/run-recovery-drill.ts",
     "recovery:check:p11": "node --experimental-strip-types scripts/check-recovery-policy.ts",

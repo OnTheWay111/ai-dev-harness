@@ -43,6 +43,7 @@ export default defineConfig(async () => {
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
   const e2eHttps = process.env.HARNESS_E2E_HTTPS === "true";
+  const p12Contract = process.env.HARNESS_P12_CONTRACT_ADAPTERS === "enabled";
   const basicSsl = e2eHttps
     ? (await import("@vitejs/plugin-basic-ssl")).default()
     : null;
@@ -72,6 +73,20 @@ export default defineConfig(async () => {
               OIDC_ALLOWED_RETURN_TO_PATHS:
                 process.env.OIDC_ALLOWED_RETURN_TO_PATHS,
               HARNESS_ALLOWED_ORIGINS: process.env.HARNESS_ALLOWED_ORIGINS,
+              ...(p12Contract ? {
+                DATABASE_URL: process.env.DATABASE_URL,
+                WORKBENCH_SCOPE_ID: process.env.WORKBENCH_SCOPE_ID,
+                HARNESS_P12_CONTRACT_ADAPTERS:
+                  process.env.HARNESS_P12_CONTRACT_ADAPTERS,
+                P12_POSTGRES_BRIDGE_URL:
+                  process.env.P12_POSTGRES_BRIDGE_URL,
+                P12_POSTGRES_BRIDGE_TOKEN:
+                  process.env.P12_POSTGRES_BRIDGE_TOKEN,
+                AUTODEV_QUEUE_IMPORT_URL:
+                  process.env.AUTODEV_QUEUE_IMPORT_URL,
+                AUTODEV_QUEUE_IMPORT_TOKEN:
+                  process.env.AUTODEV_QUEUE_IMPORT_TOKEN,
+              } : {}),
             },
           } : {}),
         },

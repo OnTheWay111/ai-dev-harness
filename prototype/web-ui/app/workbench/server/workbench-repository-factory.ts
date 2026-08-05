@@ -3,7 +3,18 @@ import {
   NeonActorVisibilityResolver,
   NeonWorkbenchReadStore,
 } from "./neon-workbench-store.ts";
+import type { Pool } from "pg";
+import { PostgresRoleBindingRepository } from
+  "../../auth/postgres-role-binding-repository.ts";
 import type { ActorVisibilityResolver } from "../../auth/visibility-scope.ts";
+import { RoleBindingVisibilityResolver } from
+  "../../auth/visibility-scope.ts";
+import { usesP12ContractAdapters } from
+  "../../control-plane/testing/p12-runtime-config.ts";
+import { P12PostgresHttpPool } from
+  "../../control-plane/testing/p12-postgres-http-pool.ts";
+import { NodePostgresWorkbenchReadStore } from
+  "./node-postgres-workbench-store.ts";
 import {
   resolveWorkbenchDeploymentConfig,
 } from "./postgres-environment.ts";
@@ -21,6 +32,13 @@ export interface WorkbenchRepositoryConfig {
   mode: WorkbenchDataSourceMode;
   databaseUrl?: string;
   scopeId?: string;
+}
+
+let p12Pool: P12PostgresHttpPool | undefined;
+
+function getP12Pool(): P12PostgresHttpPool {
+  p12Pool ??= new P12PostgresHttpPool();
+  return p12Pool;
 }
 
 export function selectWorkbenchDataSource(
@@ -49,8 +67,11 @@ export function createWorkbenchRepository(
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required for PostgreSQL workbench data");
   }
-  const database = createNeonWorkbenchDatabase(databaseUrl);
-  const store = new NeonWorkbenchReadStore(database);
+  const store = usesP12ContractAdapters()
+    ? new NodePostgresWorkbenchReadStore(
+        getP12Pool() as unknown as Pool,
+      )
+    : new NeonWorkbenchReadStore(createNeonWorkbenchDatabase(databaseUrl));
   return new PostgresWorkbenchReadRepository(
     store,
     config.scopeId?.trim() || "default",
@@ -125,8 +146,12 @@ export function getWorkbenchVisibilityResolver(): ActorVisibilityResolver {
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required for PostgreSQL visibility");
   }
-  visibilityResolver = new NeonActorVisibilityResolver(
-    createNeonWorkbenchDatabase(databaseUrl),
-  );
+  visibilityResolver = usesP12ContractAdapters()
+    ? new RoleBindingVisibilityResolver(
+        new PostgresRoleBindingRepository(getP12Pool()),
+      )
+    : new NeonActorVisibilityResolver(
+        createNeonWorkbenchDatabase(databaseUrl),
+      );
   return visibilityResolver;
 }

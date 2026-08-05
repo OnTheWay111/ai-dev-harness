@@ -17,6 +17,8 @@ import {
   getGoalWorkspaceRepository,
   usesDemoGoalWorkspace,
 } from "./goal-workspace-runtime.ts";
+import { usesP12ContractAdapters } from
+  "../testing/p12-runtime-config.ts";
 
 let service: SpecGenerationService | undefined;
 let repository: SpecRevisionRepository | undefined;
@@ -24,7 +26,7 @@ let artifacts: ArtifactStore | undefined;
 
 export function getSpecArtifactStore(): ArtifactStore {
   if (artifacts) return artifacts;
-  if (usesDemoGoalWorkspace()) {
+  if (usesDemoGoalWorkspace() || usesP12ContractAdapters()) {
     artifacts = new MemoryArtifactStore();
     return artifacts;
   }
@@ -53,9 +55,11 @@ function getAuthorizer(): SpecGenerationAuthorizer {
 export function getSpecGenerationService(): SpecGenerationService {
   if (service) return service;
   const demo = usesDemoGoalWorkspace();
+  const contract = usesP12ContractAdapters();
+  const deterministic = demo || contract;
   const modelProfile = process.env.CODEX_PLANNER_MODEL?.trim() || "configured-planner";
   service = new SpecGenerationService({
-    planner: demo
+    planner: deterministic
       ? new DemoSpecPlannerAdapter()
       : new CodexPlannerAdapter({ model: process.env.CODEX_PLANNER_MODEL?.trim() }),
     artifacts: getSpecArtifactStore(),
@@ -63,8 +67,8 @@ export function getSpecGenerationService(): SpecGenerationService {
     goals: getGoalWorkspaceRepository(),
     authorizer: getAuthorizer(),
     plannerConfiguration: {
-      adapter: demo ? "demo" : "codex",
-      modelProfile: demo ? "deterministic-demo" : modelProfile,
+      adapter: contract ? "p12-contract" : demo ? "demo" : "codex",
+      modelProfile: deterministic ? "deterministic-contract" : modelProfile,
       schemaVersion: "spec-bundle.v1",
     },
   });

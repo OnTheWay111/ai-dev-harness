@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { OidcService } from "../app/auth/oidc-service.ts";
+import { usesP12ContractAdapters } from
+  "../app/control-plane/testing/p12-runtime-config.ts";
+import { P12PostgresHttpPool } from
+  "../app/control-plane/testing/p12-postgres-http-pool.ts";
 import { validateGoalVerifierOutput } from
   "../app/control-plane/domain/goal-verification.ts";
 import { validatePlannerClarificationOutput } from
@@ -109,6 +113,45 @@ test("P12 fakes replay versioned recorded fixtures through production contracts"
     transactionCookie: started.transactionCookie,
   });
   assert.equal((await oidc.readSession(completed.sessionCookie))?.subject, fixture.oidc.subject);
+});
+
+test("P12 contract adapters fail closed outside an isolated non-production database", () => {
+  assert.equal(usesP12ContractAdapters({}), false);
+  assert.equal(usesP12ContractAdapters({
+    NODE_ENV: "test",
+    HARNESS_P12_CONTRACT_ADAPTERS: "enabled",
+    WORKBENCH_DATA_SOURCE: "postgres",
+    DATABASE_URL: "postgresql://fixture.invalid/p12",
+  }), true);
+  assert.throws(() => usesP12ContractAdapters({
+    NODE_ENV: "production",
+    HARNESS_P12_CONTRACT_ADAPTERS: "enabled",
+    WORKBENCH_DATA_SOURCE: "postgres",
+    DATABASE_URL: "postgresql://fixture.invalid/p12",
+  }), /forbidden in production/i);
+  assert.throws(() => usesP12ContractAdapters({
+    NODE_ENV: "test",
+    HARNESS_P12_CONTRACT_ADAPTERS: "enabled",
+    WORKBENCH_DATA_SOURCE: "demo",
+  }), /isolated PostgreSQL/i);
+
+  const isolated = {
+    NODE_ENV: "test",
+    HARNESS_P12_CONTRACT_ADAPTERS: "enabled",
+    WORKBENCH_DATA_SOURCE: "postgres",
+    DATABASE_URL: "postgresql://fixture.invalid/p12",
+  };
+  assert.throws(() => new P12PostgresHttpPool(isolated), /URL and token/i);
+  assert.throws(() => new P12PostgresHttpPool({
+    ...isolated,
+    P12_POSTGRES_BRIDGE_URL: "https://database.example.invalid/query",
+    P12_POSTGRES_BRIDGE_TOKEN: "fixture-token",
+  }), /loopback HTTP/i);
+  assert.doesNotThrow(() => new P12PostgresHttpPool({
+    ...isolated,
+    P12_POSTGRES_BRIDGE_URL: "http://127.0.0.1:54321/query",
+    P12_POSTGRES_BRIDGE_TOKEN: "fixture-token",
+  }));
 });
 
 test("P12 fakes program timeout, invalid output, duplicates, disorder, and partial failure", async () => {
