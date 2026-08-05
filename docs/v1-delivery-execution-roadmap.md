@@ -1317,7 +1317,7 @@ P10-04 为 `[x]（已完成）`并提交、push 路线图。
 
 目标：让系统可监控、可恢复、可回滚。
 
-- [ ] **P11-01** 贯通 request/goal/issue/run/receipt ID 的结构化日志、指标和 Trace。
+- [x] **P11-01** 贯通 request/goal/issue/run/receipt ID 的结构化日志、指标和 Trace。（已完成：2026-08-05；实现提交：ai-dev-harness@6370914d16480938801615c196c7d8c06d966794）
 
 <details>
 <summary>快捷复制开发提示词 P11-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
