@@ -1357,7 +1357,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P11-03** 配置数据库备份、Artifact 保留、RPO/RTO，并完成一次恢复演练。
+- [x] **P11-03** 配置数据库备份、Artifact 保留、RPO/RTO，并完成一次恢复演练。（已完成：2026-08-05；实现提交：ai-dev-harness@6fc7fe8adc5cadcc9f61080765f1f333b270640c）
 
 <details>
 <summary>快捷复制开发提示词 P11-03 · gpt-5.6-sol(深度) · high(高)</summary>
