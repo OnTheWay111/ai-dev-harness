@@ -1525,6 +1525,9 @@ Worktree、开发、测试、Review、Commit/Push/PR；再注入 Worker 失联�
 
 - [ ] **P12-05** 选择低风险内部项目 Canary，连续 48 小时无 P0/P1 问题。
 
+> 开发门禁已就绪（ai-dev-harness@c4230cf394d86354d8e7b8b262b61c8c7e91dc47）：强制连续 48 小时证据窗口、
+> P0/P1=0、P2 owner/规避方案和 Goal Verification；真实内部项目 owner 尚未提供，故保持未完成。
+
 <details>
 <summary>快捷复制开发提示词 P12-05 · gpt-5.6-terra(均衡) · medium(中等)</summary>
 
@@ -1544,6 +1547,9 @@ Runbook 和候选项目约束。由有权限负责人选定低风险内部 Canar
 </details>
 
 - [ ] **P12-06** 完成安全、运维、产品和项目负责人签字，逐项关闭 Production Gate。
+
+> 发布策略、十项 checklist 和四角色 OIDC/Audit Receipt/digest 签署门禁已实现
+>（ai-dev-harness@c4230cf394d86354d8e7b8b262b61c8c7e91dc47）；Canary 与真实签署未完成，故保持未完成。
 
 <details>
 <summary>快捷复制开发提示词 P12-06 · gpt-5.6-terra(均衡) · medium(中等)</summary>
