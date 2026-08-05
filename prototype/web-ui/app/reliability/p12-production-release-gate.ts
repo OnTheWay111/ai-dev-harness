@@ -145,10 +145,9 @@ function validateSignatures(
 ): number {
   const signatures = array(value, "signatures");
   if (signatures.length !== P12_RELEASE_SIGNATURE_ROLES.length) {
-    throw new Error("Production V1 requires exactly four role signatures");
+    throw new Error("Production V1 requires exactly one owner signature");
   }
   const seenRoles = new Set<string>();
-  const seenSigners = new Set<string>();
   for (const [index, value] of signatures.entries()) {
     const signature = object(value, `signatures[${index}]`);
     const role = string(signature.role, `signatures[${index}].role`);
@@ -157,12 +156,8 @@ function validateSignatures(
         seenRoles.has(role)) {
       throw new Error("Production V1 signatures have a missing or duplicate role");
     }
-    const signer = id(signature.signerId, `signatures[${index}].signerId`, true);
-    if (seenSigners.has(signer)) {
-      throw new Error("Each Production V1 role must have a distinct signer");
-    }
+    id(signature.signerId, `signatures[${index}].signerId`, true);
     seenRoles.add(role);
-    seenSigners.add(signer);
     const signedAt = timestamp(signature.signedAt, `signatures[${index}].signedAt`);
     if (signedAt < evaluatedAt) throw new Error("signature predates final gate evaluation");
     if (signedAt > now.getTime()) throw new Error("signature timestamp is in the future");

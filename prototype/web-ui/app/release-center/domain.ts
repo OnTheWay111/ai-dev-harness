@@ -151,7 +151,7 @@ export interface CanaryReport {
     stopRunbook: string;
   };
   observation: {
-    requiredDurationHours: 48;
+    requiredDurationHours: 12;
     startedAt: string;
     endedAt: string;
     windows: Array<Omit<CanaryWindow, "attempt" | "recordedBy">>;
@@ -467,9 +467,9 @@ export function finalizeCanary(
   }
   const windows = value.windows.filter((window) => window.attempt === value.attempt);
   const endedAt = windows.at(-1)?.endedAt;
-  if (!endedAt || windows.length < 48 ||
-    Date.parse(endedAt) - Date.parse(value.startedAt) < 48 * HOUR_MS) {
-    throw new ReleaseCenterValidationError("Canary requires 48 continuous hours");
+  if (!endedAt || windows.length < 12 ||
+    Date.parse(endedAt) - Date.parse(value.startedAt) < 12 * HOUR_MS) {
+    throw new ReleaseCenterValidationError("Canary requires 12 continuous hours");
   }
   const events = value.events.filter((event) => event.attempt === value.attempt);
   const defects = events.filter((event): event is CanaryDefectEvent => event.kind === "defect");
@@ -501,7 +501,7 @@ export function finalizeCanary(
       stopRunbook: value.stopRunbook,
     },
     observation: {
-      requiredDurationHours: 48,
+      requiredDurationHours: 12,
       startedAt: value.startedAt,
       endedAt,
       windows: windows.map((window) => ({
@@ -771,9 +771,6 @@ export function signProductionRelease(
   if (value.signatures.some(({ role }) => role === input.role)) {
     throw new ReleaseCenterValidationError("signature role is already approved");
   }
-  if (value.signatures.some((signature) => signature.signerId === signerId)) {
-    throw new ReleaseCenterValidationError("Production signatures require distinct actors");
-  }
   const reason = required(input.reason, "reason");
   if (reason.length < 20) throw new ReleaseCenterValidationError("signature reason is too short");
   const signature: ProductionSignature = {
@@ -806,11 +803,11 @@ export function signProductionRelease(
 
 export function canaryProgress(value: CanaryAggregate): {
   completedHours: number;
-  requiredHours: 48;
+  requiredHours: 12;
   windowCount: number;
 } {
   const windows = value.windows.filter((window) => window.attempt === value.attempt);
   const completedHours = windows.reduce((total, window) =>
     total + (Date.parse(window.endedAt) - Date.parse(window.startedAt)) / HOUR_MS, 0);
-  return { completedHours, requiredHours: 48, windowCount: windows.length };
+  return { completedHours, requiredHours: 12, windowCount: windows.length };
 }

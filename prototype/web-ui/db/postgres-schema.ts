@@ -3168,7 +3168,7 @@ export const productionGateChecks = pgTable(
     ),
     check(
       "production_gate_checks_role_chk",
-      sql`${table.ownerRole} IN ('security','operations','product','project-owner') AND jsonb_typeof(${table.evidenceRefs})='array' AND jsonb_array_length(${table.evidenceRefs}) > 0 AND char_length(btrim(${table.checkedBy})) BETWEEN 1 AND 200 AND ${table.updatedAt} >= ${table.createdAt}`,
+      sql`${table.ownerRole} IN ('owner','security','operations','product','project-owner') AND jsonb_typeof(${table.evidenceRefs})='array' AND jsonb_array_length(${table.evidenceRefs}) > 0 AND char_length(btrim(${table.checkedBy})) BETWEEN 1 AND 200 AND ${table.updatedAt} >= ${table.createdAt}`,
     ),
   ],
 );
@@ -3217,7 +3217,7 @@ export const productionReleaseSignatures = pgTable(
     ),
     check(
       "production_release_signatures_role_chk",
-      sql`${table.role} IN ('security','operations','product','project-owner') AND ${table.decision}='approved' AND ${table.authenticationMethod}='oidc'`,
+      sql`${table.role} IN ('owner','security','operations','product','project-owner') AND ${table.decision}='approved' AND ${table.authenticationMethod}='oidc'`,
     ),
     check(
       "production_release_signatures_identity_chk",

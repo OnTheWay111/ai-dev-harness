@@ -26,7 +26,7 @@ function command(actorId, key, reason = `Authorized P12 release command ${key}`)
   };
 }
 
-test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release", {
+test("PostgreSQL persists the complete Canary, ten-gate, and one-owner release", {
   skip: !process.env.POSTGRES_INTEGRATION_DATABASE_URL,
 }, async () => {
   const pool = new Pool({
@@ -38,12 +38,7 @@ test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release
     projectId: randomUUID(),
   };
   const goalId = randomUUID();
-  const actors = {
-    security: "oidc_release_security",
-    operations: "oidc_release_operations",
-    product: "oidc_release_product",
-    "project-owner": "oidc_release_project_owner",
-  };
+  const owner = "oidc_release_owner";
   let now = START;
   try {
     await pool.query(
@@ -64,12 +59,7 @@ test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release
                'Approve only digest-bound evidence','completed',$4,$4)`,
       [goalId, scope.organizationId, scope.projectId, START],
     );
-    const bindings = [
-      [actors.security, "organization_owner", null],
-      [actors.operations, "operator", scope.projectId],
-      [actors.product, "approver", scope.projectId],
-      [actors["project-owner"], "project_admin", scope.projectId],
-    ];
+    const bindings = [[owner, "organization_owner", null]];
     for (const [actorId, role, projectId] of bindings) {
       await pool.query(
         `INSERT INTO role_bindings
@@ -97,19 +87,19 @@ test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release
       goalContractVersion: 7,
       allowedAreas: ["documentation"],
       excludedAreas: ["production-data"],
-      successConditions: ["Goal Verification passed", "No P0/P1 for 48 hours"],
+      successConditions: ["Goal Verification passed", "No P0/P1 for 12 hours"],
       stopConditions: ["Any P0/P1", "owner requests Stop"],
       rollbackRunbook: "docs/runbooks/deployment-rollback-upgrade.md",
       stopRunbook: "docs/runbooks/execution-stop-worker-loss.md",
-      ...command(actors.operations, "create"),
+      ...command(owner, "create"),
     });
     canary = await service.approveCanary({
       ...scope,
       canaryId: canary.id,
       expectedVersion: canary.version,
-      ...command(actors["project-owner"], "approve"),
+      ...command(owner, "approve"),
     });
-    for (let index = 0; index < 48; index += 1) {
+    for (let index = 0; index < 12; index += 1) {
       now = new Date(START.getTime() + (index + 1) * HOUR);
       canary = await service.recordCanaryWindow({
         ...scope,
@@ -124,16 +114,16 @@ test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release
           p1Count: 0,
           evidenceRefs: [`metric-window:${index + 1}`],
         },
-        ...command(actors.operations, `window-${index + 1}`),
+        ...command(owner, `window-${index + 1}`),
       });
     }
-    now = new Date(START.getTime() + 49 * HOUR);
+    now = new Date(START.getTime() + 13 * HOUR);
     const verificationId = randomUUID();
     const passed = finalizeCanary(canary, {
       verification: {
         id: verificationId,
         verdict: "passed",
-        verifiedAt: new Date(START.getTime() + 47 * HOUR).toISOString(),
+        verifiedAt: new Date(START.getTime() + 11 * HOUR).toISOString(),
         evidenceRefs: [`goal-verification:${verificationId}`],
       },
       now,
@@ -143,7 +133,7 @@ test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release
       expectedVersion: canary.version,
       command: {
         ...scope,
-        ...command(actors.operations, "finalize-fixture"),
+        ...command(owner, "finalize-fixture"),
         requestHash: "c".repeat(64),
         endpoint: "release.canary.finalize",
         auditId: randomUUID(),
@@ -157,7 +147,7 @@ test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release
     let release = await service.createProductionRelease({
       ...scope,
       canaryId: canary.id,
-      ...command(actors.operations, "create-release"),
+      ...command(owner, "create-release"),
     });
     const gateIds = [
       "browser-e2e", "identity-security", "autodev-authorization",
@@ -165,51 +155,47 @@ test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release
       "recovery-stop", "observability-oncall", "canary-goal-verification",
       "defect-budget",
     ];
-    const roles = ["security", "operations", "product", "project-owner"];
     for (const [index, gateId] of gateIds.entries()) {
-      const ownerRole = roles[index % roles.length];
-      now = new Date(START.getTime() + 49 * HOUR + (index + 1) * 1_000);
+      now = new Date(START.getTime() + 13 * HOUR + (index + 1) * 1_000);
       release = await service.recordProductionGate({
         ...scope,
         releaseId: release.id,
         expectedVersion: release.version,
         gateId,
-        ownerRole,
+        ownerRole: "owner",
         evidenceRefs: [`gate-receipt:${gateId}`],
-        ...command(actors[ownerRole], `gate-${index + 1}`),
+        ...command(owner, `gate-${index + 1}`),
       });
     }
-    now = new Date(START.getTime() + 50 * HOUR);
+    now = new Date(START.getTime() + 14 * HOUR);
     release = await service.evaluateProductionRelease({
       ...scope,
       releaseId: release.id,
       expectedVersion: release.version,
-      ...command(actors.operations, "evaluate"),
+      ...command(owner, "evaluate"),
     });
-    for (const [index, role] of roles.entries()) {
-      now = new Date(START.getTime() + 50 * HOUR + (index + 1) * 1_000);
-      release = await service.signProductionRelease({
-        ...scope,
-        releaseId: release.id,
-        expectedVersion: release.version,
-        role,
-        ...command(
-          actors[role],
-          `sign-${role}`,
-          `Approved ${role} after reviewing all Production V1 release evidence.`,
-        ),
-      });
-    }
+    now = new Date(START.getTime() + 14 * HOUR + 1_000);
+    release = await service.signProductionRelease({
+      ...scope,
+      releaseId: release.id,
+      expectedVersion: release.version,
+      role: "owner",
+      ...command(
+        owner,
+        "sign-owner",
+        "The owner approved all Production V1 release evidence.",
+      ),
+    });
     assert.equal(release.status, "approved");
     const replay = await service.signProductionRelease({
       ...scope,
       releaseId: release.id,
-      expectedVersion: release.version - 4,
-      role: "security",
+      expectedVersion: release.version - 1,
+      role: "owner",
       ...command(
-        actors.security,
-        "sign-security",
-        "Approved security after reviewing all Production V1 release evidence.",
+        owner,
+        "sign-owner",
+        "The owner approved all Production V1 release evidence.",
       ),
     });
     assert.equal(replay.signatures.length, 1);
@@ -227,12 +213,12 @@ test("PostgreSQL persists the complete Canary, ten-gate, and four-signer release
     );
     assert.deepEqual(proof.rows[0], {
       canaries: 1,
-      windows: 48,
+      windows: 12,
       releases: 1,
       gates: 10,
-      signatures: 4,
-      audits: 67,
-      outbox: 67,
+      signatures: 1,
+      audits: 28,
+      outbox: 28,
     });
     await assert.rejects(
       pool.query(

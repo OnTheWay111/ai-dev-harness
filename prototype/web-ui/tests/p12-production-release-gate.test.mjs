@@ -8,8 +8,8 @@ import {
 
 const HOUR = 60 * 60 * 1000;
 const START = Date.parse("2026-08-05T00:00:00.000Z");
-const NOW = new Date(START + 51 * HOUR);
-const ROLES = ["security", "operations", "product", "project-owner"];
+const NOW = new Date(START + 15 * HOUR);
+const ROLES = ["owner"];
 const GATES = [
   "browser-e2e",
   "identity-security",
@@ -48,10 +48,10 @@ function canary() {
       stopRunbook: "docs/runbooks/execution-stop-worker-loss.md",
     },
     observation: {
-      requiredDurationHours: 48,
+      requiredDurationHours: 12,
       startedAt: new Date(START).toISOString(),
-      endedAt: new Date(START + 48 * HOUR).toISOString(),
-      windows: Array.from({ length: 48 }, (_, index) => ({
+      endedAt: new Date(START + 12 * HOUR).toISOString(),
+      windows: Array.from({ length: 12 }, (_, index) => ({
         sequence: index + 1,
         startedAt: new Date(START + index * HOUR).toISOString(),
         endedAt: new Date(START + (index + 1) * HOUR).toISOString(),
@@ -67,7 +67,7 @@ function canary() {
     goalVerification: {
       status: "passed",
       verificationId: "verification-canary-01",
-      completedAt: new Date(START + 47 * HOUR).toISOString(),
+      completedAt: new Date(START + 11 * HOUR).toISOString(),
       evidenceRefs: ["artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     },
     gaps: [],
@@ -81,13 +81,13 @@ function unsignedRelease() {
     releaseId: "production-v1-20260807-01",
     target: "production-v1",
     candidateCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    evaluatedAt: new Date(START + 49 * HOUR).toISOString(),
+    evaluatedAt: new Date(START + 13 * HOUR).toISOString(),
     canary: canary(),
     gates: GATES.map((gateId, index) => ({
       gateId,
       status: "passed",
-      ownerRole: index % 2 === 0 ? "security" : "operations",
-      checkedAt: new Date(START + (48 * HOUR) + index * 60_000).toISOString(),
+      ownerRole: "owner",
+      checkedAt: new Date(START + (12 * HOUR) + index * 60_000).toISOString(),
       evidenceRefs: [`gate-receipt:${gateId}`],
     })),
     defects: {
@@ -112,7 +112,7 @@ function release() {
   value.signatures = ROLES.map((role, index) => ({
     role,
     signerId: `${role}-owner-01`,
-    signedAt: new Date(START + 50 * HOUR + index * 60_000).toISOString(),
+    signedAt: new Date(START + 14 * HOUR + index * 60_000).toISOString(),
     decision: "approved",
     reason: `Approved ${role} Production V1 gate after evidence review.`,
     authenticationMethod: "oidc",
@@ -123,10 +123,10 @@ function release() {
   return value;
 }
 
-test("accepts all Production V1 gates and four digest-bound OIDC signatures", () => {
+test("accepts all Production V1 gates and one digest-bound OIDC owner signature", () => {
   const result = validateP12ProductionReleaseGate(release(), { now: NOW });
   assert.equal(result.gateCount, 10);
-  assert.equal(result.signatureCount, 4);
+  assert.equal(result.signatureCount, 1);
   assert.match(result.attestationDigest, /^[0-9a-f]{64}$/);
 });
 
@@ -154,12 +154,12 @@ test("rejects P0/P1 and ownerless P2 defects", () => {
 test("rejects missing, placeholder, future, or unbound signatures", () => {
   const missing = release();
   missing.signatures.pop();
-  assert.throws(() => validateP12ProductionReleaseGate(missing, { now: NOW }), /signatures/);
+  assert.throws(() => validateP12ProductionReleaseGate(missing, { now: NOW }), /owner signature/);
   const placeholder = release();
   placeholder.signatures[0].signerId = "test-user";
   assert.throws(() => validateP12ProductionReleaseGate(placeholder, { now: NOW }), /signer/);
   const future = release();
-  future.signatures[0].signedAt = new Date(START + 52 * HOUR).toISOString();
+  future.signatures[0].signedAt = new Date(START + 16 * HOUR).toISOString();
   assert.throws(() => validateP12ProductionReleaseGate(future, { now: NOW }), /future/);
   const unbound = release();
   unbound.signatures[0].attestationDigest = "c".repeat(64);

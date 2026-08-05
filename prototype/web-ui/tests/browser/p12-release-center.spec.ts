@@ -64,18 +64,18 @@ test("P12 Release Center persists Canary, gates, OIDC signatures, and audit rece
   expect(await created.json()).toMatchObject({ data: { status: "draft" } });
   expect(created.status()).toBe(201);
   await expect(page.getByText("Canary 草稿已创建")).toBeVisible();
-  await expect(page.getByText("等待项目负责人批准", { exact: true })).toBeVisible();
+  await expect(page.getByText("等待负责人批准", { exact: true })).toBeVisible();
 
-  await installP12Session(context, "p12-project-owner");
+  await installP12Session(context, "p12-approver");
   await page.reload();
   await waitForHydration(page);
   const approvalResponse = page.waitForResponse((response) =>
     response.url().includes("/api/v1/releases/canaries/") &&
     response.request().method() === "POST"
   );
-  await page.getByRole("button", { name: "项目负责人批准并开始计时" }).click();
+  await page.getByRole("button", { name: "负责人批准并开始计时" }).click();
   expect((await approvalResponse).status()).toBe(200);
-  await expect(page.getByText("48 小时时钟开始计时")).toBeVisible();
+  await expect(page.getByText("12 小时时钟开始计时")).toBeVisible();
 
   const pool = new Pool({ connectionString: process.env.P12_E2E_DATABASE_URL, max: 2 });
   let canaryId = "";
@@ -88,14 +88,14 @@ test("P12 Release Center persists Canary, gates, OIDC signatures, and audit rece
     );
     canaryId = selected.rows[0].id;
     const endedAt = new Date();
-    const startedAt = new Date(endedAt.getTime() - 48 * HOUR);
+    const startedAt = new Date(endedAt.getTime() - 12 * HOUR);
     await pool.query(
       `UPDATE release_canaries
           SET created_at=$1,approved_at=$1,started_at=$1,updated_at=$2
         WHERE id=$3`,
       [startedAt, endedAt, canaryId],
     );
-    for (let index = 0; index < 48; index += 1) {
+    for (let index = 0; index < 12; index += 1) {
       await pool.query(
         `INSERT INTO release_canary_windows
            (organization_id,project_id,goal_id,canary_id,attempt,sequence,
@@ -111,7 +111,7 @@ test("P12 Release Center persists Canary, gates, OIDC signatures, and audit rece
           new Date(startedAt.getTime() + index * HOUR),
           new Date(startedAt.getTime() + (index + 1) * HOUR),
           JSON.stringify([`metric-window:${index + 1}`]),
-          actorId("p12-operations"),
+          actorId("p12-approver"),
           endedAt,
         ],
       );
@@ -120,10 +120,10 @@ test("P12 Release Center persists Canary, gates, OIDC signatures, and audit rece
     await pool.end();
   }
 
-  await installP12Session(context, "p12-operations");
+  await installP12Session(context, "p12-approver");
   await page.reload();
   await waitForHydration(page);
-  await expect(page.getByText("48.00 / 48 小时")).toBeVisible();
+  await expect(page.getByText("12.00 / 12 小时")).toBeVisible();
   const finalizeResponse = page.waitForResponse((response) =>
     response.url().includes("/api/v1/releases/canaries/") &&
     response.request().method() === "POST"
@@ -134,39 +134,28 @@ test("P12 Release Center persists Canary, gates, OIDC signatures, and audit rece
   await page.getByRole("button", { name: "创建 Production Release" }).click();
   await expect(page.getByText("Production Release 已创建")).toBeVisible();
 
-  const assignments = {
-    security: ["browser-e2e", "identity-security", "supply-chain"],
-    operations: ["autodev-authorization", "recovery-stop", "observability-oncall"],
-    product: ["model-routing-write", "defect-budget"],
-    "project-owner": ["git-traceability", "canary-goal-verification"],
-  } as const;
-  const subjects = {
-    security: "p12-approver",
-    operations: "p12-operations",
-    product: "p12-product",
-    "project-owner": "p12-project-owner",
-  } as const;
-  for (const role of Object.keys(assignments) as Array<keyof typeof assignments>) {
-    await installP12Session(context, subjects[role]);
-    await page.reload();
-    await waitForHydration(page);
-    for (const gateId of assignments[role]) await writeGate(page, gateId, role);
-  }
+  const gateIds = [
+    "browser-e2e", "identity-security", "autodev-authorization",
+    "model-routing-write", "supply-chain", "git-traceability",
+    "recovery-stop", "observability-oncall", "canary-goal-verification",
+    "defect-budget",
+  ];
+  for (const gateId of gateIds) await writeGate(page, gateId, "owner");
 
-  await installP12Session(context, "p12-operations");
+  await installP12Session(context, "p12-approver");
   await page.reload();
   await waitForHydration(page);
   await expect(page.getByText("10/10").first()).toBeVisible();
   await page.getByRole("button", { name: "锁定证据并生成摘要" }).click();
   await expect(page.getByText("十项门禁已锁定")).toBeVisible();
-  await expect(page.getByText("等待四方 OIDC 签署", { exact: true })).toBeVisible();
+  await expect(page.getByText("等待负责人 OIDC 签署", { exact: true })).toBeVisible();
 
   await installP12Session(context, "p12-product");
   await page.reload();
   await waitForHydration(page);
-  await page.getByLabel("签署角色").selectOption("security");
+  await page.getByLabel("签署角色").selectOption("owner");
   await page.getByLabel("审批理由").fill(
-    "Product actor must not be able to forge the security signature.",
+    "A non-owner actor must not be able to forge the owner signature.",
   );
   const forbidden = page.waitForResponse((response) =>
     response.url().includes("/api/v1/releases/production/") &&
@@ -176,23 +165,21 @@ test("P12 Release Center persists Canary, gates, OIDC signatures, and audit rece
   expect((await forbidden).status()).toBe(403);
   await expect(page.getByRole("alert")).toContainText("forbidden");
 
-  for (const role of Object.keys(subjects) as Array<keyof typeof subjects>) {
-    await installP12Session(context, subjects[role]);
-    await page.reload();
-    await waitForHydration(page);
-    await page.getByLabel("签署角色").selectOption(role);
-    await page.getByLabel("审批理由").fill(
-      `Approved ${role} after reviewing all ten Production V1 evidence gates.`,
-    );
-    const signatureResponse = page.waitForResponse((response) =>
-      response.url().includes("/api/v1/releases/production/") &&
-      response.request().method() === "POST"
-    );
-    await page.getByRole("button", { name: "以当前 OIDC 身份签署" }).click();
-    expect((await signatureResponse).status()).toBe(200);
-  }
+  await installP12Session(context, "p12-approver");
+  await page.reload();
+  await waitForHydration(page);
+  await page.getByLabel("签署角色").selectOption("owner");
+  await page.getByLabel("审批理由").fill(
+    "The owner approved all ten Production V1 evidence gates.",
+  );
+  const signatureResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/releases/production/") &&
+    response.request().method() === "POST"
+  );
+  await page.getByRole("button", { name: "以当前 OIDC 身份签署" }).click();
+  expect((await signatureResponse).status()).toBe(200);
   await expect(page.getByText("Production V1 发布门禁已全部通过")).toBeVisible();
-  await expect(page.getByText("10/10 Gate · 4/4 独立签署")).toBeVisible();
+  await expect(page.getByText("10/10 Gate · 1/1 负责人签署")).toBeVisible();
 
   const proofPool = new Pool({
     connectionString: process.env.P12_E2E_DATABASE_URL,
@@ -216,13 +203,13 @@ test("P12 Release Center persists Canary, gates, OIDC signatures, and audit rece
     );
     expect(proof.rows[0]).toEqual({
       canary_status: "passed",
-      windows: 48,
+      windows: 12,
       release_status: "approved",
       release_result: "approved",
       gates: 10,
-      signatures: 4,
-      signers: 4,
-      signature_audits: 4,
+      signatures: 1,
+      signers: 1,
+      signature_audits: 1,
     });
   } finally {
     await proofPool.end();

@@ -77,7 +77,7 @@ function receiptMigrations() {
 test("loads the committed Drizzle migration and hashes its exact bytes", () => {
   const migrations = loadPostgresMigrations(migrationsDirectory);
 
-  assert.equal(migrations.length, 21);
+  assert.equal(migrations.length, 22);
   assert.equal(migrations[0].tag, "0000_tan_mikhail_rasputin");
   assert.equal(migrations[0].createdAt, 1785742303861);
   assert.equal(migrations[0].hash, expectedHash);
@@ -176,6 +176,8 @@ test("loads the committed Drizzle migration and hashes its exact bytes", () => {
   assert.equal(migrations[19].statements.length, 30);
   assert.equal(migrations[20].tag, "0020_wild_matthew_murdock");
   assert.equal(migrations[20].statements.length, 25);
+  assert.equal(migrations[21].tag, "0021_lively_spacker_dave");
+  assert.equal(migrations[21].statements.length, 4);
 });
 
 test("builds an atomic, locked, idempotent migration batch", () => {

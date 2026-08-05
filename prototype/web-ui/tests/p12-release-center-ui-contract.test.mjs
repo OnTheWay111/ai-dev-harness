@@ -11,13 +11,11 @@ test("release center UI exposes Canary timeline, gates, and OIDC signatures", as
   ]);
   assert.match(page, /ReleaseCenterApp/);
   assert.match(component, /P12 发布中心/);
-  assert.match(component, /48 小时连续观测/);
+  assert.match(component, /12 小时连续观测/);
   assert.match(component, /Production Gate/);
   assert.match(component, /OIDC/);
-  assert.match(component, /安全/);
-  assert.match(component, /运维/);
-  assert.match(component, /产品/);
-  assert.match(component, /项目负责人/);
+  assert.match(component, /负责人签署/);
+  assert.match(component, /1\/1 负责人签署/);
   assert.match(component, /Canary 事件时间线/);
   assert.match(component, /resolve-alert/);
   assert.match(client, /\/api\/v1\/releases\/canaries/);

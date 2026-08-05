@@ -35,22 +35,19 @@ const gateLabels: Record<ProductionGateId, string> = {
 };
 
 const roleLabels: Record<ReleaseSignatureRole, string> = {
-  security: "安全",
-  operations: "运维",
-  product: "产品",
-  "project-owner": "项目负责人",
+  owner: "负责人",
 };
 
 const canaryStatus: Record<CanaryAggregate["status"], string> = {
-  draft: "等待项目负责人批准",
-  observing: "48 小时连续观测中",
+  draft: "等待负责人批准",
+  observing: "12 小时连续观测中",
   stopped: "已停止，必须重新计时",
   passed: "Canary 已通过",
 };
 
 const releaseStatus: Record<ProductionReleaseAggregate["status"], string> = {
   draft: "门禁证据收集中",
-  awaiting_signatures: "等待四方 OIDC 签署",
+  awaiting_signatures: "等待负责人 OIDC 签署",
   approved: "Production V1 已批准",
 };
 
@@ -72,7 +69,7 @@ function errorText(error: unknown): string {
 }
 
 function progressPercent(canary: CanaryAggregate): number {
-  return Math.min(100, canaryProgress(canary).completedHours / 48 * 100);
+  return Math.min(100, canaryProgress(canary).completedHours / 12 * 100);
 }
 
 function canaryProgress(canary: CanaryAggregate): {
@@ -116,7 +113,7 @@ export function ReleaseCenterApp({
     goalContractVersion: "1",
     allowedAreas: "documentation\nnon-production-tooling",
     excludedAreas: "production-data\ncredentials\nbilling",
-    successConditions: "Goal Verification passed\nNo P0/P1 for 48 continuous hours",
+    successConditions: "Goal Verification passed\nNo P0/P1 for 12 continuous hours",
     stopConditions: "Any P0/P1\nData integrity or authorization alert\nOwner requests Stop",
   });
   const [windowEvidence, setWindowEvidence] = useState("");
@@ -133,9 +130,9 @@ export function ReleaseCenterApp({
     details: "",
   });
   const [gateId, setGateId] = useState<ProductionGateId>("browser-e2e");
-  const [gateRole, setGateRole] = useState<ReleaseSignatureRole>("operations");
+  const [gateRole, setGateRole] = useState<ReleaseSignatureRole>("owner");
   const [gateEvidence, setGateEvidence] = useState("");
-  const [signatureRole, setSignatureRole] = useState<ReleaseSignatureRole>("security");
+  const [signatureRole, setSignatureRole] = useState<ReleaseSignatureRole>("owner");
   const [signatureReason, setSignatureReason] = useState("");
 
   const selectedCanary = useMemo(() =>
@@ -259,7 +256,7 @@ export function ReleaseCenterApp({
         <div>
           <p>FORGE · AI DEV HARNESS</p>
           <h1>P12 发布中心</h1>
-          <span>真实 Canary、Production Gate 与四方签署的生产控制面</span>
+          <span>真实 Canary、Production Gate 与单一负责人签署的生产控制面</span>
         </div>
         <Link href="/" className="secondary-button">返回研发工作台</Link>
       </header>
@@ -267,9 +264,9 @@ export function ReleaseCenterApp({
       <main className="release-center-main">
         <section className="release-summary-grid" aria-label="发布状态摘要">
           <article><span>Canary</span><strong>{snapshot.canaries.length}</strong><small>草稿与历史尝试</small></article>
-          <article><span>连续观测</span><strong>{selectedCanary ? `${canaryProgress(selectedCanary).completedHours.toFixed(1)}h` : "0h"}</strong><small>最低要求 48h</small></article>
+          <article><span>连续观测</span><strong>{selectedCanary ? `${canaryProgress(selectedCanary).completedHours.toFixed(1)}h` : "0h"}</strong><small>最低要求 12h</small></article>
           <article><span>Production Gate</span><strong>{selectedRelease ? `${selectedRelease.gates.length}/10` : "0/10"}</strong><small>证据锁定后不可修改</small></article>
-          <article><span>OIDC 签署</span><strong>{selectedRelease ? `${selectedRelease.signatures.length}/4` : "0/4"}</strong><small>签署人必须互不相同</small></article>
+          <article><span>OIDC 签署</span><strong>{selectedRelease ? `${selectedRelease.signatures.length}/1` : "0/1"}</strong><small>由当前唯一负责人签署</small></article>
         </section>
 
         {notice && <div className="release-notice" role="status">{notice}</div>}
@@ -294,7 +291,7 @@ export function ReleaseCenterApp({
 
         <section className="release-panel">
           <div className="release-panel-heading">
-            <div><p>STEP 2</p><h2>48 小时连续观测</h2></div>
+            <div><p>STEP 2</p><h2>12 小时连续观测</h2></div>
             <select aria-label="选择 Canary" value={selectedCanary?.id ?? ""} onChange={(event) => setSelectedCanaryId(event.target.value)}>
               {snapshot.canaries.map((canary) => <option key={canary.id} value={canary.id}>{canary.id.slice(0, 8)} · {canaryStatus[canary.status]}</option>)}
             </select>
@@ -303,8 +300,8 @@ export function ReleaseCenterApp({
             <div className="canary-workspace">
               <div className="release-status-line"><span className={`release-badge ${selectedCanary.status}`}>{canaryStatus[selectedCanary.status]}</span><code>{selectedCanary.candidateCommit}</code><span>Attempt {selectedCanary.attempt}</span></div>
               <div className="canary-progress" aria-label="Canary 观测进度"><span style={{ width: `${progressPercent(selectedCanary)}%` }} /></div>
-              <p>{canaryProgress(selectedCanary).completedHours.toFixed(2)} / 48 小时 · {canaryProgress(selectedCanary).windowCount} 个证据窗口</p>
-              {selectedCanary.status === "draft" && <button className="primary-button" disabled={busy || !hydrated} onClick={() => void run(() => releaseCenterApi.canaryAction(scope, selectedCanary.id, { type: "approve", expectedVersion: selectedCanary.version, reason: "Project owner approves the bounded P12 Canary and starts observation." }), "Owner 已批准，48 小时时钟开始计时。")}>项目负责人批准并开始计时</button>}
+              <p>{canaryProgress(selectedCanary).completedHours.toFixed(2)} / 12 小时 · {canaryProgress(selectedCanary).windowCount} 个证据窗口</p>
+              {selectedCanary.status === "draft" && <button className="primary-button" disabled={busy || !hydrated} onClick={() => void run(() => releaseCenterApi.canaryAction(scope, selectedCanary.id, { type: "approve", expectedVersion: selectedCanary.version, reason: "Owner approves the bounded P12 Canary and starts observation." }), "负责人已批准，12 小时时钟开始计时。")}>负责人批准并开始计时</button>}
               {selectedCanary.status === "stopped" && <button className="danger-button" disabled={busy || !hydrated} onClick={() => void run(() => releaseCenterApi.canaryAction(scope, selectedCanary.id, { type: "restart", expectedVersion: selectedCanary.version, reason: "Project owner confirms remediation and restarts the full Canary clock." }), "修复已确认；新 Attempt 从零开始计时。")}>修复后重新批准并从零计时</button>}
               {selectedCanary.status === "observing" && (
                 <div className="release-action-columns">
@@ -362,7 +359,7 @@ export function ReleaseCenterApp({
                   ))}
                 </div>
               )}
-              {selectedCanary.status === "observing" && <button className="primary-button" disabled={busy || !hydrated} onClick={() => void run(() => releaseCenterApi.canaryAction(scope, selectedCanary.id, { type: "finalize", expectedVersion: selectedCanary.version, reason: "Finalize Canary after 48 hours and passed Goal Verification." }), "Canary 报告已通过最终校验。")}>完成 Canary 校验</button>}
+              {selectedCanary.status === "observing" && <button className="primary-button" disabled={busy || !hydrated} onClick={() => void run(() => releaseCenterApi.canaryAction(scope, selectedCanary.id, { type: "finalize", expectedVersion: selectedCanary.version, reason: "Finalize Canary after 12 hours and passed Goal Verification." }), "Canary 报告已通过最终校验。")}>完成 Canary 校验</button>}
               {selectedCanary.status === "passed" && !snapshot.releases.some(({ canaryId }) => canaryId === selectedCanary.id) && <button className="primary-button" disabled={busy || !hydrated} onClick={() => void createRelease(selectedCanary)}>创建 Production Release</button>}
             </div>
           )}
@@ -370,7 +367,7 @@ export function ReleaseCenterApp({
 
         <section className="release-panel">
           <div className="release-panel-heading">
-            <div><p>STEP 3</p><h2>Production Gate 与四方签署</h2></div>
+            <div><p>STEP 3</p><h2>Production Gate 与负责人签署</h2></div>
             <select aria-label="选择 Production Release" value={selectedRelease?.id ?? ""} onChange={(event) => setSelectedReleaseId(event.target.value)}>
               {snapshot.releases.map((release) => <option key={release.id} value={release.id}>{release.id.slice(0, 8)} · {releaseStatus[release.status]}</option>)}
             </select>
@@ -390,7 +387,7 @@ export function ReleaseCenterApp({
                   <label>责任角色<select value={gateRole} onChange={(event) => setGateRole(event.target.value as ReleaseSignatureRole)}>{P12_RELEASE_SIGNATURE_ROLES.map((role) => <option key={role} value={role}>{roleLabels[role]}</option>)}</select></label>
                   <label>证据引用<input value={gateEvidence} onChange={(event) => setGateEvidence(event.target.value)} placeholder="gate-receipt:..." /></label>
                   <button className="secondary-button" disabled={busy || !hydrated} onClick={() => void run(() => releaseCenterApi.productionAction(scope, selectedRelease.id, { type: "check-gate", expectedVersion: selectedRelease.version, gateId, ownerRole: gateRole, evidenceRefs: [gateEvidence], reason: `Confirm ${gateId} passed after evidence review.` }), `${gateLabels[gateId]} 已通过并写入审计。`)}>确认门禁通过</button>
-                  <button className="primary-button" disabled={busy || !hydrated || selectedRelease.gates.length !== 10} onClick={() => void run(() => releaseCenterApi.productionAction(scope, selectedRelease.id, { type: "evaluate", expectedVersion: selectedRelease.version, reason: "Lock all ten Production V1 gates and calculate the evidence digest." }), "十项门禁已锁定；现在需要四个不同 OIDC 身份签署。")}>锁定证据并生成摘要</button>
+                  <button className="primary-button" disabled={busy || !hydrated || selectedRelease.gates.length !== 10} onClick={() => void run(() => releaseCenterApi.productionAction(scope, selectedRelease.id, { type: "evaluate", expectedVersion: selectedRelease.version, reason: "Lock all ten Production V1 gates and calculate the evidence digest." }), "十项门禁已锁定；现在需要负责人以当前 OIDC 身份签署。")}>锁定证据并生成摘要</button>
                 </div>
               )}
               <div className="signature-grid">
@@ -406,7 +403,7 @@ export function ReleaseCenterApp({
                   <button className="primary-button" disabled={busy || !hydrated} onClick={() => void run(() => releaseCenterApi.productionAction(scope, selectedRelease.id, { type: "sign", expectedVersion: selectedRelease.version, role: signatureRole, reason: signatureReason }), `${roleLabels[signatureRole]}签署已由服务端 OIDC 身份和 Audit Receipt 绑定。`)}>以当前 OIDC 身份签署</button>
                 </div>
               )}
-              {selectedRelease.status === "approved" && <div className="release-approved"><strong>Production V1 发布门禁已全部通过</strong><span>10/10 Gate · 4/4 独立签署 · evidence digest 已锁定</span></div>}
+              {selectedRelease.status === "approved" && <div className="release-approved"><strong>Production V1 发布门禁已全部通过</strong><span>10/10 Gate · 1/1 负责人签署 · evidence digest 已锁定</span></div>}
             </div>
           )}
         </section>

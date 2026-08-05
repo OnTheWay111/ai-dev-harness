@@ -438,11 +438,7 @@ async function seed(pool: InstanceType<typeof Pool>): Promise<void> {
              'Authorize the isolated P12 browser owner', 'p12-bootstrap')`,
     [crypto.randomUUID(), fixed.organizationId, actorId()],
   );
-  for (const [subject, role] of [
-    ["p12-operations", "operator"],
-    ["p12-product", "approver"],
-    ["p12-project-owner", "project_admin"],
-  ]) {
+  for (const [subject, role] of [["p12-product", "approver"]]) {
     await pool.query(
       `INSERT INTO role_bindings
          (id,organization_id,project_id,actor_id,role,assigned_by_actor_id,

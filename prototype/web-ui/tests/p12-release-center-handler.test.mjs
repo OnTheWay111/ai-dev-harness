@@ -46,7 +46,7 @@ test("signature action uses the OIDC actor and rejects client supplied signer fi
         return { id: releaseId, signatures: [{ signerId: input.actorId }] };
       },
     },
-    actorResolver: async () => ({ actorId: "oidc_security_actor" }),
+    actorResolver: async () => ({ actorId: "oidc_owner_actor" }),
     allowedOrigins: ["https://harness.example"],
   });
   const invalid = await handlers.productionAction(request(
@@ -54,7 +54,7 @@ test("signature action uses the OIDC actor and rejects client supplied signer fi
     {
       ...scope,
       type: "sign",
-      role: "security",
+      role: "owner",
       signerId: "forged-client-identity",
       expectedVersion: 2,
       reason: "The client must not choose the signer identity.",
@@ -67,13 +67,13 @@ test("signature action uses the OIDC actor and rejects client supplied signer fi
     {
       ...scope,
       type: "sign",
-      role: "security",
+      role: "owner",
       expectedVersion: 2,
-      reason: "Security reviewed and approved all release evidence.",
+      reason: "The owner reviewed and approved all release evidence.",
     },
   ), releaseId);
   assert.equal(response.status, 200);
-  assert.equal(received.actorId, "oidc_security_actor");
+  assert.equal(received.actorId, "oidc_owner_actor");
   assert.equal(received.requestId, "release-handler-test-request");
 });
 

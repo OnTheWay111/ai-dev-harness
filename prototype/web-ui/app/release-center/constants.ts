@@ -12,8 +12,5 @@ export const P12_PRODUCTION_GATE_IDS = [
 ] as const;
 
 export const P12_RELEASE_SIGNATURE_ROLES = [
-  "security",
-  "operations",
-  "product",
-  "project-owner",
+  "owner",
 ] as const;

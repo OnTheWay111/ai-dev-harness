@@ -1,7 +1,7 @@
 {
   "schemaVersion": "harness.p12-release-policy.v1",
   "canary": {
-    "minimumContinuousHours": 48,
+    "minimumContinuousHours": 12,
     "maximumEvidenceWindowMinutes": 60,
     "projectClassification": "internal-low-risk",
     "stopOnSeverities": ["P0", "P1"],
@@ -20,12 +20,7 @@
     "canary-goal-verification",
     "defect-budget"
   ],
-  "signatureRoles": [
-    "security",
-    "operations",
-    "product",
-    "project-owner"
-  ],
+  "signatureRoles": ["owner"],
   "signature": {
     "authenticationMethod": "oidc",
     "bindsCanonicalEvidenceDigest": true,

@@ -24,7 +24,7 @@ Web UI 是生产控制面，不是装饰性 Dashboard。全局首屏必须在十
 执行节点
 发布中心
   Canary 观测与事件时间线
-  Production Gate 与四方 OIDC 签署
+  Production Gate 与负责人 OIDC 签署
 审计日志
 组织设置
 ```
@@ -111,10 +111,10 @@ Token 使用采用周期预算曲线，而不是简单“跑满并发”：
 ### 发布中心
 
 - 从已完成 Goal 创建绑定完整 Commit SHA 的低风险内部 Canary 草稿。
-- Project Admin 批准后锁定范围，展示 Attempt、连续 48 小时进度、逐小时证据和事件时间线。
+- 唯一负责人批准后锁定范围，展示 Attempt、连续 12 小时进度、逐小时证据和事件时间线。
 - P0/P1 自动 Stop；修复后重新批准并从零计时。告警解除是独立审计动作，不能覆盖原始披露。
-- Canary 通过后展示十项 Production Gate，按安全、运维、产品和项目负责人角色逐项关闭。
-- Gate 锁定后显示 SHA-256 evidence digest；四个互不相同的 OIDC signer 完成后才显示批准。
+- Canary 通过后展示十项 Production Gate，由唯一负责人逐项关闭。
+- Gate 锁定后显示 SHA-256 evidence digest；负责人以当前 OIDC 身份签署后显示批准。
 - 页面展示的是 PostgreSQL 权威状态；合成浏览器 fixture 明确标记为测试，不得导出为真实发布证据。
 
 ## 4. 交互原则

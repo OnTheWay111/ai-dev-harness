@@ -3,7 +3,11 @@ import type {
   CanaryReport,
   PassedGoalVerification,
   ProductionReleaseAggregate,
+  ProductionReleaseReport,
 } from "./domain.ts";
+import { P12_PRODUCTION_GATE_IDS } from "./constants.ts";
+import { releaseAttestationDigest } from
+  "../reliability/p12-production-release-gate.ts";
 import {
   type CanaryCommit,
   ReleaseCenterIdempotencyConflictError,
@@ -137,6 +141,9 @@ export class MemoryReleaseCenterRepository implements ReleaseCenterRepository {
     projectId: string;
     goalId: string;
   }) {
+    const evaluatedAt = input.evaluatedAt ?? new Date().toISOString();
+    const evaluatedAtMillis = Date.parse(evaluatedAt);
+    const startedAt = new Date(evaluatedAtMillis - 12 * 60 * 60 * 1_000).toISOString();
     const canaryReport = {
       schemaVersion: "harness.p12-canary-report.v1",
       canaryId: "00000000-0000-4000-8000-000000000088",
@@ -146,7 +153,7 @@ export class MemoryReleaseCenterRepository implements ReleaseCenterRepository {
         internal: true,
         risk: "low",
         ownerId: "oidc_project_owner",
-        approvedAt: input.evaluatedAt ?? new Date().toISOString(),
+        approvedAt: startedAt,
       },
       scope: {
         goalId: input.goalId,
@@ -161,21 +168,57 @@ export class MemoryReleaseCenterRepository implements ReleaseCenterRepository {
         stopRunbook: "docs/runbooks/execution-stop-worker-loss.md",
       },
       observation: {
-        requiredDurationHours: 48,
-        startedAt: input.evaluatedAt ?? new Date().toISOString(),
-        endedAt: input.evaluatedAt ?? new Date().toISOString(),
-        windows: [],
+        requiredDurationHours: 12,
+        startedAt,
+        endedAt: evaluatedAt,
+        windows: Array.from({ length: 12 }, (_, index) => ({
+          sequence: index + 1,
+          startedAt: new Date(Date.parse(startedAt) + index * 60 * 60 * 1_000).toISOString(),
+          endedAt: new Date(Date.parse(startedAt) + (index + 1) * 60 * 60 * 1_000).toISOString(),
+          status: "healthy" as const,
+          p0Count: 0,
+          p1Count: 0,
+          evidenceRefs: [`metric-window:memory-${index + 1}`],
+        })),
       },
       defects: [], alerts: [], interventions: [],
       goalVerification: {
         status: "passed",
         verificationId: "memory-verification",
-        completedAt: input.evaluatedAt ?? new Date().toISOString(),
+        completedAt: evaluatedAt,
         evidenceRefs: ["goal-verification:memory"],
       },
       gaps: [], result: "passed",
     } as CanaryReport;
-    const now = input.evaluatedAt ?? new Date().toISOString();
+    const now = evaluatedAt;
+    const gates: ProductionReleaseAggregate["gates"] = P12_PRODUCTION_GATE_IDS.map(
+      (gateId) => ({
+        gateId,
+        status: "passed",
+        ownerRole: "owner",
+        checkedAt: evaluatedAt,
+        evidenceRefs: [`gate-receipt:${gateId}`],
+        checkedBy: "memory-owner",
+      }),
+    );
+    const unsignedReport: ProductionReleaseReport = {
+      schemaVersion: "harness.p12-production-release-gate.v1",
+      releaseId: input.id,
+      target: "production-v1",
+      candidateCommit: "a".repeat(40),
+      evaluatedAt,
+      canary: canaryReport,
+      gates: gates.map((gate) => ({
+        gateId: gate.gateId,
+        status: gate.status,
+        ownerRole: gate.ownerRole,
+        checkedAt: gate.checkedAt,
+        evidenceRefs: gate.evidenceRefs,
+      })),
+      defects: { p0Count: 0, p1Count: 0, p2: [] },
+      signatures: [], gaps: [], result: "approved",
+    };
+    const attestationDigest = releaseAttestationDigest(unsignedReport);
     const release: ProductionReleaseAggregate = {
       id: input.id,
       organizationId: input.organizationId,
@@ -185,22 +228,14 @@ export class MemoryReleaseCenterRepository implements ReleaseCenterRepository {
       candidateCommit: "a".repeat(40),
       status: input.status ?? "draft",
       canaryReport,
-      gates: [],
+      gates,
       defects: { p0Count: 0, p1Count: 0, p2: [] },
       evaluatedAt: input.evaluatedAt ?? null,
-      attestationDigest: input.attestationDigest ?? null,
+      attestationDigest: input.status === "awaiting_signatures"
+        ? attestationDigest
+        : input.attestationDigest ?? null,
       signatures: [],
-      report: input.status === "awaiting_signatures" ? {
-        schemaVersion: "harness.p12-production-release-gate.v1",
-        releaseId: input.id,
-        target: "production-v1",
-        candidateCommit: "a".repeat(40),
-        evaluatedAt: now,
-        canary: canaryReport,
-        gates: [],
-        defects: { p0Count: 0, p1Count: 0, p2: [] },
-        signatures: [], gaps: [], result: "approved",
-      } : null,
+      report: input.status === "awaiting_signatures" ? unsignedReport : null,
       version: input.version ?? 1,
       createdBy: "memory-operator",
       createdAt: now,

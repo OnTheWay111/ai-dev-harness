@@ -1,5 +1,5 @@
 const SCHEMA_VERSION = "harness.p12-canary-report.v1";
-export const P12_CANARY_MINIMUM_HOURS = 48;
+export const P12_CANARY_MINIMUM_HOURS = 12;
 const HOUR_MS = 60 * 60 * 1000;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/;
 const PLACEHOLDER = /(?:^|[-_.])(test|example|placeholder|unknown|tbd|todo)(?:$|[-_.])/i;
@@ -70,18 +70,18 @@ function validateObservation(raw: ObjectValue, now: Date): {
 } {
   if (integer(raw.requiredDurationHours, "observation.requiredDurationHours") !==
       P12_CANARY_MINIMUM_HOURS) {
-    throw new Error("Canary requires exactly the 48-hour minimum gate");
+    throw new Error("Canary requires exactly the 12-hour minimum gate");
   }
   const startedAt = timestamp(raw.startedAt, "observation.startedAt");
   const endedAt = timestamp(raw.endedAt, "observation.endedAt");
   if (endedAt > now.getTime()) throw new Error("Canary observation cannot end in the future");
   const durationHours = (endedAt - startedAt) / HOUR_MS;
   if (durationHours < P12_CANARY_MINIMUM_HOURS) {
-    throw new Error("Canary must observe at least 48 continuous hours");
+    throw new Error("Canary must observe at least 12 continuous hours");
   }
   const windows = array(raw.windows, "observation.windows");
   if (windows.length < P12_CANARY_MINIMUM_HOURS) {
-    throw new Error("Canary requires at least 48 evidence windows");
+    throw new Error("Canary requires at least 12 evidence windows");
   }
   let previousEnd = startedAt;
   windows.forEach((value, index) => {

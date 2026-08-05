@@ -145,7 +145,7 @@ export class ReleaseCenterService {
     canaryId: string;
     expectedVersion: number;
   }) {
-    await this.authorizer.authorizeRole({ ...input, releaseRole: "project-owner" });
+    await this.authorizer.authorizeRole({ ...input, releaseRole: "owner" });
     const command = this.command(
       input, "release.canary.approve", "release.canary.approved", input,
     );
@@ -166,7 +166,7 @@ export class ReleaseCenterService {
     canaryId: string;
     expectedVersion: number;
   }) {
-    await this.authorizer.authorizeRole({ ...input, releaseRole: "project-owner" });
+    await this.authorizer.authorizeRole({ ...input, releaseRole: "owner" });
     const command = this.command(
       input, "release.canary.restart", "release.canary.restarted", input,
     );
@@ -187,7 +187,7 @@ export class ReleaseCenterService {
     expectedVersion: number;
     window: Omit<CanaryWindow, "attempt" | "recordedBy">;
   }) {
-    await this.authorizer.authorizeRole({ ...input, releaseRole: "operations" });
+    await this.authorizer.authorizeRole({ ...input, releaseRole: "owner" });
     const command = this.command(
       input, "release.canary.window", "release.canary.window-recorded", input,
     );
@@ -209,7 +209,7 @@ export class ReleaseCenterService {
     expectedVersion: number;
     event: NewCanaryEvent;
   }) {
-    await this.authorizer.authorizeRole({ ...input, releaseRole: "operations" });
+    await this.authorizer.authorizeRole({ ...input, releaseRole: "owner" });
     const command = this.command(
       input, "release.canary.event", "release.canary.event-recorded", input,
     );
@@ -231,7 +231,7 @@ export class ReleaseCenterService {
     expectedVersion: number;
     eventId: string;
   }) {
-    await this.authorizer.authorizeRole({ ...input, releaseRole: "operations" });
+    await this.authorizer.authorizeRole({ ...input, releaseRole: "owner" });
     const command = this.command(
       input,
       "release.canary.resolve-alert",
@@ -258,7 +258,7 @@ export class ReleaseCenterService {
     canaryId: string;
     expectedVersion: number;
   }) {
-    await this.authorizer.authorizeRole({ ...input, releaseRole: "operations" });
+    await this.authorizer.authorizeRole({ ...input, releaseRole: "owner" });
     const command = this.command(
       input, "release.canary.finalize", "release.canary.passed", input,
     );
@@ -291,7 +291,7 @@ export class ReleaseCenterService {
   }
 
   async createProductionRelease(input: CommandInput & { canaryId: string }) {
-    await this.authorizer.authorizeRole({ ...input, releaseRole: "operations" });
+    await this.authorizer.authorizeRole({ ...input, releaseRole: "owner" });
     const canary = await this.canary(input);
     const command = this.command(input, "release.production.create", "release.production.created", input);
     const replay = await this.repository.findProductionReleaseCommand(command);
@@ -345,7 +345,7 @@ export class ReleaseCenterService {
     releaseId: string;
     expectedVersion: number;
   }) {
-    await this.authorizer.authorizeRole({ ...input, releaseRole: "operations" });
+    await this.authorizer.authorizeRole({ ...input, releaseRole: "owner" });
     const command = this.command(
       input,
       "release.production.evaluate",

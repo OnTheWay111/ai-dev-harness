@@ -1,7 +1,7 @@
 # P12 Canary 与 Production V1 发布门禁
 
-P12-05 和 P12-06 是实际运行门禁，不是测试夹具。只有有权限负责人选定低风险内部项目、完成连续 48 小时
-观测，并由安全、运维、产品和项目负责人通过 OIDC 产生四份独立审计签署后，路线图才能勾选。开发测试中的
+P12-05 和 P12-06 是实际运行门禁，不是测试夹具。只有有权限负责人选定低风险内部项目、完成连续 12 小时
+观测，并由当前唯一负责人通过 OIDC 产生一份审计签署后，路线图才能勾选。开发测试中的
 合成窗口、身份和 Receipt 只能验证失败关闭逻辑，不能充当发布证据。
 
 ## Web 发布中心（主操作入口）
@@ -15,19 +15,16 @@ Outbox Event 和 Idempotency Receipt 要么一起成功，要么一起失败。�
 
 | 发布角色 | 项目角色 |
 |---|---|
-| `security` | Organization Owner |
-| `operations` | Operator |
-| `product` | Approver |
-| `project-owner` | Project Admin |
+| `owner` | Organization Owner |
 
 操作顺序：
 
-1. Operator 创建低风险内部 Canary 草稿，填写 Goal、完整 Commit SHA、范围、成功/Stop 条件和 Runbook。
-2. Project Admin 复核并批准；批准后配置锁定，开始 Attempt 的 48 小时时钟。
-3. Operator 最多按一小时连续记录指标窗口，并在事件时间线披露缺陷、告警和人工介入；P0/P1 自动 Stop。
-4. 告警解除也通过时间线单独审计。Stop 后由 Project Admin 确认修复并开启新的 Attempt，从零计时。
-5. 满 48 小时且同一观测区间内存在 Passed Goal Verification 后，由 Operator 完成 Canary 校验。
-6. 创建 Production Release，由责任角色逐项关闭十项门禁；锁定摘要后，四个不同 OIDC 身份依次签署。
+1. 负责人创建低风险内部 Canary 草稿，填写 Goal、完整 Commit SHA、范围、成功/Stop 条件和 Runbook。
+2. 负责人复核并批准；批准后配置锁定，开始 Attempt 的 12 小时时钟。
+3. 负责人最多按一小时连续记录指标窗口，并在事件时间线披露缺陷、告警和人工介入；P0/P1 自动 Stop。
+4. 告警解除也通过时间线单独审计。Stop 后由负责人确认修复并开启新的 Attempt，从零计时。
+5. 满 12 小时且同一观测区间内存在 Passed Goal Verification 后，由负责人完成 Canary 校验。
+6. 创建 Production Release，由负责人逐项关闭十项门禁；锁定摘要后，以当前 OIDC 身份签署。
 
 服务端接口位于 `/api/v1/releases`、`/api/v1/releases/canaries`、
 `/api/v1/releases/canaries/:canaryId/actions`、`/api/v1/releases/production` 和
@@ -38,7 +35,7 @@ Outbox Event 和 Idempotency Receipt 要么一起成功，要么一起失败。�
 
 Canary owner 必须在计时前批准 Project、Goal Contract、允许/排除范围、成功条件、Stop 条件、回滚和 Stop
 Runbook。报告使用 `harness.p12-canary-report.v1`，每个观测窗口最长一小时且首尾连续，每个窗口都引用真实
-指标证据。以下任一情况立即 Stop，当前 48 小时时钟作废，修复并重新批准后从零开始：
+指标证据。以下任一情况立即 Stop，当前 12 小时时钟作废，修复并重新批准后从零开始：
 
 - P0/P1 缺陷或告警；
 - 数据完整性、权限、Secret、重复 Run 或 Landing 不确定性；
@@ -56,12 +53,11 @@ npm run canary:check:p12 -- --report /absolute/private/p12-canary-report.json
 
 ## Production Gate 与签署
 
-`ops/production/p12-release-policy.json` 固定十项 Production Gate 和四个签署角色。Release 文件使用
+`ops/production/p12-release-policy.json` 固定十项 Production Gate 和一个 `owner` 签署角色。Release 文件使用
 `harness.p12-production-release-gate.v1`，内嵌已通过的 Canary 报告，并逐项引用 E2E、身份安全、AutoDev
 授权、模型路由、供应链、Git 追溯、恢复/Stop、监控/on-call、Goal Verification 和缺陷预算证据。
 
-四位 signer 必须互不相同，角色分别为 `security`、`operations`、`product` 和 `project-owner`。每份签署都
-需要 OIDC 身份、request ID、Audit Receipt、理由和签署时间，并绑定同一份规范化 release evidence
+唯一负责人签署需要 OIDC 身份、request ID、Audit Receipt、理由和签署时间，并绑定同一份规范化 release evidence
 SHA-256。任何证据变更都会改变 digest，使旧签署失效。Web 签署完成后，最终独立检查命令：
 
 ```bash
@@ -73,6 +69,6 @@ npm run release:check:p12 -- --release /absolute/private/p12-production-release.
 ## 当前状态
 
 截至 2026-08-05，P12-01～P12-04 已完成；Web/API/PostgreSQL 发布中心及真实浏览器/数据库 E2E 已实现，
-但 E2E 中加速生成的 48 个窗口和测试 OIDC 身份不是发布证据。真实内部 Canary owner/项目、实际连续
-48 小时报告和四角色真实签署尚未提供。因此 P12-05、P12-06 和 M4 Gate 必须保持未完成，Production V1
+但 E2E 中加速生成的 12 个窗口和测试 OIDC 身份不是发布证据。真实内部 Canary owner/项目、实际连续
+12 小时报告和负责人真实签署尚未提供。因此 P12-05、P12-06 和 M4 Gate 必须保持未完成，Production V1
 不得宣告 ready。

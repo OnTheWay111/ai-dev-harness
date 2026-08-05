@@ -37,7 +37,7 @@ function fixture() {
   return { repository, service, authorization };
 }
 
-test("service creates idempotent drafts and requires project-owner approval", async () => {
+test("service creates idempotent drafts and requires owner approval", async () => {
   const { service, authorization } = fixture();
   const input = {
     ...scope,
@@ -65,7 +65,7 @@ test("service creates idempotent drafts and requires project-owner approval", as
   });
   assert.equal(approved.status, "observing");
   assert.ok(authorization.some((entry) =>
-    entry.releaseRole === "project-owner" && entry.actorId === "oidc_project_owner"
+    entry.releaseRole === "owner" && entry.actorId === "oidc_project_owner"
   ));
 });
 
@@ -85,12 +85,12 @@ test("service derives signer identity and audit receipt instead of trusting clie
     ...scope,
     releaseId: "00000000-0000-4000-8000-000000000099",
     expectedVersion: 12,
-    role: "security",
-    ...command("oidc_real_security", "sign-security"),
+    role: "owner",
+    ...command("oidc_real_owner", "sign-owner"),
   });
-  assert.equal(signed.signatures[0].signerId, "oidc_real_security");
+  assert.equal(signed.signatures[0].signerId, "oidc_real_owner");
   assert.match(signed.signatures[0].auditReceiptId, /^[0-9a-f-]{36}$/);
   assert.ok(authorization.some((entry) =>
-    entry.releaseRole === "security" && entry.actorId === "oidc_real_security"
+    entry.releaseRole === "owner" && entry.actorId === "oidc_real_owner"
   ));
 });

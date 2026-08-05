@@ -31,7 +31,7 @@ function draft() {
     goalContractVersion: 3,
     allowedAreas: ["documentation", "non-production-tooling"],
     excludedAreas: ["production-data", "credentials", "billing"],
-    successConditions: ["Goal Verification passed", "No P0/P1 for 48 hours"],
+    successConditions: ["Goal Verification passed", "No P0/P1 for 12 hours"],
     stopConditions: ["Any P0/P1", "owner requests Stop"],
     rollbackRunbook: "docs/runbooks/deployment-rollback-upgrade.md",
     stopRunbook: "docs/runbooks/execution-stop-worker-loss.md",
@@ -62,7 +62,7 @@ function healthyWindow(index) {
 
 function passedCanary() {
   let canary = approvedCanary();
-  for (let index = 0; index < 48; index += 1) {
+  for (let index = 0; index < 12; index += 1) {
     canary = recordCanaryWindow(canary, {
       actorId: "oidc_operations",
       window: healthyWindow(index),
@@ -81,16 +81,16 @@ function passedCanary() {
       status: "mitigated",
       evidenceRefs: ["defect-receipt:P2-001"],
     },
-    now: new Date(START.getTime() + 48 * HOUR),
+    now: new Date(START.getTime() + 12 * HOUR),
   });
   return finalizeCanary(canary, {
     verification: {
       id: "verification-canary-01",
       verdict: "passed",
-      verifiedAt: new Date(START.getTime() + 47 * HOUR).toISOString(),
+      verifiedAt: new Date(START.getTime() + 11 * HOUR).toISOString(),
       evidenceRefs: ["goal-verification:verification-canary-01"],
     },
-    now: new Date(START.getTime() + 49 * HOUR),
+    now: new Date(START.getTime() + 13 * HOUR),
   });
 }
 
@@ -139,9 +139,9 @@ test("P0/P1 stops the attempt and restart preserves prior evidence", () => {
   assert.equal(restarted.events.length, 1);
 });
 
-test("Canary cannot finalize early and emits the authoritative P12 report after 48 hours", () => {
+test("Canary cannot finalize early and emits the authoritative P12 report after 12 hours", () => {
   let canary = approvedCanary();
-  for (let index = 0; index < 47; index += 1) {
+  for (let index = 0; index < 11; index += 1) {
     canary = recordCanaryWindow(canary, {
       actorId: "oidc_operations",
       window: healthyWindow(index),
@@ -152,25 +152,25 @@ test("Canary cannot finalize early and emits the authoritative P12 report after 
     verification: {
       id: "verification-early-01",
       verdict: "passed",
-      verifiedAt: new Date(START.getTime() + 46 * HOUR).toISOString(),
+      verifiedAt: new Date(START.getTime() + 10 * HOUR).toISOString(),
       evidenceRefs: ["goal-verification:verification-early-01"],
     },
-    now: new Date(START.getTime() + 48 * HOUR),
-  }), /48/);
+    now: new Date(START.getTime() + 12 * HOUR),
+  }), /12/);
 
   const passed = passedCanary();
   assert.equal(passed.status, "passed");
   assert.equal(passed.report?.schemaVersion, "harness.p12-canary-report.v1");
-  assert.equal(passed.report?.observation.windows.length, 48);
+  assert.equal(passed.report?.observation.windows.length, 12);
 });
 
-test("Production release locks ten gates, digest, and four distinct OIDC signers", () => {
+test("Production release locks ten gates, digest, and one OIDC owner signer", () => {
   const canary = passedCanary();
   let release = createProductionRelease({
     id: ids.releaseId,
     canary,
     actorId: "oidc_operations",
-    now: new Date(START.getTime() + 49 * HOUR),
+    now: new Date(START.getTime() + 13 * HOUR),
   });
   const gates = [
     "browser-e2e", "identity-security", "autodev-authorization",
@@ -178,19 +178,19 @@ test("Production release locks ten gates, digest, and four distinct OIDC signers
     "recovery-stop", "observability-oncall", "canary-goal-verification",
     "defect-budget",
   ];
-  const roles = ["security", "operations", "product", "project-owner"];
+  const roles = ["owner"];
   gates.forEach((gateId, index) => {
     release = recordProductionGate(release, {
       actorId: `oidc_${roles[index % roles.length]}`,
       gateId,
       ownerRole: roles[index % roles.length],
       evidenceRefs: [`gate-receipt:${gateId}`],
-      now: new Date(START.getTime() + 49 * HOUR + index * 1_000),
+      now: new Date(START.getTime() + 13 * HOUR + index * 1_000),
     });
   });
   release = evaluateProductionRelease(release, {
-    actorId: "oidc_operations",
-    now: new Date(START.getTime() + 50 * HOUR),
+    actorId: "oidc_owner",
+    now: new Date(START.getTime() + 14 * HOUR),
   });
   assert.equal(release.status, "awaiting_signatures");
   assert.match(release.attestationDigest ?? "", /^[0-9a-f]{64}$/);
@@ -202,20 +202,20 @@ test("Production release locks ten gates, digest, and four distinct OIDC signers
       reason: `Approved ${role} after reviewing the complete Production V1 evidence.`,
       requestId: `release-sign-${role}-01`,
       auditReceiptId: `audit-release-${role}-01`,
-      now: new Date(START.getTime() + 50 * HOUR + (index + 1) * 1_000),
+      now: new Date(START.getTime() + 14 * HOUR + (index + 1) * 1_000),
     });
   });
   assert.equal(release.status, "approved");
-  assert.equal(release.signatures.length, 4);
+  assert.equal(release.signatures.length, 1);
   assert.equal(release.report?.result, "approved");
 });
 
-test("Production signatures reject duplicate actors and evidence mutation after evaluation", () => {
+test("Production evidence locks after evaluation and duplicate owner signatures are rejected", () => {
   let release = createProductionRelease({
     id: ids.releaseId,
     canary: passedCanary(),
     actorId: "oidc_operations",
-    now: new Date(START.getTime() + 49 * HOUR),
+    now: new Date(START.getTime() + 13 * HOUR),
   });
   const gates = [
     "browser-e2e", "identity-security", "autodev-authorization",
@@ -225,38 +225,38 @@ test("Production signatures reject duplicate actors and evidence mutation after 
   ];
   for (const gateId of gates) {
     release = recordProductionGate(release, {
-      actorId: "oidc_security",
+      actorId: "oidc_owner",
       gateId,
-      ownerRole: "security",
+      ownerRole: "owner",
       evidenceRefs: [`gate-receipt:${gateId}`],
-      now: new Date(START.getTime() + 49 * HOUR),
+      now: new Date(START.getTime() + 13 * HOUR),
     });
   }
   release = evaluateProductionRelease(release, {
-    actorId: "oidc_operations",
-    now: new Date(START.getTime() + 50 * HOUR),
+    actorId: "oidc_owner",
+    now: new Date(START.getTime() + 14 * HOUR),
   });
   assert.throws(() => recordProductionGate(release, {
-    actorId: "oidc_security",
+    actorId: "oidc_owner",
     gateId: "browser-e2e",
-    ownerRole: "security",
+    ownerRole: "owner",
     evidenceRefs: ["gate-receipt:mutated"],
-    now: new Date(START.getTime() + 50 * HOUR),
+    now: new Date(START.getTime() + 14 * HOUR),
   }), /locked/);
   release = signProductionRelease(release, {
     actorId: "oidc_same_person",
-    role: "security",
-    reason: "Security evidence and release policy are fully approved.",
-    requestId: "release-sign-security-01",
-    auditReceiptId: "audit-release-security-01",
-    now: new Date(START.getTime() + 50 * HOUR),
+    role: "owner",
+    reason: "Owner evidence and release policy are fully approved.",
+    requestId: "release-sign-owner-01",
+    auditReceiptId: "audit-release-owner-01",
+    now: new Date(START.getTime() + 14 * HOUR),
   });
   assert.throws(() => signProductionRelease(release, {
     actorId: "oidc_same_person",
-    role: "operations",
-    reason: "Operations evidence and release policy are fully approved.",
-    requestId: "release-sign-operations-01",
-    auditReceiptId: "audit-release-operations-01",
-    now: new Date(START.getTime() + 50 * HOUR),
-  }), /distinct/);
+    role: "owner",
+    reason: "Owner evidence and release policy are fully approved again.",
+    requestId: "release-sign-owner-02",
+    auditReceiptId: "audit-release-owner-02",
+    now: new Date(START.getTime() + 14 * HOUR),
+  }), /not awaiting signatures/);
 });

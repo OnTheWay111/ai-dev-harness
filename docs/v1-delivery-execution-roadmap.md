@@ -1523,10 +1523,10 @@ Worktree、开发、测试、Review、Commit/Push/PR；再注入 Worker 失联�
 
 </details>
 
-- [ ] **P12-05** 选择低风险内部项目 Canary，连续 48 小时无 P0/P1 问题。
+- [ ] **P12-05** 选择低风险内部项目 Canary，连续 12 小时无 P0/P1 问题。
 
 > 开发门禁和 Web 发布中心已就绪：`/releases`、API、PostgreSQL 事务持久化与浏览器 E2E 强制连续
-> 48 小时证据窗口、P0/P1=0、事件披露/告警解除、P2 owner/规避方案和 Goal Verification。E2E 的加速
+> 12 小时证据窗口、P0/P1=0、事件披露/告警解除、P2 owner/规避方案和 Goal Verification。E2E 的加速
 > 窗口不属于发布证据；真实内部项目 owner 尚未提供，故保持未完成。
 
 <details>
@@ -1540,18 +1540,18 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 工作区固定为 `/Users/onthewayli/harness/ai-dev-harness`；先读取 `docs/v1-delivery-execution-roadmap.md` 第 2.1 自动交付协议。你正在无上下文独立执行 P12-05。先阅读第 2.1、P12、发布门槛、SLO、
 Runbook 和候选项目约束。由有权限负责人选定低风险内部 Canary，记录范围、成功/停止条件、owner、观察
-指标和回退；运行完整 Goal 流程并连续观察 48 小时，记录所有缺陷、告警、人工介入和 Goal Verification。
+指标和回退；运行完整 Goal 流程并连续观察 12 小时，记录所有缺陷、告警、人工介入和 Goal Verification。
 出现 P0/P1 必须停止、修复并重新计时，禁止缩短观察期。满足条件后按第 2.1 自动 commit/push `main`，
 再标记 P12-05 为 `[x]（已完成）`并提交、push 路线图。
 ```
 
 </details>
 
-- [ ] **P12-06** 完成安全、运维、产品和项目负责人签字，逐项关闭 Production Gate。
+- [ ] **P12-06** 完成唯一负责人签字，逐项关闭 Production Gate。
 
-> 发布策略、十项 checklist 和四角色 OIDC/Audit Receipt/digest 签署门禁已在 Web 发布中心实现；服务端
+> 发布策略、十项 checklist 和单一负责人 OIDC/Audit Receipt/digest 签署门禁已在 Web 发布中心实现；服务端
 > 从 OIDC 会话派生 signer，PostgreSQL 将 Gate、签署、Audit 与 Outbox 原子持久化，并由浏览器 E2E 验证
-> 越权失败关闭和四个不同 signer。真实 Canary 与真实签署未完成，故保持未完成。
+> 越权失败关闭和唯一 owner signer。真实 Canary 与真实签署未完成，故保持未完成。
 
 <details>
 <summary>快捷复制开发提示词 P12-06 · gpt-5.6-terra(均衡) · medium(中等)</summary>
@@ -1565,7 +1565,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 工作区固定为 `/Users/onthewayli/harness/ai-dev-harness`；先读取 `docs/v1-delivery-execution-roadmap.md` 第 2.1 自动交付协议。你正在无上下文独立执行最后环节 P12-06。先阅读第 2.1、P12、Production
 V1 发布门槛、全部阶段证据和 Canary 报告。建立逐项 release checklist，核对 E2E、OIDC/RBAC/审计、
 AutoDev 授权、模型路由、漏洞例外、Commit/PR 追溯、备份恢复、回滚/Stop、监控/on-call、P0/P1=0 和
-P2 owner；收集安全、运维、产品和项目负责人真实签字。任一 Gate 未满足则保持未完成。全部签字后按
+P2 owner；由当前唯一负责人完成真实签字。任一 Gate 未满足则保持未完成。签字后按
 第 2.1 自动 commit/push `main`，再标记 P12-06 为 `[x]（已完成）`并提交、push 路线图。
 ```
 

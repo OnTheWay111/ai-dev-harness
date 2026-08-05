@@ -12,10 +12,7 @@ import type {
 import type { ReleaseSignatureRole } from "./domain.ts";
 
 const releaseRoleBindings: Readonly<Record<ReleaseSignatureRole, Role>> = {
-  security: "organization_owner",
-  operations: "operator",
-  product: "approver",
-  "project-owner": "project_admin",
+  owner: "organization_owner",
 };
 
 export class RoleBindingReleaseCenterAuthorizer
