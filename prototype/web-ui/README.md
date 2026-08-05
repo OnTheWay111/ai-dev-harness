@@ -240,6 +240,9 @@ structured redaction, and stable metric names are documented in
 Production alert thresholds, durations, deduplication, suppression, ownership,
 recovery events, and operational Runbooks are documented in
 [`../../docs/p11-alerting.md`](../../docs/p11-alerting.md).
+The RPO/RTO policy, database PITR gate, Artifact Object Lock lifecycle, isolated
+restore procedure, and actual drill receipt are documented in
+[`../../docs/p11-recovery.md`](../../docs/p11-recovery.md).
 The isolated, read-only Codex Planner subprocess contract and controlled smoke
 test are documented in
 [`../../docs/codex-planner.md`](../../docs/codex-planner.md).

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "harness.recovery-policy.v1",
+  "environment": "production",
+  "database": {
+    "automaticBackups": true,
+    "backupRetentionDays": 35,
+    "crossRegionCopy": true,
+    "encryptionAtRest": true,
+    "pointInTimeRecovery": {
+      "enabled": true,
+      "maxRecoveryPointAgeMinutes": 15,
+      "continuousWalArchiving": true
+    }
+  },
+  "objectStore": {
+    "versioning": true,
+    "encryptionAtRest": true,
+    "objectLock": {
+      "enabled": true,
+      "mode": "COMPLIANCE"
+    },
+    "abortIncompleteMultipartUploadDays": 1,
+    "noncurrentVersionRetentionDays": 365
+  },
+  "artifactRetention": {
+    "standard_180d": 180,
+    "extended_365d": 365,
+    "legal_hold": "indefinite-until-authorized-release"
+  },
+  "auditRetentionDays": 180,
+  "recoveryTarget": {
+    "rtoMinutes": 240,
+    "networkEgress": "deny",
+    "productionTraffic": "deny",
+    "requireSeparateCredentials": true,
+    "requireRestoreReceipt": true
+  }
+}

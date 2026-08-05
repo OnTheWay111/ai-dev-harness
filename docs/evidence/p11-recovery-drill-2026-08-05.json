@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "harness.recovery-drill.v1",
+  "drillId": "p11-20260805-actual",
+  "startedAt": "2026-08-05T02:25:59.962Z",
+  "completedAt": "2026-08-05T02:26:01.021Z",
+  "durationSeconds": 1.059,
+  "rpoMinutes": 15,
+  "rtoMinutes": 240,
+  "observedRecoveryPointAgeMinutes": 0.011,
+  "sourceDatabase": "harness_recovery_source_20260805b",
+  "targetDatabase": "harness_recovery_target_20260805d",
+  "isolatedTarget": true,
+  "backupArtifactSha256": "88e6ecb8e1f310e72dc12a3aca13e2830eaff62a357b51acb2ed97b9c07163b6",
+  "migrationLedgerSha256": "8438ce2c7e381974805d35d46936174ad7a4b01442e3fec2ab0dbc29dd6fbe3d",
+  "schemaTables": [
+    "artifact_objects",
+    "audit_events",
+    "goals",
+    "issues",
+    "runs"
+  ],
+  "entityChecks": [
+    {
+      "entity": "goal",
+      "sourceCount": 1,
+      "targetCount": 1,
+      "sourceSha256": "baad4938f86d097127bcfcacd87d227b859270cf08a76f0de2d4040543617a18",
+      "targetSha256": "baad4938f86d097127bcfcacd87d227b859270cf08a76f0de2d4040543617a18",
+      "matched": true
+    },
+    {
+      "entity": "issue",
+      "sourceCount": 1,
+      "targetCount": 1,
+      "sourceSha256": "fd517a8a4845a14cc397fa694f28e57a83ae85d4e9d7ca52b91003aed35b09ac",
+      "targetSha256": "fd517a8a4845a14cc397fa694f28e57a83ae85d4e9d7ca52b91003aed35b09ac",
+      "matched": true
+    },
+    {
+      "entity": "run",
+      "sourceCount": 1,
+      "targetCount": 1,
+      "sourceSha256": "e7758aaa73c5e75ea28f5b533f98f8fb2b364d440335674be31efea392a3a79f",
+      "targetSha256": "e7758aaa73c5e75ea28f5b533f98f8fb2b364d440335674be31efea392a3a79f",
+      "matched": true
+    },
+    {
+      "entity": "audit",
+      "sourceCount": 1,
+      "targetCount": 1,
+      "sourceSha256": "6c49dc4a7ea0cacc722dd62e2bd8cd0adebfdf839723071d75889d416858bb86",
+      "targetSha256": "6c49dc4a7ea0cacc722dd62e2bd8cd0adebfdf839723071d75889d416858bb86",
+      "matched": true
+    },
+    {
+      "entity": "artifact_digest",
+      "sourceCount": 1,
+      "targetCount": 1,
+      "sourceSha256": "42fd0288299338bb20ea0963da373257fcf8785d4f8d6b0adf95ba96cb0a5bfa",
+      "targetSha256": "42fd0288299338bb20ea0963da373257fcf8785d4f8d6b0adf95ba96cb0a5bfa",
+      "matched": true
+    }
+  ],
+  "artifactRetentionVerified": true,
+  "result": "passed",
+  "gaps": []
+}

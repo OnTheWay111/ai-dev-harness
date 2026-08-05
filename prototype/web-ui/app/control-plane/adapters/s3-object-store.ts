@@ -26,6 +26,8 @@ import {
   validateDownloadGrant,
   validateObjectUpload,
 } from "../ports/object-store-port.ts";
+import { artifactObjectLockInput } from
+  "../../reliability/recovery-policy.ts";
 
 export interface S3ObjectStoreOptions {
   client: S3Client;
@@ -116,6 +118,10 @@ export class S3ObjectStore implements ObjectStorePort {
             project: input.scope.projectId,
           },
           ServerSideEncryption: "AES256",
+          ...artifactObjectLockInput(
+            input.retentionPolicy,
+            input.retentionUntil,
+          ),
         }));
       } catch (error) {
         if (!alreadyExists(error)) throw error;
