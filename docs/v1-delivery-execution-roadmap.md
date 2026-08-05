@@ -1377,7 +1377,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P11-04** 建立 expand/migrate/contract 数据迁移和应用版本回滚流程。
+- [x] **P11-04** 建立 expand/migrate/contract 数据迁移和应用版本回滚流程。（已完成：2026-08-05；实现提交：ai-dev-harness@eaa43a9ac24bc292c8490902fa23866e0b98c0c1）
 
 <details>
 <summary>快捷复制开发提示词 P11-04 · gpt-5.6-sol(深度) · high(高)</summary>
