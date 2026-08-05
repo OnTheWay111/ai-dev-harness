@@ -1397,7 +1397,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P11-05** 完成 Secret 扫描、依赖漏洞、许可证、SBOM、镜像和供应链评审。
+- [x] **P11-05** 完成 Secret 扫描、依赖漏洞、许可证、SBOM、镜像和供应链评审。（已完成：2026-08-05；实现提交：ai-dev-harness@d259263c1a18e11e46f6d44c54d4afb9acf78bc5）
 
 <details>
 <summary>快捷复制开发提示词 P11-05 · gpt-5.6-sol(深度) · high(高)</summary>
