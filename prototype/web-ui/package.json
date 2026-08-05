@@ -16,6 +16,8 @@
     "test:autodev:integration": "node --experimental-strip-types --test tests/autodev-queue-import-integration.test.mjs",
     "scheduler:p7": "node --experimental-strip-types scripts/run-execution-scheduler.ts",
     "projector:p8": "node --experimental-strip-types scripts/run-workbench-projector.ts",
+    "monitor:p11": "node --experimental-strip-types scripts/run-alert-monitor.ts",
+    "test:p11": "node --experimental-strip-types --test tests/p11-*.test.mjs",
     "test:p8": "node --experimental-strip-types --test tests/p8-*.test.mjs",
     "test:p9": "node --experimental-strip-types --test tests/p9-*.test.mjs",
     "test:p9:postgres": "node --experimental-strip-types scripts/run-postgres-integration-tests.ts tests/p9-postgres-integration.test.mjs",

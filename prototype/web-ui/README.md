@@ -237,6 +237,9 @@ browser draft-recovery boundary are documented in
 The request/Goal/Issue/Run/Receipt correlation dictionary, W3C trace propagation,
 structured redaction, and stable metric names are documented in
 [`../../docs/p11-observability.md`](../../docs/p11-observability.md).
+Production alert thresholds, durations, deduplication, suppression, ownership,
+recovery events, and operational Runbooks are documented in
+[`../../docs/p11-alerting.md`](../../docs/p11-alerting.md).
 The isolated, read-only Codex Planner subprocess contract and controlled smoke
 test are documented in
 [`../../docs/codex-planner.md`](../../docs/codex-planner.md).
