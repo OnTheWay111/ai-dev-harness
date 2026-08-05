@@ -1463,7 +1463,7 @@ fixture。契约套件必须同时跑 fake 与可用真实适配器。通过后�
 
 </details>
 
-- [ ] **P12-02** 浏览器 E2E 覆盖 Goal → 澄清 → 审批 → Issue → 执行 → 验收主路径。
+- [x] **P12-02** 浏览器 E2E 覆盖 Goal → 澄清 → 审批 → Issue → 执行 → 验收主路径。（已完成：2026-08-05；实现提交：ai-dev-harness@6ab37fc5d93029c6ec30d4a5adf0d744f50342ca）
 
 <details>
 <summary>快捷复制开发提示词 P12-02 · gpt-5.6-terra(均衡) · medium(中等)</summary>
