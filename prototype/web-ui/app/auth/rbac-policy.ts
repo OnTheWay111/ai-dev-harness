@@ -11,6 +11,8 @@ export const permissions = [
   "goal.read",
   "goal.write",
   "goal.approve",
+  "goal.verify",
+  "goal.accept",
   "spec.read",
   "spec.generate",
   "spec.approve",
@@ -21,6 +23,8 @@ export const permissions = [
   "issue.project",
   "run.operate",
   "evidence.read",
+  "delivery_report.read",
+  "delivery_report.generate",
 ] as const;
 
 export type Permission = (typeof permissions)[number];
@@ -32,6 +36,7 @@ const grants: Readonly<Record<Role, ReadonlySet<Permission>>> = {
     "role_binding.manage",
     "goal.read",
     "goal.write",
+    "goal.verify",
     "spec.read",
     "spec.generate",
     "issue.read",
@@ -39,11 +44,15 @@ const grants: Readonly<Record<Role, ReadonlySet<Permission>>> = {
     "issue.edit",
     "run.operate",
     "evidence.read",
+    "delivery_report.read",
+    "delivery_report.generate",
   ]),
   approver: new Set([
     "goal.read",
     "goal.write",
     "goal.approve",
+    "goal.verify",
+    "goal.accept",
     "spec.read",
     "spec.generate",
     "spec.approve",
@@ -53,9 +62,17 @@ const grants: Readonly<Record<Role, ReadonlySet<Permission>>> = {
     "issue.approve",
     "issue.project",
     "evidence.read",
+    "delivery_report.read",
+    "delivery_report.generate",
   ]),
-  operator: new Set(["goal.read", "spec.read", "issue.read", "run.operate", "evidence.read"]),
-  viewer: new Set(["goal.read", "spec.read", "issue.read", "evidence.read"]),
+  operator: new Set([
+    "goal.read", "goal.verify", "spec.read", "issue.read", "run.operate",
+    "evidence.read", "delivery_report.read", "delivery_report.generate",
+  ]),
+  viewer: new Set([
+    "goal.read", "spec.read", "issue.read", "evidence.read",
+    "delivery_report.read",
+  ]),
 };
 
 export class AuthorizationDeniedError extends Error {

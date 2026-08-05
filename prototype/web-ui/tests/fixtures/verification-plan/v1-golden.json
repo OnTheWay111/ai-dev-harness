@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "acceptance-verification-plan-draft.v1",
+  "entries": [
+    {
+      "id": "verify-ac-1",
+      "criterionRef": "00000000-0000-4000-8000-000000000011",
+      "environment": "test",
+      "strategy": {
+        "type": "command",
+        "reference": "command:test:p10"
+      },
+      "successCondition": "The approved P10 test command exits with code 0.",
+      "timeoutMs": 60000,
+      "responsibleParty": "quality-engineering"
+    },
+    {
+      "id": "verify-ac-2",
+      "criterionRef": "00000000-0000-4000-8000-000000000012",
+      "environment": "staging",
+      "strategy": {
+        "type": "artifact",
+        "reference": "artifact:test-output:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "successCondition": "The immutable test Artifact exists with the approved digest.",
+      "timeoutMs": 10000,
+      "responsibleParty": "delivery-platform"
+    },
+    {
+      "id": "verify-ac-3",
+      "criterionRef": "00000000-0000-4000-8000-000000000013",
+      "environment": "production",
+      "strategy": {
+        "type": "manual",
+        "instructions": "An Approver confirms the recovery drill receipt and records a reason.",
+        "requiredRole": "approver"
+      },
+      "successCondition": "A project Approver signs the immutable recovery drill evidence.",
+      "timeoutMs": 86400000,
+      "responsibleParty": "project-approver"
+    }
+  ]
+}

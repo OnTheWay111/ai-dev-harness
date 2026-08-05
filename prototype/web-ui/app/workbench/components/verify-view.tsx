@@ -1,95 +1,363 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { AcceptanceVerificationPlan } from
+  "../../control-plane/domain/acceptance-verification";
+import type { DeliveryReport } from
+  "../../control-plane/domain/delivery-report";
+import type { GoalContract } from
+  "../../control-plane/domain/goal-contract";
+import type { GoalVerification } from
+  "../../control-plane/domain/goal-verification";
+import type { VerificationGapReport } from
+  "../../control-plane/domain/verification-gap";
+import type { IssuePlan } from "../../control-plane/domain/issue-plan";
+import {
+  GoalVerificationApiError,
+  goalVerificationApi,
+} from "../goal-verification-api";
+import {
+  goalWorkspaceApi,
+  type GoalWorkspaceScope,
+} from "../goal-workspace-api";
+import { issuePlanApi } from "../issue-plan-api";
 import { StatusPill, Stepper } from "./ui";
 
-export function VerifyView({ notify }: { notify: (message: string) => void }) {
-  const [verified, setVerified] = useState(false);
-  const criteria = useMemo(
-    () => [
-      { id: "AC-001", title: "Web 完成目标、范围和 Issue 审批", evidence: "browser-e2e/run-188 · 12 scenarios", ready: true },
-      { id: "AC-002", title: "AutoDev 安全领取并保留完整证据", evidence: "run-loop-18 / evidence-manifest.json", ready: true },
-      { id: "AC-003", title: "根据风险自动选择 Builder 能力", evidence: "model-route-audit / 8 decisions", ready: true },
-      { id: "AC-004", title: "通过 OIDC、RBAC、审计和恢复演练", evidence: verified ? "security-gate / passed" : "等待最终恢复演练", ready: verified },
-    ],
-    [verified],
+const queryReferences = [
+  "query:issues:completed",
+  "query:reviews:approved",
+  "query:delivery:ready",
+] as const;
+
+function errorMessage(error: unknown): string {
+  return error instanceof GoalVerificationApiError
+    ? `${error.message}. ${error.preservedState}`
+    : error instanceof Error ? error.message : "目标验收服务暂时不可用";
+}
+
+export function VerifyView({
+  notify,
+  scope,
+  goalId,
+}: {
+  notify: (message: string) => void;
+  scope: GoalWorkspaceScope;
+  goalId: string | null;
+}) {
+  const [goal, setGoal] = useState<GoalContract | null>(null);
+  const [issuePlan, setIssuePlan] = useState<IssuePlan | null>(null);
+  const [plans, setPlans] = useState<readonly AcceptanceVerificationPlan[]>([]);
+  const [verifications, setVerifications] = useState<readonly GoalVerification[]>([]);
+  const [gaps, setGaps] = useState<readonly VerificationGapReport[]>([]);
+  const [reports, setReports] = useState<readonly DeliveryReport[]>([]);
+  const [manualEvidence, setManualEvidence] = useState<Record<string, string>>({});
+  const [acceptanceReason, setAcceptanceReason] = useState(
+    "All required evidence, disclosed risks, and manual checks are accepted.",
   );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const refresh = useCallback(async () => {
+    if (!goalId) return;
+    const [nextGoal, issueTimeline, nextPlans, nextVerifications, nextGaps, nextReports] =
+      await Promise.all([
+        goalWorkspaceApi.get(scope, goalId),
+        issuePlanApi.timeline(scope, goalId),
+        goalVerificationApi.planTimeline(scope, goalId),
+        goalVerificationApi.verificationTimeline(scope, goalId),
+        goalVerificationApi.gapTimeline(scope, goalId),
+        goalVerificationApi.reportTimeline(scope, goalId),
+      ]);
+    setGoal(nextGoal);
+    setIssuePlan(issueTimeline.plans.at(-1) ?? null);
+    setPlans(nextPlans);
+    setVerifications(nextVerifications);
+    setGaps(nextGaps);
+    setReports(nextReports);
+  }, [goalId, scope]);
+
+  useEffect(() => {
+    if (!goalId) return;
+    let active = true;
+    void Promise.resolve()
+      .then(() => {
+        if (!active) return;
+        setBusy(true);
+        return refresh();
+      })
+      .catch((caught: unknown) => {
+        if (active) setError(errorMessage(caught));
+      })
+      .finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [goalId, refresh]);
+
+  const latestPlan = plans.at(-1) ?? null;
+  const latestVerification = verifications.at(-1) ?? null;
+  const latestReport = reports.at(-1) ?? null;
+  const verdictByCriterion = useMemo(() => new Map(
+    latestVerification?.verifierOutput.criteria.map((item) => [
+      item.criterionRef,
+      item,
+    ]) ?? [],
+  ), [latestVerification]);
+  const passed = goal?.acceptanceCriteria.filter((criterion) =>
+    verdictByCriterion.get(criterion.id)?.verdict === "passed"
+  ).length ?? 0;
+
+  const perform = useCallback(async (
+    action: () => Promise<unknown>,
+    success: string,
+  ) => {
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+      notify(success);
+      await refresh();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }, [notify, refresh]);
+
+  async function compiledPlan(): Promise<AcceptanceVerificationPlan> {
+    if (latestPlan) return latestPlan;
+    if (!goal || !goalId || !issuePlan) {
+      throw new Error("Goal 与已批准 Issue Plan 尚未就绪");
+    }
+    return await goalVerificationApi.compilePlan(
+      scope,
+      goalId,
+      issuePlan,
+      goal.version,
+      {
+        schemaVersion: "acceptance-verification-plan-draft.v1",
+        entries: goal.acceptanceCriteria.map((criterion, index) => {
+          const reference = queryReferences[index % queryReferences.length];
+          return {
+            id: `verify-ac-${index + 1}`,
+            criterionRef: criterion.id,
+            environment: "staging" as const,
+            strategy: { type: "query" as const, reference },
+            successCondition:
+              `Approved ${reference} must prove the criterion with zero missing records.`,
+            timeoutMs: 30_000,
+            responsibleParty: "delivery-platform",
+          };
+        }),
+      },
+    );
+  }
+
+  if (!goalId) {
+    return (
+      <div className="screen detail-screen">
+        <section className="panel verification-panel">
+          <div className="panel-header">
+            <div><p className="eyebrow">GOAL VERIFIER</p><h3>尚未选择可验收 Goal</h3></div>
+          </div>
+          <p>先在“需求澄清”创建 Goal 并完成 Issue 执行，再进入目标验收。</p>
+        </section>
+      </div>
+    );
+  }
 
   return (
-    <div className="screen detail-screen">
+    <div className="screen detail-screen" aria-busy={busy}>
       <div className="goal-heading">
         <div>
           <div className="heading-meta">
-            <StatusPill tone={verified ? "success" : "warning"}>{verified ? "可以交付" : "等待最终验收"}</StatusPill>
-            <span>GOAL-2407</span><span>Verification revision 1</span>
+            <StatusPill tone={latestReport?.status === "accepted" ? "success" : "warning"}>
+              {latestReport?.status === "accepted" ? "已完成交付" : "目标验收中"}
+            </StatusPill>
+            <span>{goalId}</span>
+            <span>Verification revision {latestVerification?.revision ?? 0}</span>
           </div>
-          <h2>Production V1 目标验收</h2>
-          <p>Issue 完成不等于目标完成。这里逐条验证原始 Goal Contract。</p>
+          <h2>{goal?.title ?? "Goal Verifier 与 Delivery Report"}</h2>
+          <p>Issue 完成不等于目标完成；这里逐条验证原始 Goal Contract，并保留不可变报告版本。</p>
         </div>
         <div className="heading-actions">
-          <button className="secondary-button">下载证据包</button>
+          {latestReport && (
+            <a
+              className="secondary-button"
+              href={goalVerificationApi.exportUrl(scope, goalId, latestReport.id)}
+            >
+              导出 Delivery Report
+            </a>
+          )}
           <button
             className="primary-button"
-            onClick={() => {
-              setVerified(true);
-              notify("Goal Verifier 已通过，Delivery Report 已生成");
-            }}
+            disabled={busy || !goal || goal.status !== "verifying"}
+            onClick={() => void perform(async () => {
+              if (!goal) return;
+              const plan = await compiledPlan();
+              const signed = plan.entries.flatMap((entry) => {
+                if (entry.strategy.type !== "manual") return [];
+                const evidenceRef = manualEvidence[entry.id]?.trim();
+                return evidenceRef ? [{
+                  entryId: entry.id,
+                  evidenceRef,
+                  reason: `Approver confirmed ${entry.successCondition}`,
+                }] : [];
+              });
+              await goalVerificationApi.verify(
+                scope,
+                goalId,
+                plan,
+                goal.version,
+                signed,
+              );
+            }, "独立 Goal Verifier 会话已完成")}
           >
-            {verified ? "重新运行验收" : "运行最终验收"}
+            {latestVerification ? "重新运行验收" : "运行最终验收"}
           </button>
         </div>
       </div>
 
       <Stepper current={6} />
+      {error && <div className="workbench-state-banner failure" role="alert">{error}</div>}
 
       <div className="verify-layout">
         <main>
           <section className="panel verification-panel">
             <div className="panel-header">
               <div><p className="eyebrow">ACCEPTANCE CRITERIA</p><h3>原始验收标准</h3></div>
-              <span className="criteria-score">{criteria.filter((item) => item.ready).length} / {criteria.length} 通过</span>
+              <span className="criteria-score">{passed} / {goal?.acceptanceCriteria.length ?? 0} 通过</span>
             </div>
             <div className="verification-list">
-              {criteria.map((item) => (
-                <article className={item.ready ? "passed" : "pending"} key={item.id}>
-                  <span className="verify-icon">{item.ready ? "✓" : "…"}</span>
-                  <div><span>{item.id}</span><strong>{item.title}</strong><small>{item.evidence}</small></div>
-                  <StatusPill tone={item.ready ? "success" : "warning"}>{item.ready ? "通过" : "待完成"}</StatusPill>
-                </article>
-              ))}
+              {goal?.acceptanceCriteria.map((criterion) => {
+                const result = verdictByCriterion.get(criterion.id);
+                const ready = result?.verdict === "passed";
+                return (
+                  <article className={ready ? "passed" : "pending"} key={criterion.id}>
+                    <span className="verify-icon">{ready ? "✓" : "…"}</span>
+                    <div>
+                      <span>AC-{String(criterion.position).padStart(3, "0")}</span>
+                      <strong>{criterion.statement}</strong>
+                      <small>{result?.evidenceRefs.join(" · ") || "等待确定性证据"}</small>
+                    </div>
+                    <StatusPill tone={ready ? "success" : "warning"}>
+                      {result?.verdict ?? "待验证"}
+                    </StatusPill>
+                  </article>
+                );
+              })}
             </div>
+            {latestPlan?.entries.some(({ strategy }) => strategy.type === "manual") && (
+              <div className="risk-row">
+                <StatusPill tone="warning">人工证据</StatusPill>
+                <div>
+                  <strong>Approver 签字证据</strong>
+                  {latestPlan.entries.filter(({ strategy }) => strategy.type === "manual")
+                    .map((entry) => (
+                      <input
+                        key={entry.id}
+                        aria-label={`${entry.id} evidence reference`}
+                        placeholder="不可变证据引用"
+                        value={manualEvidence[entry.id] ?? ""}
+                        onChange={(event) => setManualEvidence((current) => ({
+                          ...current,
+                          [entry.id]: event.target.value,
+                        }))}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="panel risk-panel">
             <div className="panel-header">
-              <div><p className="eyebrow">DISCLOSED RISKS</p><h3>风险与限制</h3></div>
-              <button className="text-button">添加披露</button>
+              <div><p className="eyebrow">DISCLOSED RISKS</p><h3>回归风险与差距</h3></div>
+              <StatusPill tone={gaps.length ? "warning" : "success"}>
+                {gaps.length ? `${gaps.length} 份差距报告` : "无已记录差距"}
+              </StatusPill>
             </div>
-            <div className="risk-row">
-              <StatusPill tone="warning">已接受</StatusPill>
-              <div><strong>首期仅支持单组织内部部署</strong><p>多租户、计费和外部客户注册已明确排除。</p></div>
-              <span>Approver · Li</span>
-            </div>
-            <div className="risk-row">
-              <StatusPill tone="info">需监控</StatusPill>
-              <div><strong>AutoDev 任务级 Builder 接口依赖授权扩展</strong><p>兼容性测试通过；升级时必须重新执行契约测试。</p></div>
-              <span>Owner · Platform</span>
-            </div>
+            {latestVerification?.verifierOutput.regressionRisks.map((risk) => (
+              <div className="risk-row" key={risk.description}>
+                <StatusPill tone={risk.severity === "critical" || risk.severity === "high" ? "danger" : "info"}>
+                  {risk.severity}
+                </StatusPill>
+                <div><strong>{risk.description}</strong><p>{risk.evidenceRefs.join(" · ")}</p></div>
+              </div>
+            ))}
+            {latestVerification?.verdict === "failed" && (
+              <button
+                className="secondary-button"
+                disabled={busy || gaps.some(({ verificationId }) =>
+                  verificationId === latestVerification.id
+                )}
+                onClick={() => void perform(
+                  () => goalVerificationApi.createGap(scope, goalId, latestVerification.id),
+                  "差距报告已保存；旧 Evidence、Review、Commit 与 Artifact 未被修改",
+                )}
+              >
+                生成 Verification Gap Report
+              </button>
+            )}
           </section>
         </main>
 
         <aside className="panel delivery-card">
-          <div className={`delivery-seal ${verified ? "ready" : ""}`}><span>{verified ? "✓" : "⌛"}</span></div>
-          <p className="eyebrow">DELIVERY DECISION</p>
-          <h3>{verified ? "目标已经达成" : "还差 1 条证据"}</h3>
-          <p>{verified ? "所有原始验收标准通过，没有未披露的阻塞问题。可以通知人工验收。" : "安全与恢复演练尚未完成。系统不会因为所有 Issue 已关闭而提前交付。"}</p>
-          <div className="delivery-facts">
-            <div><span>Issue</span><strong>8 / 8</strong></div>
-            <div><span>测试</span><strong>326 / 326</strong></div>
-            <div><span>P0/P1</span><strong>0</strong></div>
+          <div className={`delivery-seal ${latestVerification?.verdict === "passed" ? "ready" : ""}`}>
+            <span>{latestVerification?.verdict === "passed" ? "✓" : "⌛"}</span>
           </div>
-          <button className="primary-button full" disabled={!verified} onClick={() => notify("交付通知已生成，等待人工验收")}>生成 Delivery Report</button>
-          <button className="secondary-button full">预览交付内容</button>
-          <small className="delivery-footnote">报告将包含代码、PR、测试、例外、风险和人工重点检查项。</small>
+          <p className="eyebrow">DELIVERY DECISION</p>
+          <h3>{latestReport?.status === "accepted"
+            ? "目标已经达成"
+            : latestVerification?.verdict === "passed"
+            ? "等待人工最终验收"
+            : "验收证据尚未闭合"}</h3>
+          <p>只有全部必需标准通过并完成 Approver 门禁，Goal 才会从 verifying 原子转换为 completed。</p>
+          <div className="delivery-facts">
+            <div><span>Plan</span><strong>r{latestPlan?.revision ?? 0}</strong></div>
+            <div><span>Verification</span><strong>r{latestVerification?.revision ?? 0}</strong></div>
+            <div><span>Report</span><strong>r{latestReport?.revision ?? 0}</strong></div>
+          </div>
+          <button
+            className="primary-button full"
+            disabled={busy || latestVerification?.verdict !== "passed"}
+            onClick={() => void perform(async () => {
+              if (!latestVerification) return;
+              await goalVerificationApi.generateReport(
+                scope,
+                goalId,
+                latestVerification.id,
+                latestVerification.verifierOutput.regressionRisks.map((risk) => ({
+                  severity: risk.severity,
+                  statement: risk.description,
+                  disposition: "monitor" as const,
+                })),
+              );
+            }, "新的不可变 Delivery Report 版本已生成")}
+          >
+            生成 Delivery Report
+          </button>
+          <textarea
+            aria-label="Final acceptance reason"
+            value={acceptanceReason}
+            onChange={(event) => setAcceptanceReason(event.target.value)}
+          />
+          <button
+            className="secondary-button full"
+            disabled={busy || latestReport?.status !== "awaiting_human_acceptance" || !goal}
+            onClick={() => void perform(async () => {
+              if (!latestReport || !goal) return;
+              await goalVerificationApi.acceptReport(
+                scope,
+                goalId,
+                latestReport.id,
+                goal.version,
+                acceptanceReason,
+              );
+            }, "人工门禁已记录，Goal 已完成")}
+          >
+            Approver 最终验收
+          </button>
+          <small className="delivery-footnote">
+            报告包含原始范围、非目标、逐项证据、Issue/Run、Review、Commit/PR、异常、风险与人工签字。
+          </small>
         </aside>
       </div>
     </div>

@@ -123,6 +123,10 @@ deny behavior, and role-change Audit transaction are documented in
   delivery policy, real isolated Git remote, PR/Landing, and schema tests
 - `npm run test:p9:postgres`: migrate an isolated real PostgreSQL database and
   verify P9 append-only metadata, Review, delivery receipts, Audit, and replay
+- `npm run test:p10`: run verification-plan, independent Verifier, immutable
+  gap/remediation, Delivery Report, API/UI, and schema contract tests
+- `npm run test:p10:postgres`: migrate an isolated PostgreSQL database and
+  verify P10 immutable chains, Audit, replay, rollback, and atomic Goal acceptance
 - `npm run test:browser:p8`: run retained-data, empty-state, conflict, and duplicate-click Chromium paths
 - `npm run projector:p8`: run the independent Outbox-driven workbench projector (server-side `DATABASE_URL` required)
 - `npm run test:postgres:integration`: create, migrate, test, and destroy a
@@ -262,6 +266,9 @@ CSRF/同源校验、严格请求 Schema、大小上限、限流、安全响应�
 P9 的对象存储、证据脱敏、独立 Review、Push 策略、短期凭证和
 Commit→PR→Landing 审计状态流记录在
 [`../../docs/p9-artifact-evidence-git-delivery.md`](../../docs/p9-artifact-evidence-git-delivery.md)。
+P10 的确定性验收计划、独立只读 Goal Verifier、差距回流、不可变
+Delivery Report 和最终人工门禁记录在
+[`../../docs/p10-goal-verifier-delivery-report.md`](../../docs/p10-goal-verifier-delivery-report.md)。
 
 The seed command is only a bootstrap utility. In the real pipeline, the
 scheduler/aggregator owns `WorkbenchSnapshot` generation. The P8 Projector

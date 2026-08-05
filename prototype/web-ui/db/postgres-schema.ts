@@ -57,6 +57,26 @@ import {
 import type {
   ArtifactRetentionPolicy,
 } from "../app/control-plane/ports/object-store-port.ts";
+import type {
+  AcceptanceVerificationEntry,
+  VerificationPlanCompilation,
+} from "../app/control-plane/domain/acceptance-verification.ts";
+import type {
+  DeterministicVerificationResult,
+  GoalVerificationVerdict,
+  GoalVerifierOutput,
+} from "../app/control-plane/domain/goal-verification.ts";
+import type {
+  GapRemediationReceipt,
+  VerificationGap,
+} from "../app/control-plane/domain/verification-gap.ts";
+import type {
+  DeliveryHumanAcceptance,
+  DeliveryIssueRun,
+  DeliveryKnownRisk,
+  DeliveryReportAcceptance,
+  DeliveryReportStatus,
+} from "../app/control-plane/domain/delivery-report.ts";
 
 export {
   artifactKinds,
@@ -2371,6 +2391,381 @@ export const deliveryOperationReceipts = pgTable(
   ],
 );
 
+export const acceptanceVerificationPlans = pgTable(
+  "acceptance_verification_plans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    goalVersion: integer("goal_version").notNull(),
+    issuePlanId: uuid("issue_plan_id").notNull(),
+    issuePlanVersion: integer("issue_plan_version").notNull(),
+    revision: integer("revision").notNull(),
+    previousPlanId: uuid("previous_plan_id"),
+    entries: jsonb("entries").$type<AcceptanceVerificationEntry[]>().notNull(),
+    compilation: jsonb("compilation").$type<VerificationPlanCompilation>().notNull(),
+    digest: text("digest").notNull(),
+    compiledAt: timestamp("compiled_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "acceptance_verification_plans_goal_fk",
+      columns: [table.organizationId, table.projectId, table.goalId],
+      foreignColumns: [goals.organizationId, goals.projectId, goals.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "acceptance_verification_plans_issue_plan_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.issuePlanId,
+      ],
+      foreignColumns: [
+        issuePlanRevisions.organizationId, issuePlanRevisions.projectId,
+        issuePlanRevisions.goalId, issuePlanRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("acceptance_verification_plans_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    foreignKey({
+      name: "acceptance_verification_plans_previous_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.previousPlanId,
+      ],
+      foreignColumns: [
+        table.organizationId, table.projectId, table.goalId, table.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("acceptance_verification_plans_goal_revision_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.revision,
+    ),
+    check(
+      "acceptance_verification_plans_chain_chk",
+      sql`${table.revision} > 0 AND ((${table.revision}=1 AND ${table.previousPlanId} IS NULL) OR (${table.revision}>1 AND ${table.previousPlanId} IS NOT NULL))`,
+    ),
+    check(
+      "acceptance_verification_plans_source_chk",
+      sql`${table.goalVersion} > 0 AND ${table.issuePlanVersion} > 0 AND ${table.version} > 0`,
+    ),
+    check(
+      "acceptance_verification_plans_payload_chk",
+      sql`jsonb_typeof(${table.entries})='array' AND jsonb_array_length(${table.entries}) BETWEEN 1 AND 50 AND jsonb_typeof(${table.compilation})='object' AND ${table.digest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "acceptance_verification_plans_time_chk",
+      sql`${table.compiledAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const goalVerifications = pgTable(
+  "goal_verifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    verificationPlanId: uuid("verification_plan_id").notNull(),
+    issuePlanId: uuid("issue_plan_id").notNull(),
+    revision: integer("revision").notNull(),
+    previousVerificationId: uuid("previous_verification_id"),
+    goalVersion: integer("goal_version").notNull(),
+    verdict: text("verdict").$type<GoalVerificationVerdict>().notNull(),
+    deterministicResults: jsonb("deterministic_results")
+      .$type<DeterministicVerificationResult[]>().notNull(),
+    verifierOutput: jsonb("verifier_output").$type<GoalVerifierOutput>().notNull(),
+    verifierIdentity: text("verifier_identity").notNull(),
+    verifierVersion: text("verifier_version").notNull(),
+    sessionId: text("session_id").notNull(),
+    verifiedAt: timestamp("verified_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "goal_verifications_plan_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId,
+        table.verificationPlanId,
+      ],
+      foreignColumns: [
+        acceptanceVerificationPlans.organizationId,
+        acceptanceVerificationPlans.projectId,
+        acceptanceVerificationPlans.goalId,
+        acceptanceVerificationPlans.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "goal_verifications_issue_plan_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.issuePlanId,
+      ],
+      foreignColumns: [
+        issuePlanRevisions.organizationId, issuePlanRevisions.projectId,
+        issuePlanRevisions.goalId, issuePlanRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("goal_verifications_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    foreignKey({
+      name: "goal_verifications_previous_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId,
+        table.previousVerificationId,
+      ],
+      foreignColumns: [
+        table.organizationId, table.projectId, table.goalId, table.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("goal_verifications_goal_revision_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.revision,
+    ),
+    uniqueIndex("goal_verifications_session_uidx").on(
+      table.organizationId, table.sessionId,
+    ),
+    check(
+      "goal_verifications_chain_chk",
+      sql`${table.revision} > 0 AND ((${table.revision}=1 AND ${table.previousVerificationId} IS NULL) OR (${table.revision}>1 AND ${table.previousVerificationId} IS NOT NULL))`,
+    ),
+    check(
+      "goal_verifications_verdict_chk",
+      sql`${table.verdict} IN ('passed','failed','needs_manual')`,
+    ),
+    check(
+      "goal_verifications_payload_chk",
+      sql`${table.goalVersion} > 0 AND ${table.version} > 0 AND jsonb_typeof(${table.deterministicResults})='array' AND jsonb_array_length(${table.deterministicResults}) BETWEEN 1 AND 50 AND jsonb_typeof(${table.verifierOutput})='object'`,
+    ),
+    check(
+      "goal_verifications_identity_chk",
+      sql`char_length(btrim(${table.verifierIdentity})) BETWEEN 1 AND 200 AND char_length(btrim(${table.verifierVersion})) BETWEEN 1 AND 200 AND char_length(btrim(${table.sessionId})) BETWEEN 1 AND 200 AND ${table.verifiedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const verificationGapReports = pgTable(
+  "verification_gap_reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    verificationId: uuid("verification_id").notNull(),
+    issuePlanId: uuid("issue_plan_id").notNull(),
+    failedCriterionRefs: jsonb("failed_criterion_refs").$type<string[]>().notNull(),
+    preservedEvidenceRefs: jsonb("preserved_evidence_refs").$type<string[]>().notNull(),
+    gaps: jsonb("gaps").$type<VerificationGap[]>().notNull(),
+    createdBy: text("created_by").notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "verification_gap_reports_verification_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.verificationId,
+      ],
+      foreignColumns: [
+        goalVerifications.organizationId, goalVerifications.projectId,
+        goalVerifications.goalId, goalVerifications.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "verification_gap_reports_issue_plan_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.issuePlanId,
+      ],
+      foreignColumns: [
+        issuePlanRevisions.organizationId, issuePlanRevisions.projectId,
+        issuePlanRevisions.goalId, issuePlanRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("verification_gap_reports_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    uniqueIndex("verification_gap_reports_verification_uidx").on(
+      table.verificationId,
+    ),
+    check(
+      "verification_gap_reports_payload_chk",
+      sql`jsonb_typeof(${table.failedCriterionRefs})='array' AND jsonb_array_length(${table.failedCriterionRefs}) <= 50 AND jsonb_typeof(${table.preservedEvidenceRefs})='array' AND jsonb_typeof(${table.gaps})='array' AND jsonb_array_length(${table.gaps}) BETWEEN 1 AND 50`,
+    ),
+    check(
+      "verification_gap_reports_identity_chk",
+      sql`char_length(btrim(${table.createdBy})) BETWEEN 1 AND 200 AND ${table.version} > 0`,
+    ),
+  ],
+);
+
+export const gapRemediationReceipts = pgTable(
+  "gap_remediation_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    reportId: uuid("report_id").notNull(),
+    planId: uuid("plan_id").notNull(),
+    actorId: text("actor_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    receipt: jsonb("receipt").$type<GapRemediationReceipt>().notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "gap_remediation_receipts_report_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.reportId,
+      ],
+      foreignColumns: [
+        verificationGapReports.organizationId,
+        verificationGapReports.projectId,
+        verificationGapReports.goalId,
+        verificationGapReports.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "gap_remediation_receipts_plan_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.planId,
+      ],
+      foreignColumns: [
+        issuePlanRevisions.organizationId, issuePlanRevisions.projectId,
+        issuePlanRevisions.goalId, issuePlanRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("gap_remediation_receipts_idempotency_uidx").on(
+      table.organizationId, table.reportId, table.actorId, table.idempotencyKey,
+    ),
+    check(
+      "gap_remediation_receipts_identity_chk",
+      sql`char_length(btrim(${table.actorId})) BETWEEN 1 AND 200 AND char_length(${table.idempotencyKey}) BETWEEN 8 AND 200 AND ${table.requestHash} ~ '^[0-9a-f]{64}$' AND jsonb_typeof(${table.receipt})='object'`,
+    ),
+  ],
+);
+
+export const deliveryReports = pgTable(
+  "delivery_reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    revision: integer("revision").notNull(),
+    previousReportId: uuid("previous_report_id"),
+    verificationId: uuid("verification_id").notNull(),
+    verificationPlanId: uuid("verification_plan_id").notNull(),
+    issuePlanId: uuid("issue_plan_id").notNull(),
+    goalSnapshot: jsonb("goal_snapshot").$type<import("../app/control-plane/domain/goal-contract.ts").GoalContract>().notNull(),
+    acceptance: jsonb("acceptance").$type<DeliveryReportAcceptance[]>().notNull(),
+    issueRuns: jsonb("issue_runs").$type<DeliveryIssueRun[]>().notNull(),
+    exceptions: jsonb("exceptions").$type<string[]>().notNull(),
+    knownRisks: jsonb("known_risks").$type<DeliveryKnownRisk[]>().notNull(),
+    regressionRisks: jsonb("regression_risks")
+      .$type<GoalVerifierOutput["regressionRisks"]>().notNull(),
+    status: text("status").$type<DeliveryReportStatus>().notNull(),
+    humanAcceptance: jsonb("human_acceptance").$type<DeliveryHumanAcceptance | null>(),
+    digest: text("digest").notNull(),
+    generatedBy: text("generated_by").notNull(),
+    generatedAt: timestamp("generated_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    version: integer("version").default(1).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "delivery_reports_verification_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.verificationId,
+      ],
+      foreignColumns: [
+        goalVerifications.organizationId, goalVerifications.projectId,
+        goalVerifications.goalId, goalVerifications.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "delivery_reports_verification_plan_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId,
+        table.verificationPlanId,
+      ],
+      foreignColumns: [
+        acceptanceVerificationPlans.organizationId,
+        acceptanceVerificationPlans.projectId,
+        acceptanceVerificationPlans.goalId,
+        acceptanceVerificationPlans.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "delivery_reports_issue_plan_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.issuePlanId,
+      ],
+      foreignColumns: [
+        issuePlanRevisions.organizationId, issuePlanRevisions.projectId,
+        issuePlanRevisions.goalId, issuePlanRevisions.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("delivery_reports_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    foreignKey({
+      name: "delivery_reports_previous_fk",
+      columns: [
+        table.organizationId, table.projectId, table.goalId, table.previousReportId,
+      ],
+      foreignColumns: [
+        table.organizationId, table.projectId, table.goalId, table.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("delivery_reports_goal_revision_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.revision,
+    ),
+    check(
+      "delivery_reports_chain_chk",
+      sql`${table.revision} > 0 AND ((${table.revision}=1 AND ${table.previousReportId} IS NULL) OR (${table.revision}>1 AND ${table.previousReportId} IS NOT NULL))`,
+    ),
+    check(
+      "delivery_reports_status_chk",
+      sql`(${table.status}='awaiting_human_acceptance' AND ${table.humanAcceptance} IS NULL) OR (${table.status}='accepted' AND jsonb_typeof(${table.humanAcceptance})='object')`,
+    ),
+    check(
+      "delivery_reports_payload_chk",
+      sql`jsonb_typeof(${table.goalSnapshot})='object' AND jsonb_typeof(${table.acceptance})='array' AND jsonb_array_length(${table.acceptance}) BETWEEN 1 AND 50 AND jsonb_typeof(${table.issueRuns})='array' AND jsonb_array_length(${table.issueRuns}) > 0 AND jsonb_typeof(${table.exceptions})='array' AND jsonb_typeof(${table.knownRisks})='array' AND jsonb_typeof(${table.regressionRisks})='array'`,
+    ),
+    check(
+      "delivery_reports_identity_chk",
+      sql`${table.digest} ~ '^[0-9a-f]{64}$' AND char_length(btrim(${table.generatedBy})) BETWEEN 1 AND 200 AND ${table.version} > 0 AND ${table.generatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
 export const evidence = pgTable(
   "evidence",
   {
@@ -2704,6 +3099,11 @@ export type PullRequestReceiptRecord = typeof pullRequestReceipts.$inferSelect;
 export type NewPullRequestReceiptRecord = typeof pullRequestReceipts.$inferInsert;
 export type LandingReceiptRecord = typeof landingReceipts.$inferSelect;
 export type NewLandingReceiptRecord = typeof landingReceipts.$inferInsert;
+export type AcceptanceVerificationPlanRecord = typeof acceptanceVerificationPlans.$inferSelect;
+export type GoalVerificationRecord = typeof goalVerifications.$inferSelect;
+export type VerificationGapReportRecord = typeof verificationGapReports.$inferSelect;
+export type GapRemediationReceiptRecord = typeof gapRemediationReceipts.$inferSelect;
+export type DeliveryReportRecord = typeof deliveryReports.$inferSelect;
 export type DeliveryOperationReceiptRecord = typeof deliveryOperationReceipts.$inferSelect;
 export type NewDeliveryOperationReceiptRecord = typeof deliveryOperationReceipts.$inferInsert;
 export type Evidence = typeof evidence.$inferSelect;

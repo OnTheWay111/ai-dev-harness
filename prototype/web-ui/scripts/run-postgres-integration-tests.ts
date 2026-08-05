@@ -100,6 +100,7 @@ const defaultIntegrationTestFiles = [
   "tests/p7-postgres-integration.test.mjs",
   "tests/p8-postgres-integration.test.mjs",
   "tests/p9-postgres-integration.test.mjs",
+  "tests/p10-postgres-integration.test.mjs",
   "tests/security-regression-postgres.test.mjs",
 ] as const;
 

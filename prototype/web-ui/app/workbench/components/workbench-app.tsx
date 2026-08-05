@@ -9,6 +9,7 @@ import { WorkbenchRealtimeClient, type WorkbenchRealtimeState } from
 import { presentWorkbenchFailure, type WorkbenchFailurePresentation } from
   "../workbench-ui-state";
 import type { GoalWorkspaceScope } from "../goal-workspace-api";
+import { goalDraftStorageKey } from "../goal-workspace-draft";
 import { Sidebar, Topbar } from "./app-shell";
 import { ClarifyView } from "./clarify-view";
 import { IssuesView, type IssuePlanContext } from "./issues-view";
@@ -30,6 +31,7 @@ export function WorkbenchApp({
   const [realtimeState, setRealtimeState] = useState<WorkbenchRealtimeState>("connecting");
   const [failure, setFailure] = useState<WorkbenchFailurePresentation | null>(null);
   const [issuePlanContext, setIssuePlanContext] = useState<IssuePlanContext | null>(null);
+  const [restoredGoalId, setRestoredGoalId] = useState<string | null>(null);
 
   const notify = useCallback((message: string) => {
     setToast(message);
@@ -39,6 +41,17 @@ export function WorkbenchApp({
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [view]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setRestoredGoalId(window.localStorage.getItem(
+        `${goalDraftStorageKey(goalWorkspaceScope)}:last-goal`,
+      ));
+    });
+    return () => { active = false; };
+  }, [goalWorkspaceScope]);
 
   const refreshWorkbench = useCallback(async () => {
     setRealtimeState("refreshing");
@@ -168,6 +181,7 @@ export function WorkbenchApp({
             scope={goalWorkspaceScope}
             onContinue={(context) => {
               setIssuePlanContext(context);
+              setRestoredGoalId(context.goalId);
               notify("已批准规格已锁定，正在生成 Issue 开发合同");
               setView("issues");
             }}
@@ -190,7 +204,13 @@ export function WorkbenchApp({
             onDownloadArtifact={(artifactId) => void downloadArtifact(artifactId)}
           />
         )}
-        {view === "verify" && <VerifyView notify={notify} />}
+        {view === "verify" && (
+          <VerifyView
+            notify={notify}
+            scope={goalWorkspaceScope}
+            goalId={issuePlanContext?.goalId ?? restoredGoalId}
+          />
+        )}
       </div>
       {toast && (
         <div className="toast" role="status" aria-live="polite">
