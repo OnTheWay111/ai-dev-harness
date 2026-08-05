@@ -10,6 +10,7 @@ export interface AutoDevRunEventV1 {
   phase: string;
   status: string;
   message: string;
+  observability?: import("../../observability/context.ts").ObservabilityContext;
 }
 
 export interface ExecutionRunProjection {
@@ -17,6 +18,7 @@ export interface ExecutionRunProjection {
   organizationId: string;
   projectId: string;
   goalId: string;
+  issueId?: string;
   externalRunId: string;
   externalTaskId: string;
   status: RunStatus;

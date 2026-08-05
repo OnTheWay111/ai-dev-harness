@@ -17,6 +17,7 @@ export interface SchedulerJob {
   organizationId: string;
   projectId: string;
   goalId: string;
+  requestId?: string;
   runId: string;
   issueId?: string;
   externalTaskId: string;

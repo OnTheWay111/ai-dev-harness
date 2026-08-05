@@ -28,6 +28,8 @@ import { getArtifactObjectStore } from
   "../app/control-plane/runtime/artifact-runtime.ts";
 import { resolvePostgresConnection } from
   "../app/workbench/server/postgres-environment.ts";
+import { StructuredTelemetry } from
+  "../app/observability/telemetry.ts";
 
 const { Pool } = pg;
 
@@ -79,6 +81,7 @@ function secretNames(): string[] {
 }
 
 async function main(): Promise<void> {
+  const telemetry = new StructuredTelemetry();
   const database = resolvePostgresConnection(process.env, "app");
   const pool = new Pool({ connectionString: database.databaseUrl, max: 6 });
   const repository = new PostgresSchedulerRepository(pool);
@@ -96,6 +99,7 @@ async function main(): Promise<void> {
   });
   const eventService = new ExternalEventService({
     repository: new PostgresExecutionEventRepository(pool),
+    telemetry,
   });
   const eventPoller = new AutoDevEventPoller({
     repositoryRoot: required("AUTODEV_REPOSITORY_ROOT"),
@@ -121,6 +125,7 @@ async function main(): Promise<void> {
         repository: new PostgresEvidenceRepository(pool),
       }),
     ),
+    telemetry,
   });
   const intervalMs = positiveInteger("SCHEDULER_INTERVAL_MS", 2_000);
   const heartbeatMs = positiveInteger("EXECUTION_NODE_HEARTBEAT_MS", 15_000);
@@ -141,6 +146,7 @@ async function main(): Promise<void> {
     supervisorId: required("SCHEDULER_SUPERVISOR_ID"),
     leaseDurationMs: positiveInteger("EXECUTION_LEASE_DURATION_MS", 60_000),
     selectedSecrets,
+    telemetry,
   });
   let stopping = false;
   process.once("SIGINT", () => { stopping = true; });

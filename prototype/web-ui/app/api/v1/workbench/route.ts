@@ -21,6 +21,14 @@ import { readRequestPrincipal } from "../../../auth/oidc-http.ts";
 import { getOidcService } from "../../../auth/oidc-runtime.ts";
 import { withSecurityHeaders } from
   "../../../security/request-security.ts";
+import {
+  contextFromRequest,
+  traceparent,
+} from "../../../observability/context.ts";
+import {
+  getOperationalTelemetry,
+  type OperationalTelemetry,
+} from "../../../observability/telemetry.ts";
 
 const taskFilters = new Set<TaskFilter>([
   "all",
@@ -30,10 +38,6 @@ const taskFilters = new Set<TaskFilter>([
   "blocked",
   "waiting",
 ]);
-
-function requestId(): string {
-  return `req_${crypto.randomUUID()}`;
-}
 
 function validationError(
   requestIdValue: string,
@@ -149,16 +153,38 @@ export async function handleWorkbenchRequest(
       ? await getWorkbenchVisibilityResolver().resolve(principal.actorId)
       : null;
   },
+  telemetry: OperationalTelemetry = getOperationalTelemetry(),
 ): Promise<Response> {
-  const id = requestId();
+  const startedAt = Date.now();
   const url = new URL(request.url);
+  const suppliedGoalId = url.searchParams.get("goalId")?.trim();
+  const observed = contextFromRequest(request,
+    suppliedGoalId && /^[A-Za-z0-9_-]{1,64}$/.test(suppliedGoalId)
+      ? { goalId: suppliedGoalId }
+      : {});
+  const id = observed.requestId;
+  const observe = (response: Response): Response => {
+    response.headers.set("x-request-id", observed.requestId);
+    response.headers.set("traceparent", traceparent(observed));
+    telemetry.event("web.request.completed", observed, {
+      method: "GET",
+      route: "/api/v1/workbench",
+      status: response.status,
+    }, response.status >= 500 ? "error" : response.status >= 400 ? "warn" : "info");
+    telemetry.metric("harness_http_request_duration_ms", "histogram",
+      Date.now() - startedAt, {
+        route: "/api/v1/workbench",
+        status: String(response.status),
+      });
+    return response;
+  };
   const query = parseQuery(url, id);
-  if (query instanceof Response) return query;
+  if (query instanceof Response) return observe(query);
 
   try {
     const visibility = await visibilityProvider(request);
-    if (!visibility) return accessError(id, 401);
-    if (!hasVisibleProjects(visibility)) return accessError(id, 403);
+    if (!visibility) return observe(accessError(id, 401));
+    if (!hasVisibleProjects(visibility)) return observe(accessError(id, 403));
     const workbenchRepository = repositoryProvider();
     const result = await workbenchRepository.getWorkbench(visibility, query);
     const etag = `"workbench-${await responseHash([
@@ -169,7 +195,7 @@ export async function handleWorkbenchRequest(
     const headers = responseHeaders(etag, workbenchRepository.kind);
 
     if (request.headers.get("if-none-match") === etag) {
-      return withSecurityHeaders(new Response(null, { status: 304, headers }));
+      return observe(withSecurityHeaders(new Response(null, { status: 304, headers })));
     }
 
     const body: WorkbenchResponse = {
@@ -177,13 +203,13 @@ export async function handleWorkbenchRequest(
       page: result.page,
       requestId: id,
     };
-    return withSecurityHeaders(Response.json(body, { headers }));
+    return observe(withSecurityHeaders(Response.json(body, { headers })));
   } catch (error) {
     if (error instanceof WorkbenchRepositoryError) {
-      return validationError(id, error.message, error.field);
+      return observe(validationError(id, error.message, error.field));
     }
-    console.error("Failed to load workbench", { requestId: id });
-    return internalError(id);
+    telemetry.event("web.request.failed", observed, { error }, "error");
+    return observe(internalError(id));
   }
 }
 

@@ -11,13 +11,18 @@ import {
 import type { ApiErrorEnvelope } from "../contracts.ts";
 import { TaskActionError } from "./task-action-repository.ts";
 import type { TaskActionService } from "./task-action-service.ts";
+import {
+  childObservabilityContext,
+  contextFromRequest,
+  traceparent,
+  type ObservabilityContext,
+} from "../../observability/context.ts";
+import {
+  getOperationalTelemetry,
+  type OperationalTelemetry,
+} from "../../observability/telemetry.ts";
 
 class AuthenticationRequiredError extends Error {}
-
-function requestId(request: Request): string {
-  const supplied = request.headers.get("x-request-id")?.trim();
-  return supplied && supplied.length <= 200 ? supplied : `req_${crypto.randomUUID()}`;
-}
 
 function statusFor(code: ApiErrorEnvelope["error"]["code"]): number {
   if (code === "validation_failed") return 400;
@@ -95,7 +100,27 @@ export function createTaskApiHandlers(input: {
   visibilityResolver(request: Request): Promise<ActorVisibilityScope>;
   rateLimiter?: RateLimiter;
   allowedOrigins?: readonly string[];
+  telemetry?: OperationalTelemetry;
 }) {
+  const telemetry = input.telemetry ?? getOperationalTelemetry();
+  const observe = (
+    response: Response,
+    observed: ObservabilityContext,
+    route: string,
+    method: "GET" | "POST",
+    startedAt: number,
+  ): Response => {
+    response.headers.set("x-request-id", observed.requestId);
+    response.headers.set("traceparent", traceparent(observed));
+    telemetry.event("web.request.completed", observed, {
+      method,
+      route,
+      status: response.status,
+    }, response.status >= 500 ? "error" : response.status >= 400 ? "warn" : "info");
+    telemetry.metric("harness_http_request_duration_ms", "histogram",
+      Date.now() - startedAt, { route, status: String(response.status) });
+    return response;
+  };
   const context = async (request: Request) => {
     const actor = await input.actorResolver(request);
     if (!actor) throw new AuthenticationRequiredError();
@@ -106,22 +131,28 @@ export function createTaskApiHandlers(input: {
   };
   return {
     task: async (request: Request, taskId: string): Promise<Response> => {
-      const id = requestId(request);
+      const startedAt = Date.now();
+      const observed = contextFromRequest(request);
+      const id = observed.requestId;
       try {
         if (request.method !== "GET" || !validResourceId(taskId)) {
           throw new TaskActionError("not_found", "Task was not found");
         }
         const resolved = await context(request);
-        return withSecurityHeaders(Response.json({
+        return observe(withSecurityHeaders(Response.json({
           data: await input.service.getTask(taskId, resolved.visibility),
           requestId: id,
-        }, { headers: { "cache-control": "private, no-store" } }));
+        }, { headers: { "cache-control": "private, no-store" } })), observed,
+        "/api/v1/tasks/:taskId", "GET", startedAt);
       } catch (error) {
-        return mappedError(error, id);
+        return observe(mappedError(error, id), observed,
+          "/api/v1/tasks/:taskId", "GET", startedAt);
       }
     },
     action: async (request: Request, taskId: string): Promise<Response> => {
-      const id = requestId(request);
+      const startedAt = Date.now();
+      const observed = contextFromRequest(request);
+      const id = observed.requestId;
       try {
         if (request.method !== "POST" || !validResourceId(taskId)) {
           throw new TaskActionError("not_found", "Task was not found");
@@ -144,28 +175,39 @@ export function createTaskApiHandlers(input: {
           idempotencyKey,
           request: body as never,
         });
-        return withSecurityHeaders(Response.json(receipt, {
+        const receiptContext = childObservabilityContext(observed, "web", {
+          receiptId: receipt.receiptId,
+        });
+        telemetry.event("task.action.accepted", receiptContext, {
+          taskId,
+          status: receipt.status,
+        }, "audit");
+        return observe(withSecurityHeaders(Response.json(receipt, {
           status: 202,
           headers: { "cache-control": "private, no-store" },
-        }));
+        })), receiptContext, "/api/v1/tasks/:taskId/actions", "POST", startedAt);
       } catch (error) {
-        return mappedError(error, id);
+        return observe(mappedError(error, id), observed,
+          "/api/v1/tasks/:taskId/actions", "POST", startedAt);
       }
     },
     receipt: async (request: Request, receiptId: string): Promise<Response> => {
-      const id = requestId(request);
+      const startedAt = Date.now();
+      const observed = contextFromRequest(request, { receiptId });
+      const id = observed.requestId;
       try {
         if (request.method !== "GET" ||
           !/^rcpt_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(receiptId)) {
           throw new TaskActionError("not_found", "Receipt was not found");
         }
         const resolved = await context(request);
-        return withSecurityHeaders(Response.json(
+        return observe(withSecurityHeaders(Response.json(
           await input.service.getReceipt(receiptId, resolved.visibility),
           { headers: { "cache-control": "private, no-store" } },
-        ));
+        )), observed, "/api/v1/receipts/:receiptId", "GET", startedAt);
       } catch (error) {
-        return mappedError(error, id);
+        return observe(mappedError(error, id), observed,
+          "/api/v1/receipts/:receiptId", "GET", startedAt);
       }
     },
   };

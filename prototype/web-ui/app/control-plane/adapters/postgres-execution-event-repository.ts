@@ -14,6 +14,7 @@ interface ContextRow {
   organization_id: string;
   project_id: string;
   goal_id: string;
+  issue_id: string;
   run_id: string;
   external_run_id: string;
   external_task_id: string;
@@ -38,6 +39,7 @@ function mapProjection(row: ContextRow): ExecutionRunProjection {
     organizationId: row.organization_id,
     projectId: row.project_id,
     goalId: row.goal_id,
+    issueId: row.issue_id,
     externalRunId: row.external_run_id,
     externalTaskId: row.external_task_id,
     status: row.run_status,
@@ -94,7 +96,7 @@ export class PostgresExecutionEventRepository implements ExecutionEventRepositor
       }
       const contextResult = await client.query<ContextRow>(
         `SELECT job.id AS job_id, job.organization_id, job.project_id, job.goal_id,
-                job.run_id, job.external_run_id, job.external_task_id,
+                job.issue_id, job.run_id, job.external_run_id, job.external_task_id,
                 run.status AS run_status,
                 job.phase, run.version AS run_version, job.last_event_sequence,
                 job.reconciliation_required
@@ -110,6 +112,15 @@ export class PostgresExecutionEventRepository implements ExecutionEventRepositor
         return { disposition: "run_not_found" };
       }
       if (context.external_task_id !== input.event.externalTaskId) {
+        await client.query("ROLLBACK");
+        return { disposition: "identity_mismatch" };
+      }
+      const observed = input.event.observability;
+      if (observed && (
+        observed.runId !== context.run_id ||
+        observed.goalId !== context.goal_id ||
+        observed.issueId !== context.issue_id
+      )) {
         await client.query("ROLLBACK");
         return { disposition: "identity_mismatch" };
       }

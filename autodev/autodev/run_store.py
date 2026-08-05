@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -27,6 +28,9 @@ ALLOWED_CONCLUSION_ARTIFACTS = {"summary.md", "direction_review.md", "direction_
 T = TypeVar("T")
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+OBSERVABILITY_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$")
+TRACE_ID_PATTERN = re.compile(r"^(?!0{32}$)[0-9a-f]{32}$")
+SPAN_ID_PATTERN = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
 
 
 class RunAlreadyExistsError(FileExistsError):
@@ -39,6 +43,49 @@ class AutoDevRunSchemaError(ValueError):
 
 class RunProjectionWarning(RuntimeWarning):
     """Database truth committed but a compatibility projection needs repair."""
+
+
+def _worker_observability_context() -> dict[str, str] | None:
+    raw = os.environ.get("HARNESS_OBSERVABILITY_CONTEXT", "").strip()
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid HARNESS_OBSERVABILITY_CONTEXT") from exc
+    if not isinstance(value, dict):
+        raise ValueError("invalid HARNESS_OBSERVABILITY_CONTEXT")
+    allowed = {
+        "schema_version", "process", "request_id", "goal_id", "issue_id",
+        "run_id", "receipt_id", "trace_id", "span_id", "parent_span_id",
+        "trace_flags",
+    }
+    if set(value) - allowed or value.get("schema_version") != "harness.observability.v1":
+        raise ValueError("unsupported HARNESS_OBSERVABILITY_CONTEXT")
+    required_ids = ("request_id", "run_id")
+    optional_ids = ("goal_id", "issue_id", "receipt_id")
+    if any(not OBSERVABILITY_ID_PATTERN.fullmatch(str(value.get(key, ""))) for key in required_ids):
+        raise ValueError("invalid observability correlation identity")
+    if any(
+        key in value and not OBSERVABILITY_ID_PATTERN.fullmatch(str(value[key]))
+        for key in optional_ids
+    ):
+        raise ValueError("invalid observability correlation identity")
+    if not TRACE_ID_PATTERN.fullmatch(str(value.get("trace_id", ""))) or not SPAN_ID_PATTERN.fullmatch(str(value.get("span_id", ""))):
+        raise ValueError("invalid observability trace identity")
+    if value.get("trace_flags") not in {"00", "01"}:
+        raise ValueError("invalid observability trace flags")
+    return {
+        "schema_version": "harness.observability.v1",
+        "process": "worker",
+        "request_id": str(value["request_id"]),
+        **{key: str(value[key]) for key in optional_ids if key in value},
+        "run_id": str(value["run_id"]),
+        "trace_id": str(value["trace_id"]),
+        "span_id": uuid.uuid4().hex[:16],
+        "parent_span_id": str(value["span_id"]),
+        "trace_flags": str(value["trace_flags"]),
+    }
 
 
 def validate_run_id(run_id: str) -> str:
@@ -342,6 +389,9 @@ def append_event(
         "message": message,
         "artifact": artifact,
     }
+    observability = _worker_observability_context()
+    if observability:
+        event["observability"] = observability
     if extra:
         event["extra"] = extra
     if persistence.mode == MODE_DATABASE:

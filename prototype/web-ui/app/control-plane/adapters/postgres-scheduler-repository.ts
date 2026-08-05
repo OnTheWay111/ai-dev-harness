@@ -15,6 +15,7 @@ interface JobRow {
   organization_id: string;
   project_id: string;
   goal_id: string;
+  request_id?: string;
   run_id: string;
   issue_id: string;
   external_task_id: string;
@@ -79,6 +80,7 @@ function mapJob(row: JobRow): SchedulerJob {
     organizationId: row.organization_id,
     projectId: row.project_id,
     goalId: row.goal_id,
+    requestId: row.request_id,
     runId: row.run_id,
     issueId: row.issue_id,
     externalTaskId: row.external_task_id,
@@ -344,7 +346,8 @@ export class PostgresSchedulerRepository implements SchedulerRepository {
               version=job.version+1, updated_at=$1
          FROM candidate
         WHERE job.id=candidate.id
-       RETURNING ${jobColumns.replace(/\b(id|organization_id|project_id|goal_id|run_id|external_task_id|required_capability|state|phase|priority|attempt|max_attempts|budget|deadline_at|next_attempt_at|external_run_id|node_id|lease_token_digest|lease_expires_at|heartbeat_at|last_event_sequence|reconciliation_required|failure_code|failure_reason|version)\b/g, "job.$1")}`,
+       RETURNING ${jobColumns.replace(/\b(id|organization_id|project_id|goal_id|run_id|external_task_id|required_capability|state|phase|priority|attempt|max_attempts|budget|deadline_at|next_attempt_at|external_run_id|node_id|lease_token_digest|lease_expires_at|heartbeat_at|last_event_sequence|reconciliation_required|failure_code|failure_reason|version)\b/g, "job.$1")},
+                 (SELECT request_id FROM runs WHERE id=job.run_id) AS request_id`,
       [now],
     );
     return result.rows[0] ? mapJob(result.rows[0]) : null;

@@ -234,6 +234,9 @@ Goal, SpecRevision, Issue, and Run lifecycle rules are listed in
 The versioned Goal Contract fields, CRUD API, authorization transaction, and
 browser draft-recovery boundary are documented in
 [`../../docs/goal-workspace.md`](../../docs/goal-workspace.md).
+The request/Goal/Issue/Run/Receipt correlation dictionary, W3C trace propagation,
+structured redaction, and stable metric names are documented in
+[`../../docs/p11-observability.md`](../../docs/p11-observability.md).
 The isolated, read-only Codex Planner subprocess contract and controlled smoke
 test are documented in
 [`../../docs/codex-planner.md`](../../docs/codex-planner.md).

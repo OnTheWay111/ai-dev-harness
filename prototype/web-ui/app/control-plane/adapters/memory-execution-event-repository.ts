@@ -59,6 +59,14 @@ export class MemoryExecutionEventRepository implements ExecutionEventRepository 
     if (run.externalTaskId !== input.event.externalTaskId) {
       return { disposition: "identity_mismatch" };
     }
+    const observed = input.event.observability;
+    if (observed && (
+      observed.runId !== run.id ||
+      observed.goalId !== run.goalId ||
+      run.issueId !== undefined && observed.issueId !== run.issueId
+    )) {
+      return { disposition: "identity_mismatch" };
+    }
 
     const record: InboxRecord = {
       event: structuredClone(input.event),

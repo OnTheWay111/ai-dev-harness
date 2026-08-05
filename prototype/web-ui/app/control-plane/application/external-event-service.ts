@@ -3,6 +3,8 @@ import type {
   EventIngestResult,
   ExecutionEventRepository,
 } from "../ports/execution-event-repository.ts";
+import { parseObservabilityEnvelope } from "../../observability/context.ts";
+import type { OperationalTelemetry } from "../../observability/telemetry.ts";
 
 export class ExternalEventValidationError extends Error {
   constructor(message: string) {
@@ -35,6 +37,10 @@ export function normalizeAutoDevRunEvent(
     else if (level === "error") status = "failed";
     else if (["stop", "cancelled"].includes(phase)) status = "cancelled";
   }
+  let observability;
+  if (raw.observability !== undefined) {
+    observability = parseObservabilityEnvelope(raw.observability);
+  }
   return {
     schemaVersion: String(raw.schema_version ?? "") as "autodev.run-event.v1",
     sourceEventId: String(raw.event_id ?? ""),
@@ -45,6 +51,7 @@ export function normalizeAutoDevRunEvent(
     phase,
     status,
     message: String(raw.message ?? ""),
+    observability,
   };
 }
 
@@ -87,19 +94,40 @@ function validate(event: AutoDevRunEventV1): void {
   if (!event.phase.trim() || !event.status.trim()) {
     throw new ExternalEventValidationError("Event phase and status are required");
   }
+  if (event.observability && event.observability.runId === undefined) {
+    throw new ExternalEventValidationError(
+      "Worker observability context requires the authoritative run identity",
+    );
+  }
 }
 
 export class ExternalEventService {
   private readonly repository: ExecutionEventRepository;
+  private readonly telemetry?: OperationalTelemetry;
 
-  constructor(dependencies: { repository: ExecutionEventRepository }) {
+  constructor(dependencies: {
+    repository: ExecutionEventRepository;
+    telemetry?: OperationalTelemetry;
+  }) {
     this.repository = dependencies.repository;
+    this.telemetry = dependencies.telemetry;
   }
 
   async ingest(event: AutoDevRunEventV1): Promise<EventIngestResult> {
     validate(event);
     const digest = await sha256(event);
     const result = await this.repository.ingest({ event, digest });
+    this.telemetry?.metric("harness_worker_events_total", "counter", 1, {
+      disposition: result.disposition,
+    });
+    if (event.observability) {
+      this.telemetry?.event("worker.event.ingested", event.observability, {
+        sourceEventId: event.sourceEventId,
+        phase: event.phase,
+        status: event.status,
+        disposition: result.disposition,
+      }, result.disposition === "conflict" ? "error" : "info");
+    }
     if (result.disposition === "conflict") throw new ExternalEventConflictError();
     if (["run_not_found", "identity_mismatch"].includes(result.disposition)) {
       throw new ExternalEventValidationError(

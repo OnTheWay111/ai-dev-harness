@@ -12,6 +12,8 @@ import type {
 } from "../ports/execution-gateway-port.ts";
 import type { ExecutionArtifactSink } from
   "../ports/execution-artifact-port.ts";
+import { observabilityEnvironment } from "../../observability/context.ts";
+import type { OperationalTelemetry } from "../../observability/telemetry.ts";
 
 const SAFE_ENVIRONMENT_KEYS = new Set([
   "PATH",
@@ -69,6 +71,7 @@ export interface AutoDevCliExecutionGatewayOptions {
     cleanup(path: string): Promise<void>;
   };
   artifactSink?: ExecutionArtifactSink;
+  telemetry?: OperationalTelemetry;
 }
 
 function safeEnvironment(
@@ -177,6 +180,7 @@ export class AutoDevCliExecutionGateway implements ExecutionGatewayPort {
   }
 
   async start(request: ExecutionStartRequest): Promise<ExternalExecutionStatus> {
+    const startedAt = Date.now();
     validateIdentifier(request.externalTaskId, "External task id");
     validateIdentifier(request.externalRunId, "External run id");
     if (!Number.isSafeInteger(request.timeoutMs) || request.timeoutMs < 1) {
@@ -189,12 +193,20 @@ export class AutoDevCliExecutionGateway implements ExecutionGatewayPort {
     if (secretNames.some((name) => !SECRET_NAME_PATTERN.test(name))) {
       throw new ExecutionPolicyError("Secret selectors must be explicit environment names");
     }
+    if (secretNames.includes("HARNESS_OBSERVABILITY_CONTEXT")) {
+      throw new ExecutionPolicyError("Observability context is a reserved environment value");
+    }
     const secrets = await this.options.secretResolver(secretNames);
     if (Object.keys(secrets).some((name) => !secretNames.includes(name))) {
       throw new ExecutionPolicyError("Secret resolver returned an unrequested value");
     }
     const environment = {
       ...safeEnvironment(this.options.environment),
+      ...(request.observability ? {
+        HARNESS_OBSERVABILITY_CONTEXT: JSON.stringify(
+          observabilityEnvironment(request.observability),
+        ),
+      } : {}),
       ...Object.fromEntries(secretNames.map((name) => {
         const value = secrets[name];
         if (!value) throw new ExecutionPolicyError(`Required secret ${name} is unavailable`);
@@ -237,6 +249,18 @@ export class AutoDevCliExecutionGateway implements ExecutionGatewayPort {
     };
     if (!this.customRunner) {
       this.launchProcess(processRequest, request, Object.values(secrets));
+      if (request.observability) {
+        this.options.telemetry?.event("gateway.process.launched", request.observability, {
+          externalRunId: request.externalRunId,
+          timeoutMs: request.timeoutMs,
+        });
+      }
+      this.options.telemetry?.metric(
+        "harness_gateway_start_duration_ms",
+        "histogram",
+        Date.now() - startedAt,
+        { result: "launched" },
+      );
       return {
         externalRunId: request.externalRunId,
         state: "starting",
@@ -255,7 +279,21 @@ export class AutoDevCliExecutionGateway implements ExecutionGatewayPort {
         throw new ExecutionPolicyError("Execution workspace cleanup failed");
       }
     }
-    return parseStatus(request.externalRunId, result, Object.values(secrets));
+    const status = parseStatus(request.externalRunId, result, Object.values(secrets));
+    if (request.observability) {
+      this.options.telemetry?.event("gateway.process.completed", request.observability, {
+        externalRunId: request.externalRunId,
+        state: status.state,
+        phase: status.phase,
+      });
+    }
+    this.options.telemetry?.metric(
+      "harness_gateway_start_duration_ms",
+      "histogram",
+      Date.now() - startedAt,
+      { result: status.state },
+    );
+    return status;
   }
 
   async inspect(externalRunId: string): Promise<ExternalExecutionStatus | null> {

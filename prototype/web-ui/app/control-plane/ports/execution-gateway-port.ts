@@ -11,6 +11,7 @@ export interface ExecutionStartRequest {
   externalRunId: string;
   selectedSecrets: readonly string[];
   timeoutMs: number;
+  observability?: import("../../observability/context.ts").ObservabilityContext;
   artifactContext?: import("./execution-artifact-port.ts").ExecutionArtifactContext;
 }
 
