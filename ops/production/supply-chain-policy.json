@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "harness.supply-chain-policy.v1",
+  "environment": "production",
+  "blockSeverities": [
+    "critical",
+    "high"
+  ],
+  "requiredSurfaces": [
+    "repository-secret",
+    "web-sca",
+    "python-sca",
+    "license",
+    "sbom",
+    "build-artifact",
+    "container-image",
+    "provenance"
+  ],
+  "exceptions": {
+    "requireOwner": true,
+    "requireExpiry": true,
+    "maximumDays": 90,
+    "secretsWaivable": false
+  },
+  "licenses": {
+    "prohibited": [
+      "AGPL",
+      "GPL",
+      "SSPL",
+      "UNLICENSED",
+      "LicenseRef-Proprietary"
+    ],
+    "requireExactComponentException": true
+  },
+  "containerImage": {
+    "currentStatus": "not-applicable",
+    "reason": "The current deployment has no Dockerfile, Containerfile, or OCI image target.",
+    "failIfBuildDefinitionAppears": true,
+    "requiredScanner": "trivy",
+    "requiredProvenance": "github-artifact-attestation"
+  }
+}

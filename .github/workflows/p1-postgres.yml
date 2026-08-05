@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
   group: p1-postgres-${{ github.ref }}
@@ -20,7 +22,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: postgres
@@ -36,28 +38,57 @@ jobs:
       POSTGRES_TEST_ADMIN_URL: postgresql://postgres@127.0.0.1:5432/postgres
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22.13.0
           cache: npm
           cache-dependency-path: prototype/web-ui/package-lock.json
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: autodev/pyproject.toml
+          cache-dependency-path: autodev/requirements-dev.lock
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          deny-licenses: AGPL-1.0, AGPL-3.0, GPL-2.0, GPL-3.0, SSPL-1.0
       - name: Install AutoDev from the root repository
         run: |
           python -m venv autodev/.venv
-          autodev/.venv/bin/python -m pip install -e "./autodev[dev]"
+          autodev/.venv/bin/python -m pip install -c autodev/requirements-dev.lock -e "./autodev[dev]"
+      - name: Audit locked Python dependencies
+        run: |
+          python -m venv .security-venv
+          .security-venv/bin/python -m pip install pip-audit==2.10.1
+          .security-venv/bin/pip-audit --requirement autodev/requirements-dev.lock --strict
       - name: Run AutoDev tests
         run: autodev/.venv/bin/python -m unittest discover -s autodev/tests -v
       - name: Install locked dependencies
         run: npm ci
         working-directory: prototype/web-ui
+      - name: Enforce supply-chain policy and Web dependency severity
+        run: |
+          npm audit --audit-level=high
+          npm audit --omit=dev --audit-level=moderate
+          npm run security:policy:p11
+          node --experimental-strip-types --test tests/p11-supply-chain.test.mjs
+        working-directory: prototype/web-ui
+      - name: Scan repository dependencies, licenses, misconfiguration, and Secrets
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.73.0
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig,license
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false
+          skip-dirs: prototype/web-ui/node_modules,prototype/web-ui/dist,autodev/.venv,.security-venv
       - name: Install Chromium for the P5 review path
         run: npx playwright install --with-deps chromium
         working-directory: prototype/web-ui
@@ -67,3 +98,32 @@ jobs:
       - name: Run the P5 specification review browser path
         run: npm run test:browser:spec-review
         working-directory: prototype/web-ui
+      - name: Generate CycloneDX SBOMs and build manifest
+        env:
+          SUPPLY_CHAIN_OUTPUT_DIR: ${{ runner.temp }}/supply-chain
+        run: |
+          npm run security:artifacts:p11
+          ../../autodev/.venv/bin/python ../../autodev/scripts/generate_sbom.py --output "${SUPPLY_CHAIN_OUTPUT_DIR}/python-sbom.cdx.json"
+        working-directory: prototype/web-ui
+      - name: Scan built Web artifact
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          skip-setup-trivy: true
+          scan-type: fs
+          scan-ref: prototype/web-ui/dist
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: false
+      - name: Upload SBOM and build evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: p11-supply-chain-evidence
+          path: ${{ runner.temp }}/supply-chain
+          if-no-files-found: error
+          retention-days: 90
+      - name: Attest SBOM and build evidence provenance
+        if: github.event_name == 'push'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: ${{ runner.temp }}/supply-chain/*

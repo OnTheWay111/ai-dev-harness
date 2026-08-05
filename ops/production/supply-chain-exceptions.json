@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "harness.supply-chain-exceptions.v1",
+  "exceptions": [
+    {
+      "id": "license:autodev-harness:LicenseRef-Proprietary",
+      "component": "autodev-harness",
+      "kind": "license",
+      "owner": "repository-maintainer",
+      "approvedBy": "repository-maintainer",
+      "reason": "First-party AutoDev source is authorized only for this repository's internal production deployment while its distribution license remains proprietary.",
+      "scope": "internal-production-only",
+      "expiresAt": "2026-09-04T00:00:00.000Z",
+      "constraints": [
+        "no-redistribution",
+        "no-third-party-hosting",
+        "renew-or-remove-before-expiry"
+      ]
+    }
+  ]
+}

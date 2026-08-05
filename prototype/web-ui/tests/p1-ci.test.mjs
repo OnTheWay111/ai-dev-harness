@@ -25,13 +25,18 @@ test("P1 workflow is valid, least-privilege, and runs the complete gate", () => 
   const document = parseDocument(workflowText);
   assert.deepEqual(document.errors, []);
   const workflow = document.toJS();
-  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.deepEqual(workflow.permissions, {
+    contents: "read",
+    "id-token": "write",
+    attestations: "write",
+  });
   assert.deepEqual(workflow.on.push.branches, ["main"]);
   assert.deepEqual(workflow.on.pull_request.branches, ["main"]);
 
   const job = workflow.jobs["p1-postgres"];
   assert.equal(job["runs-on"], "ubuntu-latest");
   assert.match(job.services.postgres.image, /^postgres:16(?:\b|\.)/);
+  assert.match(job.services.postgres.image, /@sha256:[0-9a-f]{64}$/);
   assert.match(job.services.postgres.options, /pg_isready/);
   assert.equal(job.services.postgres.env.POSTGRES_HOST_AUTH_METHOD, "trust");
   assert.doesNotMatch(workflowText, /\$\{\{\s*secrets\./);
@@ -39,8 +44,10 @@ test("P1 workflow is valid, least-privilege, and runs the complete gate", () => 
   assert.equal(adminUrl.hostname, "127.0.0.1");
   assert.equal(adminUrl.password, "");
 
-  assert.ok(job.steps.some((step) => step.uses === "actions/checkout@v6"));
-  assert.ok(job.steps.some((step) => step.uses === "actions/setup-node@v6"));
+  assert.ok(job.steps.some((step) =>
+    /^actions\/checkout@[0-9a-f]{40}$/.test(step.uses ?? "")));
+  assert.ok(job.steps.some((step) =>
+    /^actions\/setup-node@[0-9a-f]{40}$/.test(step.uses ?? "")));
   assert.ok(
     job.steps.some(
       (step) =>

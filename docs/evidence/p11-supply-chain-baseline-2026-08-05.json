@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "harness.supply-chain-baseline.v1",
+  "generatedAt": "2026-08-05T02:55:00.000Z",
+  "policy": {
+    "blockSeverities": [
+      "critical",
+      "high"
+    ],
+    "secretExceptionsAllowed": false,
+    "maximumExceptionDays": 90
+  },
+  "scans": {
+    "webDependencies": {
+      "tool": "npm audit",
+      "production": {
+        "critical": 0,
+        "high": 0,
+        "moderate": 0,
+        "low": 0,
+        "total": 0
+      },
+      "all": {
+        "critical": 0,
+        "high": 0,
+        "moderate": 4,
+        "low": 1,
+        "total": 5,
+        "blocking": 0
+      },
+      "nonBlockingFindings": [
+        {
+          "advisory": "GHSA-67mh-4wv8-2f99",
+          "component": "esbuild via drizzle-kit development tooling",
+          "severity": "moderate",
+          "affectedPathCount": 4,
+          "owner": "platform-security",
+          "reviewBy": "2026-09-04",
+          "disposition": "Track upstream; the suggested npm force fix is a breaking drizzle-kit downgrade and was not applied."
+        },
+        {
+          "advisory": "GHSA-4x5r-pxfx-6jf8",
+          "component": "@babel/core development tooling",
+          "severity": "low",
+          "affectedPathCount": 1,
+          "owner": "platform-security",
+          "reviewBy": "2026-09-04",
+          "disposition": "Non-production development dependency; track the non-breaking upstream fix."
+        }
+      ]
+    },
+    "pythonDependencies": {
+      "tool": "pip-audit 2.10.1",
+      "lockedDependencyCount": 10,
+      "vulnerabilityCount": 0,
+      "blocking": 0
+    },
+    "repository": {
+      "tool": "Trivy 0.73.0",
+      "scannerImage": "aquasec/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c",
+      "scanners": [
+        "vulnerability",
+        "secret",
+        "misconfiguration",
+        "license"
+      ],
+      "critical": 0,
+      "high": 0,
+      "report": "supply-chain/trivy-repository.json",
+      "reportSha256": "16dc7973bf0a7106ed96b272cfb0b9061f8de9680ea68c02bd6c1467569d27d0"
+    },
+    "webBuildArtifact": {
+      "tool": "Trivy 0.73.0",
+      "scanners": [
+        "vulnerability",
+        "secret",
+        "misconfiguration"
+      ],
+      "critical": 0,
+      "high": 0,
+      "report": "supply-chain/trivy-web-build.json",
+      "reportSha256": "bc8962fa4058e81aa8724aa1fb3bb5b79630201589e7fa32b69fcf9de3ae886e"
+    },
+    "licenses": {
+      "installedWebPackageCount": 549,
+      "blocking": 0,
+      "waived": [
+        "license:autodev-harness:LicenseRef-Proprietary"
+      ]
+    },
+    "containerImage": {
+      "status": "not-applicable",
+      "reason": "No Dockerfile, Containerfile, or OCI image target exists in the repository.",
+      "guard": "A newly added image build definition fails the policy until image scanning and provenance are configured."
+    }
+  },
+  "artifacts": [
+    {
+      "path": "supply-chain/web-sbom.cdx.json",
+      "type": "CycloneDX 1.5",
+      "componentCount": 555,
+      "sha256": "35bde8819dc58366e5b6c5496950b77c0b7f329f385cfd4160affbe649f5d8da"
+    },
+    {
+      "path": "supply-chain/python-sbom.cdx.json",
+      "type": "CycloneDX 1.5",
+      "componentCount": 13,
+      "sha256": "b4e3e6c0dd72eaf3ed090966f2e358d486d0d4ca56b37d06a19a9825b7187fa0"
+    },
+    {
+      "path": "supply-chain/web-build-manifest.json",
+      "type": "SHA-256 build manifest",
+      "fileCount": 75,
+      "sha256": "8a87a09df511370f00a4e1720066ee7ecab00e4d6de2e9314a1f3690b370a4c0"
+    }
+  ],
+  "ci": {
+    "actionsPinnedByFullCommitSha": true,
+    "dependencyReviewOnPullRequests": true,
+    "artifactAttestationOnMainPush": true,
+    "syntheticHighFailurePathPassed": true
+  },
+  "exceptionIds": [
+    "license:autodev-harness:LicenseRef-Proprietary"
+  ],
+  "blockingFindingCount": 0,
+  "result": "passed"
+}

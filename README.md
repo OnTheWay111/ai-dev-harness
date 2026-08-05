@@ -18,6 +18,7 @@
 - [开源项目与本地 AutoDev 评估](docs/project-evaluation.md)
 - [Production V1 方案](docs/production-v1-plan.md)
 - [Web UI 交互设计说明](docs/web-ui-design.md)
+- [P11 软件供应链安全](docs/p11-supply-chain.md)
 - [可交互 Web UI 原型](prototype/web-ui)
 - [AutoDev 执行引擎源码](autodev)
 

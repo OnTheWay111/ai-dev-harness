@@ -1,0 +1,1869 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.73.0"
+  },
+  "ReportID": "019fcfd7-dc80-79cd-80d0-86ea3f7f97a4",
+  "CreatedAt": "2026-08-05T02:54:18.240643624Z",
+  "ArtifactID": "sha256:715c765b8cf78a59f40cd463147bfc580edadaf3e63a98f705c99e789f39bedf",
+  "ArtifactName": "/workspace",
+  "ArtifactType": "repository",
+  "Metadata": {
+    "RepoURL": "https://github.com/OnTheWay111/ai-dev-harness.git",
+    "Branch": "main",
+    "Commit": "d4f0f296d90e9dff226e6e1368db7fa35af422a3",
+    "CommitMsg": "docs(roadmap): mark P11-04 complete",
+    "Author": "onthewayli \u003conthewayli@tencent.com\u003e",
+    "Committer": "onthewayli \u003conthewayli@tencent.com\u003e"
+  },
+  "Results": [
+    {
+      "Target": "prototype/web-ui/package-lock.json",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Packages": [
+        {
+          "ID": "@aws-sdk/client-s3@3.1103.0",
+          "Name": "@aws-sdk/client-s3",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/client-s3@3.1103.0",
+            "UID": "b4307f100ddaaa04"
+          },
+          "Version": "3.1103.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "@aws-sdk/checksums@3.1000.26",
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/credential-provider-node@3.972.78",
+            "@aws-sdk/middleware-sdk-s3@3.972.72",
+            "@aws-sdk/signature-v4-multi-region@3.996.43",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/fetch-http-handler@5.6.13",
+            "@smithy/node-http-handler@4.9.13",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 75,
+              "EndLine": 96
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/s3-request-presigner@3.1103.0",
+          "Name": "@aws-sdk/s3-request-presigner",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/s3-request-presigner@3.1103.0",
+            "UID": "43a217840ff73c61"
+          },
+          "Version": "3.1103.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/signature-v4-multi-region@3.996.43",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 300,
+              "EndLine": 316
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@neondatabase/serverless@1.1.0",
+          "Name": "@neondatabase/serverless",
+          "Identifier": {
+            "PURL": "pkg:npm/%40neondatabase/serverless@1.1.0",
+            "UID": "32d6d6864aef67ca"
+          },
+          "Version": "1.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 2522,
+              "EndLine": 2530
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@playwright/test@1.62.1",
+          "Name": "@playwright/test",
+          "Identifier": {
+            "PURL": "pkg:npm/%40playwright/test@1.62.1",
+            "UID": "84848a19015e724a"
+          },
+          "Version": "1.62.1",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "playwright@1.62.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2734,
+              "EndLine": 2749
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@types/node@22.19.19",
+          "Name": "@types/node",
+          "Identifier": {
+            "PURL": "pkg:npm/%40types/node@22.19.19",
+            "UID": "2a9f56ea4e9dec"
+          },
+          "Version": "22.19.19",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "undici-types@6.21.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3507,
+              "EndLine": 3516
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@types/pg@8.20.4",
+          "Name": "@types/pg",
+          "Identifier": {
+            "PURL": "pkg:npm/%40types/pg@8.20.4",
+            "UID": "9ce7d5f4d12e434b"
+          },
+          "Version": "8.20.4",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "@types/node@22.19.19",
+            "pg-protocol@1.15.0",
+            "pg-types@2.2.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3517,
+              "EndLine": 3528
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "drizzle-orm@0.45.2",
+          "Name": "drizzle-orm",
+          "Identifier": {
+            "PURL": "pkg:npm/drizzle-orm@0.45.2",
+            "UID": "eb5f1de165d7828"
+          },
+          "Version": "0.45.2",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "@neondatabase/serverless@1.1.0",
+            "@types/pg@8.20.4",
+            "pg@8.22.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 5769,
+              "EndLine": 5893
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "next@16.3.0",
+          "Name": "next",
+          "Identifier": {
+            "PURL": "pkg:npm/next@16.3.0",
+            "UID": "674e32304fa65e27"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "@next/env@16.3.0",
+            "@next/swc-darwin-arm64@16.3.0",
+            "@next/swc-darwin-x64@16.3.0",
+            "@next/swc-linux-arm64-gnu@16.3.0",
+            "@next/swc-linux-arm64-musl@16.3.0",
+            "@next/swc-linux-x64-gnu@16.3.0",
+            "@next/swc-linux-x64-musl@16.3.0",
+            "@next/swc-win32-arm64-msvc@16.3.0",
+            "@next/swc-win32-x64-msvc@16.3.0",
+            "@playwright/test@1.62.1",
+            "@swc/helpers@0.5.15",
+            "baseline-browser-mapping@2.10.30",
+            "caniuse-lite@1.0.30001793",
+            "postcss@8.5.25",
+            "react-dom@19.2.8",
+            "react@19.2.8",
+            "sharp@0.35.0",
+            "styled-jsx@5.1.6"
+          ],
+          "Locations": [
+            {
+              "StartLine": 8352,
+              "EndLine": 8404
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg@8.22.0",
+          "Name": "pg",
+          "Identifier": {
+            "PURL": "pkg:npm/pg@8.22.0",
+            "UID": "9622e45b1402a02a"
+          },
+          "Version": "8.22.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "pg-cloudflare@1.4.0",
+            "pg-connection-string@2.14.0",
+            "pg-pool@3.14.0",
+            "pg-protocol@1.15.0",
+            "pg-types@2.2.0",
+            "pgpass@1.0.5"
+          ],
+          "Locations": [
+            {
+              "StartLine": 8693,
+              "EndLine": 8720
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react@19.2.8",
+          "Name": "react",
+          "Identifier": {
+            "PURL": "pkg:npm/react@19.2.8",
+            "UID": "c5a22a4160cfdc2"
+          },
+          "Version": "19.2.8",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "Locations": [
+            {
+              "StartLine": 8994,
+              "EndLine": 9002
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react-dom@19.2.8",
+          "Name": "react-dom",
+          "Identifier": {
+            "PURL": "pkg:npm/react-dom@19.2.8",
+            "UID": "46e6fed8d50a80b6"
+          },
+          "Version": "19.2.8",
+          "Relationship": "direct",
+          "DependsOn": [
+            "react@19.2.8",
+            "scheduler@0.27.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 9003,
+              "EndLine": 9013
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/checksums@3.1000.26",
+          "Name": "@aws-sdk/checksums",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/checksums@3.1000.26",
+            "UID": "8bf9ec8dff8eed9"
+          },
+          "Version": "3.1000.26",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 59,
+              "EndLine": 74
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/core@3.977.6",
+          "Name": "@aws-sdk/core",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/core@3.977.6",
+            "UID": "fabf7b86caa016e4"
+          },
+          "Version": "3.977.6",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/types@3.974.2",
+            "@aws-sdk/xml-builder@3.972.37",
+            "@aws/lambda-invoke-store@0.3.0",
+            "@smithy/core@3.31.1",
+            "@smithy/signature-v4@5.6.12",
+            "@smithy/types@4.16.1",
+            "bowser@2.14.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 97,
+              "EndLine": 115
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/credential-provider-env@3.972.67",
+          "Name": "@aws-sdk/credential-provider-env",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/credential-provider-env@3.972.67",
+            "UID": "801640a321510af2"
+          },
+          "Version": "3.972.67",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 116,
+              "EndLine": 131
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/credential-provider-http@3.972.69",
+          "Name": "@aws-sdk/credential-provider-http",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/credential-provider-http@3.972.69",
+            "UID": "d5cb1dcffb7a7f0f"
+          },
+          "Version": "3.972.69",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/fetch-http-handler@5.6.13",
+            "@smithy/node-http-handler@4.9.13",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 132,
+              "EndLine": 149
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/credential-provider-ini@3.973.12",
+          "Name": "@aws-sdk/credential-provider-ini",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/credential-provider-ini@3.973.12",
+            "UID": "a50d7375b598b491"
+          },
+          "Version": "3.973.12",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/credential-provider-env@3.972.67",
+            "@aws-sdk/credential-provider-http@3.972.69",
+            "@aws-sdk/credential-provider-login@3.972.74",
+            "@aws-sdk/credential-provider-process@3.972.67",
+            "@aws-sdk/credential-provider-sso@3.973.11",
+            "@aws-sdk/credential-provider-web-identity@3.972.73",
+            "@aws-sdk/nested-clients@3.997.41",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/credential-provider-imds@4.4.16",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 150,
+              "EndLine": 173
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/credential-provider-login@3.972.74",
+          "Name": "@aws-sdk/credential-provider-login",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/credential-provider-login@3.972.74",
+            "UID": "ca58eff0ef2ca1cf"
+          },
+          "Version": "3.972.74",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/nested-clients@3.997.41",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 174,
+              "EndLine": 190
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/credential-provider-node@3.972.78",
+          "Name": "@aws-sdk/credential-provider-node",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/credential-provider-node@3.972.78",
+            "UID": "64a04460941160c5"
+          },
+          "Version": "3.972.78",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/credential-provider-env@3.972.67",
+            "@aws-sdk/credential-provider-http@3.972.69",
+            "@aws-sdk/credential-provider-ini@3.973.12",
+            "@aws-sdk/credential-provider-process@3.972.67",
+            "@aws-sdk/credential-provider-sso@3.973.11",
+            "@aws-sdk/credential-provider-web-identity@3.972.73",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/credential-provider-imds@4.4.16",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 191,
+              "EndLine": 212
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/credential-provider-process@3.972.67",
+          "Name": "@aws-sdk/credential-provider-process",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/credential-provider-process@3.972.67",
+            "UID": "7e29cd5a23e60bbe"
+          },
+          "Version": "3.972.67",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 213,
+              "EndLine": 228
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/credential-provider-sso@3.973.11",
+          "Name": "@aws-sdk/credential-provider-sso",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/credential-provider-sso@3.973.11",
+            "UID": "3207fccf6bac7701"
+          },
+          "Version": "3.973.11",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/nested-clients@3.997.41",
+            "@aws-sdk/token-providers@3.1103.0",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 229,
+              "EndLine": 246
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/credential-provider-web-identity@3.972.73",
+          "Name": "@aws-sdk/credential-provider-web-identity",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/credential-provider-web-identity@3.972.73",
+            "UID": "d3e65f4084a09db"
+          },
+          "Version": "3.972.73",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/nested-clients@3.997.41",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 247,
+              "EndLine": 263
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/middleware-sdk-s3@3.972.72",
+          "Name": "@aws-sdk/middleware-sdk-s3",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/middleware-sdk-s3@3.972.72",
+            "UID": "cf5b0d585c01514b"
+          },
+          "Version": "3.972.72",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/signature-v4-multi-region@3.996.43",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 264,
+              "EndLine": 280
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/nested-clients@3.997.41",
+          "Name": "@aws-sdk/nested-clients",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/nested-clients@3.997.41",
+            "UID": "d2b038582caa55a6"
+          },
+          "Version": "3.997.41",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/signature-v4-multi-region@3.996.43",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/fetch-http-handler@5.6.13",
+            "@smithy/node-http-handler@4.9.13",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 281,
+              "EndLine": 299
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/signature-v4-multi-region@3.996.43",
+          "Name": "@aws-sdk/signature-v4-multi-region",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/signature-v4-multi-region@3.996.43",
+            "UID": "69ee8fb996739cd1"
+          },
+          "Version": "3.996.43",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/types@3.974.2",
+            "@smithy/signature-v4@5.6.12",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 317,
+              "EndLine": 331
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/token-providers@3.1103.0",
+          "Name": "@aws-sdk/token-providers",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/token-providers@3.1103.0",
+            "UID": "6c2531694ef292ec"
+          },
+          "Version": "3.1103.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@aws-sdk/core@3.977.6",
+            "@aws-sdk/nested-clients@3.997.41",
+            "@aws-sdk/types@3.974.2",
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 332,
+              "EndLine": 348
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/types@3.974.2",
+          "Name": "@aws-sdk/types",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/types@3.974.2",
+            "UID": "2ed41e558c5d1d11"
+          },
+          "Version": "3.974.2",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 349,
+              "EndLine": 361
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws-sdk/xml-builder@3.972.37",
+          "Name": "@aws-sdk/xml-builder",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws-sdk/xml-builder@3.972.37",
+            "UID": "b12192f1b031c87"
+          },
+          "Version": "3.972.37",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 362,
+              "EndLine": 374
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@aws/lambda-invoke-store@0.3.0",
+          "Name": "@aws/lambda-invoke-store",
+          "Identifier": {
+            "PURL": "pkg:npm/%40aws/lambda-invoke-store@0.3.0",
+            "UID": "bf96bf70b801523a"
+          },
+          "Version": "0.3.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 375,
+              "EndLine": 383
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@img/colour@1.1.0",
+          "Name": "@img/colour",
+          "Identifier": {
+            "PURL": "pkg:npm/%40img/colour@1.1.0",
+            "UID": "eb4480408526e28a"
+          },
+          "Version": "1.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1909,
+              "EndLine": 1918
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/env@16.3.0",
+          "Name": "@next/env",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/env@16.3.0",
+            "UID": "35a92d385fb710a0"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2531,
+              "EndLine": 2536
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/swc-darwin-arm64@16.3.0",
+          "Name": "@next/swc-darwin-arm64",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/swc-darwin-arm64@16.3.0",
+            "UID": "db30365ac7f1f8bd"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2548,
+              "EndLine": 2563
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/swc-darwin-x64@16.3.0",
+          "Name": "@next/swc-darwin-x64",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/swc-darwin-x64@16.3.0",
+            "UID": "6d56b9a0b53e91e9"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2564,
+              "EndLine": 2579
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/swc-linux-arm64-gnu@16.3.0",
+          "Name": "@next/swc-linux-arm64-gnu",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/swc-linux-arm64-gnu@16.3.0",
+            "UID": "f4c3568f63b6e0f7"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2580,
+              "EndLine": 2595
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/swc-linux-arm64-musl@16.3.0",
+          "Name": "@next/swc-linux-arm64-musl",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/swc-linux-arm64-musl@16.3.0",
+            "UID": "fa7bee02a9197339"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2596,
+              "EndLine": 2611
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/swc-linux-x64-gnu@16.3.0",
+          "Name": "@next/swc-linux-x64-gnu",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/swc-linux-x64-gnu@16.3.0",
+            "UID": "50034f7f5171e12"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2612,
+              "EndLine": 2627
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/swc-linux-x64-musl@16.3.0",
+          "Name": "@next/swc-linux-x64-musl",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/swc-linux-x64-musl@16.3.0",
+            "UID": "525b7a91b19a0f32"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2628,
+              "EndLine": 2643
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/swc-win32-arm64-msvc@16.3.0",
+          "Name": "@next/swc-win32-arm64-msvc",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/swc-win32-arm64-msvc@16.3.0",
+            "UID": "c5ccdceeeb5d2bf6"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2644,
+              "EndLine": 2659
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@next/swc-win32-x64-msvc@16.3.0",
+          "Name": "@next/swc-win32-x64-msvc",
+          "Identifier": {
+            "PURL": "pkg:npm/%40next/swc-win32-x64-msvc@16.3.0",
+            "UID": "ed38276e74d1e5a0"
+          },
+          "Version": "16.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2660,
+              "EndLine": 2675
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@smithy/core@3.31.1",
+          "Name": "@smithy/core",
+          "Identifier": {
+            "PURL": "pkg:npm/%40smithy/core@3.31.1",
+            "UID": "1039ac53c27a5d7a"
+          },
+          "Version": "3.31.1",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3083,
+              "EndLine": 3095
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@smithy/credential-provider-imds@4.4.16",
+          "Name": "@smithy/credential-provider-imds",
+          "Identifier": {
+            "PURL": "pkg:npm/%40smithy/credential-provider-imds@4.4.16",
+            "UID": "c8573591ec2985cd"
+          },
+          "Version": "4.4.16",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3096,
+              "EndLine": 3109
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@smithy/fetch-http-handler@5.6.13",
+          "Name": "@smithy/fetch-http-handler",
+          "Identifier": {
+            "PURL": "pkg:npm/%40smithy/fetch-http-handler@5.6.13",
+            "UID": "ee8d3c584918fdcb"
+          },
+          "Version": "5.6.13",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3110,
+              "EndLine": 3123
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@smithy/node-http-handler@4.9.13",
+          "Name": "@smithy/node-http-handler",
+          "Identifier": {
+            "PURL": "pkg:npm/%40smithy/node-http-handler@4.9.13",
+            "UID": "a5d4bd52a610aa94"
+          },
+          "Version": "4.9.13",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3124,
+              "EndLine": 3137
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@smithy/signature-v4@5.6.12",
+          "Name": "@smithy/signature-v4",
+          "Identifier": {
+            "PURL": "pkg:npm/%40smithy/signature-v4@5.6.12",
+            "UID": "6fae00f06a2cc3b9"
+          },
+          "Version": "5.6.12",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@smithy/core@3.31.1",
+            "@smithy/types@4.16.1",
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3138,
+              "EndLine": 3151
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@smithy/types@4.16.1",
+          "Name": "@smithy/types",
+          "Identifier": {
+            "PURL": "pkg:npm/%40smithy/types@4.16.1",
+            "UID": "88e5d56849b3d2fe"
+          },
+          "Version": "4.16.1",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3152,
+              "EndLine": 3163
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "@swc/helpers@0.5.15",
+          "Name": "@swc/helpers",
+          "Identifier": {
+            "PURL": "pkg:npm/%40swc/helpers@0.5.15",
+            "UID": "223d31f978169d32"
+          },
+          "Version": "0.5.15",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "tslib@2.8.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 3171,
+              "EndLine": 3179
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "baseline-browser-mapping@2.10.30",
+          "Name": "baseline-browser-mapping",
+          "Identifier": {
+            "PURL": "pkg:npm/baseline-browser-mapping@2.10.30",
+            "UID": "9cce18d88d6eaf1c"
+          },
+          "Version": "2.10.30",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 4788,
+              "EndLine": 4799
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "bowser@2.14.1",
+          "Name": "bowser",
+          "Identifier": {
+            "PURL": "pkg:npm/bowser@2.14.1",
+            "UID": "778520d0a4b8e11b"
+          },
+          "Version": "2.14.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 4807,
+              "EndLine": 4812
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "caniuse-lite@1.0.30001793",
+          "Name": "caniuse-lite",
+          "Identifier": {
+            "PURL": "pkg:npm/caniuse-lite@1.0.30001793",
+            "UID": "6af0acb85856d88a"
+          },
+          "Version": "1.0.30001793",
+          "Licenses": [
+            "CC-BY-4.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 4947,
+              "EndLine": 4966
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "client-only@0.0.1",
+          "Name": "client-only",
+          "Identifier": {
+            "PURL": "pkg:npm/client-only@0.0.1",
+            "UID": "62051d53023e62d6"
+          },
+          "Version": "0.0.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 4995,
+              "EndLine": 5000
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "detect-libc@2.1.2",
+          "Name": "detect-libc",
+          "Identifier": {
+            "PURL": "pkg:npm/detect-libc@2.1.2",
+            "UID": "c0eb61d486fca589"
+          },
+          "Version": "2.1.2",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 5246,
+              "EndLine": 5255
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "fsevents@2.3.2",
+          "Name": "fsevents",
+          "Identifier": {
+            "PURL": "pkg:npm/fsevents@2.3.2",
+            "UID": "d7afe85c6f8ffe0d"
+          },
+          "Version": "2.3.2",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8840,
+              "EndLine": 8852
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "nanoid@3.3.17",
+          "Name": "nanoid",
+          "Identifier": {
+            "PURL": "pkg:npm/nanoid@3.3.17",
+            "UID": "f815377060f9ea2e"
+          },
+          "Version": "3.3.17",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8305,
+              "EndLine": 8321
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-connection-string@2.14.0",
+          "Name": "pg-connection-string",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-connection-string@2.14.0",
+            "UID": "13d28aca5f585cdc"
+          },
+          "Version": "2.14.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8729,
+              "EndLine": 8735
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-int8@1.0.1",
+          "Name": "pg-int8",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-int8@1.0.1",
+            "UID": "906009a64c62fdda"
+          },
+          "Version": "1.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8736,
+              "EndLine": 8745
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-pool@3.14.0",
+          "Name": "pg-pool",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-pool@3.14.0",
+            "UID": "bfa665b218a7b6ed"
+          },
+          "Version": "3.14.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "pg@8.22.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 8746,
+              "EndLine": 8755
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-protocol@1.15.0",
+          "Name": "pg-protocol",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-protocol@1.15.0",
+            "UID": "24b9957d8c8afda5"
+          },
+          "Version": "1.15.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8756,
+              "EndLine": 8762
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pg-types@2.2.0",
+          "Name": "pg-types",
+          "Identifier": {
+            "PURL": "pkg:npm/pg-types@2.2.0",
+            "UID": "116e2d560cfb2656"
+          },
+          "Version": "2.2.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "pg-int8@1.0.1",
+            "postgres-array@2.0.0",
+            "postgres-bytea@1.0.1",
+            "postgres-date@1.0.7",
+            "postgres-interval@1.2.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 8763,
+              "EndLine": 8779
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "pgpass@1.0.5",
+          "Name": "pgpass",
+          "Identifier": {
+            "PURL": "pkg:npm/pgpass@1.0.5",
+            "UID": "cada27dd2203b009"
+          },
+          "Version": "1.0.5",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "split2@4.2.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 8780,
+              "EndLine": 8789
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "picocolors@1.1.1",
+          "Name": "picocolors",
+          "Identifier": {
+            "PURL": "pkg:npm/picocolors@1.1.1",
+            "UID": "c3e0fe630480ea1d"
+          },
+          "Version": "1.1.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8790,
+              "EndLine": 8795
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "playwright@1.62.1",
+          "Name": "playwright",
+          "Identifier": {
+            "PURL": "pkg:npm/playwright@1.62.1",
+            "UID": "8081d23d15b91c45"
+          },
+          "Version": "1.62.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "fsevents@2.3.2",
+            "playwright-core@1.62.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 8809,
+              "EndLine": 8826
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "playwright-core@1.62.1",
+          "Name": "playwright-core",
+          "Identifier": {
+            "PURL": "pkg:npm/playwright-core@1.62.1",
+            "UID": "117e835b2bb80a36"
+          },
+          "Version": "1.62.1",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8827,
+              "EndLine": 8839
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postcss@8.5.25",
+          "Name": "postcss",
+          "Identifier": {
+            "PURL": "pkg:npm/postcss@8.5.25",
+            "UID": "59945f4f49ee2614"
+          },
+          "Version": "8.5.25",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "nanoid@3.3.17",
+            "picocolors@1.1.1",
+            "source-map-js@1.2.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 8863,
+              "EndLine": 8890
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postgres-array@2.0.0",
+          "Name": "postgres-array",
+          "Identifier": {
+            "PURL": "pkg:npm/postgres-array@2.0.0",
+            "UID": "45bb0401c19be630"
+          },
+          "Version": "2.0.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8898,
+              "EndLine": 8907
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postgres-bytea@1.0.1",
+          "Name": "postgres-bytea",
+          "Identifier": {
+            "PURL": "pkg:npm/postgres-bytea@1.0.1",
+            "UID": "8b15073cfa96bc5f"
+          },
+          "Version": "1.0.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8908,
+              "EndLine": 8917
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postgres-date@1.0.7",
+          "Name": "postgres-date",
+          "Identifier": {
+            "PURL": "pkg:npm/postgres-date@1.0.7",
+            "UID": "cabd41b5996487a1"
+          },
+          "Version": "1.0.7",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 8918,
+              "EndLine": 8927
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "postgres-interval@1.2.0",
+          "Name": "postgres-interval",
+          "Identifier": {
+            "PURL": "pkg:npm/postgres-interval@1.2.0",
+            "UID": "e4bd39af9f5539d7"
+          },
+          "Version": "1.2.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "xtend@4.0.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 8928,
+              "EndLine": 8940
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "scheduler@0.27.0",
+          "Name": "scheduler",
+          "Identifier": {
+            "PURL": "pkg:npm/scheduler@0.27.0",
+            "UID": "b6c911cca7c25306"
+          },
+          "Version": "0.27.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 9286,
+              "EndLine": 9291
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "semver@7.8.5",
+          "Name": "semver",
+          "Identifier": {
+            "PURL": "pkg:npm/semver@7.8.5",
+            "UID": "33a9c927cd7617d7"
+          },
+          "Version": "7.8.5",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 9456,
+              "EndLine": 9468
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "sharp@0.35.0",
+          "Name": "sharp",
+          "Identifier": {
+            "PURL": "pkg:npm/sharp@0.35.0",
+            "UID": "3371fb038bec7ba4"
+          },
+          "Version": "0.35.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "@img/colour@1.1.0",
+            "@img/sharp-darwin-arm64@0.35.0",
+            "@img/sharp-darwin-x64@0.35.0",
+            "@img/sharp-freebsd-wasm32@0.35.0",
+            "@img/sharp-libvips-darwin-arm64@1.3.0",
+            "@img/sharp-libvips-darwin-x64@1.3.0",
+            "@img/sharp-libvips-linux-arm64@1.3.0",
+            "@img/sharp-libvips-linux-arm@1.3.0",
+            "@img/sharp-libvips-linux-ppc64@1.3.0",
+            "@img/sharp-libvips-linux-riscv64@1.3.0",
+            "@img/sharp-libvips-linux-s390x@1.3.0",
+            "@img/sharp-libvips-linux-x64@1.3.0",
+            "@img/sharp-libvips-linuxmusl-arm64@1.3.0",
+            "@img/sharp-libvips-linuxmusl-x64@1.3.0",
+            "@img/sharp-linux-arm64@0.35.0",
+            "@img/sharp-linux-arm@0.35.0",
+            "@img/sharp-linux-ppc64@0.35.0",
+            "@img/sharp-linux-riscv64@0.35.0",
+            "@img/sharp-linux-s390x@0.35.0",
+            "@img/sharp-linux-x64@0.35.0",
+            "@img/sharp-linuxmusl-arm64@0.35.0",
+            "@img/sharp-linuxmusl-x64@0.35.0",
+            "@img/sharp-webcontainers-wasm32@0.35.0",
+            "@img/sharp-win32-arm64@0.35.0",
+            "@img/sharp-win32-ia32@0.35.0",
+            "@img/sharp-win32-x64@0.35.0",
+            "detect-libc@2.1.2",
+            "semver@7.8.5"
+          ],
+          "Locations": [
+            {
+              "StartLine": 9412,
+              "EndLine": 9455
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "source-map-js@1.2.1",
+          "Name": "source-map-js",
+          "Identifier": {
+            "PURL": "pkg:npm/source-map-js@1.2.1",
+            "UID": "93b556dfdaf06b05"
+          },
+          "Version": "1.2.1",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 9578,
+              "EndLine": 9586
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "split2@4.2.0",
+          "Name": "split2",
+          "Identifier": {
+            "PURL": "pkg:npm/split2@4.2.0",
+            "UID": "d2e9cd889730aa12"
+          },
+          "Version": "4.2.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 9598,
+              "EndLine": 9606
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "styled-jsx@5.1.6",
+          "Name": "styled-jsx",
+          "Identifier": {
+            "PURL": "pkg:npm/styled-jsx@5.1.6",
+            "UID": "63a1f853df8bf644"
+          },
+          "Version": "5.1.6",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "client-only@0.0.1",
+            "react@19.2.8"
+          ],
+          "Locations": [
+            {
+              "StartLine": 9804,
+              "EndLine": 9826
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "tslib@2.8.1",
+          "Name": "tslib",
+          "Identifier": {
+            "PURL": "pkg:npm/tslib@2.8.1",
+            "UID": "341b58cdedfeab26"
+          },
+          "Version": "2.8.1",
+          "Licenses": [
+            "0BSD"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 10084,
+              "EndLine": 10089
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "undici-types@6.21.0",
+          "Name": "undici-types",
+          "Identifier": {
+            "PURL": "pkg:npm/undici-types@6.21.0",
+            "UID": "9d7ffb8a75b34c3d"
+          },
+          "Version": "6.21.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 10274,
+              "EndLine": 10280
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "xtend@4.0.2",
+          "Name": "xtend",
+          "Identifier": {
+            "PURL": "pkg:npm/xtend@4.0.2",
+            "UID": "5cf7a679ae5102c6"
+          },
+          "Version": "4.0.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 11177,
+              "EndLine": 11186
+            }
+          ],
+          "AnalyzedBy": "npm"
+        }
+      ]
+    },
+    {
+      "Target": "prototype/web-ui/package-lock.json",
+      "Class": "license"
+    }
+  ]
+}
