@@ -1417,7 +1417,7 @@ Critical/High 规则及带 owner/期限的例外流程；不得用自动 force f
 
 </details>
 
-- [ ] **P11-06** 编写部署、Stop、恢复、凭证轮换、数据修复和 on-call Runbook。
+- [x] **P11-06** 编写部署、Stop、恢复、凭证轮换、数据修复和 on-call Runbook。（已完成：2026-08-05；实现提交：ai-dev-harness@fb50967f7447617494b9e02f33431211e79ae009）
 
 <details>
 <summary>快捷复制开发提示词 P11-06 · gpt-5.6-terra(均衡) · medium(中等)</summary>
