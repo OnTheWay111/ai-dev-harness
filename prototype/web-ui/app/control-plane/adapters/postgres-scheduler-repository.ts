@@ -343,7 +343,7 @@ export class PostgresSchedulerRepository implements SchedulerRepository {
        )
        UPDATE scheduler_jobs job
           SET state='claimed', heartbeat_at=$1, failure_reason=NULL,
-              version=job.version+1, updated_at=$1
+              version=job.version+1, updated_at=GREATEST($1,job.created_at)
          FROM candidate
         WHERE job.id=candidate.id
        RETURNING ${jobColumns.replace(/\b(id|organization_id|project_id|goal_id|run_id|external_task_id|required_capability|state|phase|priority|attempt|max_attempts|budget|deadline_at|next_attempt_at|external_run_id|node_id|lease_token_digest|lease_expires_at|heartbeat_at|last_event_sequence|reconciliation_required|failure_code|failure_reason|version)\b/g, "job.$1")},

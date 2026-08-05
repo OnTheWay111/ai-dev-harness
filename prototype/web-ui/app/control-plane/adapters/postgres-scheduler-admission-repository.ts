@@ -137,7 +137,8 @@ export class PostgresSchedulerAdmissionRepository implements SchedulerAdmissionR
         ],
       );
       const issueUpdated = await client.query(
-        `UPDATE issues SET status='in_progress',version=version+1,updated_at=$1
+        `UPDATE issues SET status='in_progress',version=version+1,
+                           updated_at=GREATEST($1,created_at)
           WHERE id=$2 AND version=$3 AND status='ready'`,
         [admittedAt, command.issueId, issue.rows[0].version],
       );
@@ -167,7 +168,7 @@ export class PostgresSchedulerAdmissionRepository implements SchedulerAdmissionR
       await client.query(
         `UPDATE idempotency_records
             SET status='completed',response_status=201,response_ref=$1,
-                response_digest=$2,updated_at=$3
+                response_digest=$2,updated_at=GREATEST($3,created_at)
           WHERE organization_id=$4 AND actor_id=$5
             AND endpoint='scheduler.admit' AND key=$6`,
         [

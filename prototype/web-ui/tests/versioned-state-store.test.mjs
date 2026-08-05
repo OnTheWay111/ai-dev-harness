@@ -28,6 +28,7 @@ test("persists a Goal transition with hierarchy and expectedVersion predicates",
   );
   assert.match(calls[0].text, /UPDATE goals/);
   assert.match(calls[0].text, /version = \$6/);
+  assert.match(calls[0].text, /GREATEST\(\$2, created_at\)/);
   assert.deepEqual(calls[0].values.slice(0, 6), [
     "clarifying",
     new Date("2026-08-04T09:00:00.000Z"),

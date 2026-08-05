@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "harness.migration-policy.v1",
+  "environment": "production",
+  "phases": [
+    "expand",
+    "migrate",
+    "contract"
+  ],
+  "minimumCompatibilityHours": 24,
+  "expand": {
+    "additiveOnly": true,
+    "requireNullableNewColumns": true,
+    "requireConcurrentIndexes": true
+  },
+  "migrate": {
+    "requireIdempotentBackfill": true,
+    "requireDualVersionReadWrite": true,
+    "requireVerificationDigest": true
+  },
+  "contract": {
+    "requireZeroPreviousVersionInstances": true,
+    "requireZeroIncompatibleRuns": true,
+    "requireIrreversibleApproval": true,
+    "requireFreshBackupMinutes": 15
+  },
+  "runningRuns": {
+    "defaultAction": "drain",
+    "allowForcedTermination": false
+  },
+  "rollback": {
+    "requirePreviousAppVerification": true,
+    "previousArtifactRetentionHours": 168
+  }
+}

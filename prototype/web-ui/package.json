@@ -21,6 +21,8 @@
     "recovery:fixture:p11": "node --experimental-strip-types scripts/prepare-recovery-drill-fixture.ts",
     "recovery:drill:p11": "node --experimental-strip-types scripts/run-recovery-drill.ts",
     "recovery:check:p11": "node --experimental-strip-types scripts/check-recovery-policy.ts",
+    "migration:check:p11": "node --experimental-strip-types scripts/check-migration-policy.ts",
+    "migration:drill:p11": "node --experimental-strip-types scripts/run-migration-rollback-drill.ts",
     "test:p8": "node --experimental-strip-types --test tests/p8-*.test.mjs",
     "test:p9": "node --experimental-strip-types --test tests/p9-*.test.mjs",
     "test:p9:postgres": "node --experimental-strip-types scripts/run-postgres-integration-tests.ts tests/p9-postgres-integration.test.mjs",

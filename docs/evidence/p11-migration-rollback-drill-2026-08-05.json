@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "harness.migration-rollback-drill.v1",
+  "drillId": "p11-migration-20260805-actual",
+  "migrationId": "p11-payload-v2",
+  "startedAt": "2026-08-05T02:33:53.342Z",
+  "completedAt": "2026-08-05T02:33:53.398Z",
+  "durationSeconds": 0.056,
+  "database": "harness_recovery_source_20260805b",
+  "table": "p11_migration_drill_20260805a",
+  "phases": [
+    {
+      "phase": "expand",
+      "result": "passed",
+      "statementsSha256": "ff6be5c8c1e34c99f15057a29ad8233dafebf2216a684c4cf6440a5f5a96ef82"
+    },
+    {
+      "phase": "migrate",
+      "result": "passed",
+      "statementsSha256": "0faaf676e989bb299a73e3dc5f2241da9862cacfcac5a1dee2e71b1e144d95e3"
+    },
+    {
+      "phase": "app_rollback",
+      "result": "passed",
+      "statementsSha256": "672482839c9e218ed2747071b5e70fbc62250802147dc115597d7ef355aba2f3"
+    }
+  ],
+  "previousAppVersion": "v1",
+  "candidateAppVersion": "v2",
+  "facts": {
+    "baselineRows": 1,
+    "afterCandidateRows": 2,
+    "afterBackfillRows": 3,
+    "remainingNulls": 0,
+    "oldAppReadAfterExpand": true,
+    "oldAppReadCandidateRows": true,
+    "oldAppWriteAfterExpand": true,
+    "newAppReadAfterRollback": true,
+    "contractBlockedWithOldVersion": true
+  },
+  "noDestructiveReset": true,
+  "result": "passed",
+  "gaps": []
+}

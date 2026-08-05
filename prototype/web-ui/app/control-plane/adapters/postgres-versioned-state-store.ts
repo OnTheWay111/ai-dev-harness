@@ -56,7 +56,8 @@ export interface PersistedState {
 
 const goalUpdate = `
   UPDATE goals
-     SET status = $1, version = version + 1, updated_at = $2
+     SET status = $1, version = version + 1,
+         updated_at = GREATEST($2, created_at)
    WHERE id = $3
      AND organization_id = $4
      AND project_id = $5
@@ -65,7 +66,8 @@ const goalUpdate = `
 
 const specRevisionUpdate = `
   UPDATE spec_revisions
-     SET status = $1, version = version + 1, updated_at = $2
+     SET status = $1, version = version + 1,
+         updated_at = GREATEST($2, created_at)
    WHERE id = $3
      AND organization_id = $4
      AND project_id = $5
@@ -75,7 +77,8 @@ const specRevisionUpdate = `
 
 const issueUpdate = `
   UPDATE issues
-     SET status = $1, version = version + 1, updated_at = $2
+     SET status = $1, version = version + 1,
+         updated_at = GREATEST($2, created_at)
    WHERE id = $3
      AND organization_id = $4
      AND project_id = $5
@@ -88,15 +91,16 @@ const runUpdate = `
      SET status = $1,
          version = version + 1,
          started_at = CASE
-           WHEN $1 = 'running' THEN COALESCE(started_at, $2)
+           WHEN $1 = 'running'
+             THEN COALESCE(started_at, GREATEST($2, created_at))
            ELSE started_at
          END,
          finished_at = CASE
            WHEN $1 IN ('succeeded', 'failed', 'cancelled')
-             THEN COALESCE(finished_at, $2)
+             THEN COALESCE(finished_at, GREATEST($2, started_at, created_at))
            ELSE NULL
          END,
-         updated_at = $2
+         updated_at = GREATEST($2, created_at)
    WHERE id = $3
      AND organization_id = $4
      AND project_id = $5

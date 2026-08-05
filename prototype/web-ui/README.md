@@ -243,6 +243,9 @@ recovery events, and operational Runbooks are documented in
 The RPO/RTO policy, database PITR gate, Artifact Object Lock lifecycle, isolated
 restore procedure, and actual drill receipt are documented in
 [`../../docs/p11-recovery.md`](../../docs/p11-recovery.md).
+Expand/migrate/contract gates, Run draining, irreversible approval, compatibility
+windows, application rollback, and the real drill receipt are documented in
+[`../../docs/p11-migration-release.md`](../../docs/p11-migration-release.md).
 The isolated, read-only Codex Planner subprocess contract and controlled smoke
 test are documented in
 [`../../docs/codex-planner.md`](../../docs/codex-planner.md).

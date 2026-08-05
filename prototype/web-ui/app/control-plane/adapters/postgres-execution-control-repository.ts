@@ -130,7 +130,7 @@ export class PostgresExecutionControlRepository implements ExecutionControlRepos
             SET state=$1,reason=$2,
                 consecutive_failures=CASE WHEN $3 IN ('start','retry') THEN 0 ELSE consecutive_failures END,
                 circuit_open_until=CASE WHEN $3 IN ('start','retry') THEN NULL ELSE circuit_open_until END,
-                version=version+1,updated_at=$4
+                version=version+1,updated_at=GREATEST($4,created_at)
           WHERE id=$5 AND version=$6
         RETURNING id,organization_id,project_id,scope_type,scope_key,state,
                   consecutive_failures,circuit_open_until,reason,version`,
