@@ -200,6 +200,21 @@ function normalizeIssuer(value: string): string {
   return safeEndpoint(value).replace(/\/$/, "");
 }
 
+export function oidcLoginUrl(
+  returnTo: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  const safeReturnTo = /^\/[A-Za-z0-9/_-]*$/.test(returnTo) ? returnTo : "/";
+  const relative = `/auth/login?returnTo=${safeReturnTo}`;
+  const redirectUri = environment.OIDC_REDIRECT_URI?.trim();
+  if (!redirectUri) return relative;
+  try {
+    return `${new URL(safeEndpoint(redirectUri)).origin}${relative}`;
+  } catch {
+    return relative;
+  }
+}
+
 export function normalizeReturnTo(
   value: string | null | undefined,
   allowedPaths: readonly string[],

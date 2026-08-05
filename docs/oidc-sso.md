@@ -15,15 +15,17 @@ runtime:
 | `OIDC_ISSUER` | no | Exact issuer used for discovery and claim validation |
 | `OIDC_CLIENT_ID` | no | Environment-specific OIDC client registration |
 | `OIDC_CLIENT_SECRET` | yes | Confidential client credential; optional only for providers that permit it |
-| `OIDC_REDIRECT_URI` | no | Exact HTTPS callback registered with the provider |
+| `OIDC_REDIRECT_URI` | no | Exact HTTPS callback; local development may use `http://localhost:<port>` |
 | `OIDC_COOKIE_SECRET` | yes | 32 random bytes encoded as base64url for AES-256-GCM cookie envelopes |
 | `OIDC_ALLOWED_RETURN_TO_PATHS` | no | Comma-separated same-origin path allowlist |
 | `OIDC_SESSION_TTL_SECONDS` | no | Short session lifetime, at most eight hours |
 | `OIDC_TRANSACTION_TTL_SECONDS` | no | Login transaction lifetime, at most 15 minutes |
+| `HARNESS_LOCAL_HTTP` | no | Inject server variables without Vite TLS; local development only |
 
 Do not use `NEXT_PUBLIC_`, build arguments, command arguments, logs, Git, or
 browser storage for either Secret. Development, test, and staging use separate
-client registrations and cookie keys. Rotate the client Secret in the IdP and
+client registrations and cookie keys. Only local `localhost` development may
+use HTTP; staging and production remain HTTPS-only. Rotate the client Secret in the IdP and
 Secret manager using an overlap window when the provider supports two active
 credentials. Rotating the cookie key is intentionally fail-closed and expires
 all prior application sessions; schedule it as a sign-in maintenance event.
@@ -32,7 +34,7 @@ all prior application sessions; schedule it as a sign-in maintenance event.
 
 1. Login discovers an exact issuer, generates random `state`, `nonce`, and a
    PKCE verifier, then stores them in a ten-minute AES-GCM transaction Cookie.
-2. Callback exchanges the one-time code over HTTPS and validates the ID Token's
+2. Callback exchanges the one-time code over HTTPS (or local `localhost` HTTP) and validates the ID Token's
    RS256 signature, `kid`, issuer, audience, nonce, expiry, and issued-at time.
 3. OIDC access, refresh, and ID Tokens are discarded after validation. The
    browser receives only an encrypted application session containing the

@@ -6,6 +6,7 @@ import {
   OidcService,
   createCookieSecret,
   loadOidcConfig,
+  oidcLoginUrl,
 } from "../app/auth/oidc-service.ts";
 import {
   handleOidcCallback,
@@ -276,5 +277,20 @@ test("configuration fails closed without server-only cookie key material", () =>
     }),
     (error) =>
       error instanceof OidcAuthenticationError && error.code === "configuration",
+  );
+});
+
+test("local HTTP login keeps the configured localhost port", () => {
+  assert.equal(
+    oidcLoginUrl("/releases", {
+      OIDC_REDIRECT_URI: "http://localhost:4175/auth/callback",
+    }),
+    "http://localhost:4175/auth/login?returnTo=/releases",
+  );
+  assert.equal(
+    oidcLoginUrl("/releases", {
+      OIDC_REDIRECT_URI: "http://127.0.0.1:4175/auth/callback",
+    }),
+    "/auth/login?returnTo=/releases",
   );
 });

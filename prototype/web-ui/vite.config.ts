@@ -43,6 +43,8 @@ export default defineConfig(async () => {
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
   const e2eHttps = process.env.HARNESS_E2E_HTTPS === "true";
+  const localHttp = process.env.HARNESS_LOCAL_HTTP === "true";
+  const injectRuntimeVariables = e2eHttps || localHttp;
   const p12Contract = process.env.HARNESS_P12_CONTRACT_ADAPTERS === "enabled";
   const basicSsl = e2eHttps
     ? (await import("@vitejs/plugin-basic-ssl")).default()
@@ -63,7 +65,7 @@ export default defineConfig(async () => {
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: {
           ...localBindingConfig,
-          ...(e2eHttps ? {
+          ...(injectRuntimeVariables ? {
             vars: {
               WORKBENCH_DATA_SOURCE: process.env.WORKBENCH_DATA_SOURCE,
               OIDC_ISSUER: process.env.OIDC_ISSUER,

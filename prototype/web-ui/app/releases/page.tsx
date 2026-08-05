@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { readRequestPrincipal } from "../auth/oidc-http";
 import { getOidcService } from "../auth/oidc-runtime";
+import { oidcLoginUrl } from "../auth/oidc-service";
 import { ReleaseCenterApp } from "../release-center/release-center-app";
 import type { ReleaseCenterSnapshot } from "../release-center/api-client";
 import type { ReleaseCenterScope } from "../release-center/repository";
@@ -20,7 +21,7 @@ export default async function ReleasesPage() {
     "https://harness.invalid/releases",
     { headers: { cookie: requestHeaders.get("cookie") ?? "" } },
   ), getOidcService());
-  if (!principal) redirect("/auth/login?returnTo=/releases");
+  if (!principal) redirect(oidcLoginUrl("/releases"));
   let scope: ReleaseCenterScope | null = null;
   let initialSnapshot: ReleaseCenterSnapshot | null = null;
   let failed = false;

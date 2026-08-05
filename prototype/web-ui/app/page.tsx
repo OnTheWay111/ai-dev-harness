@@ -5,6 +5,7 @@ import {
 } from "./workbench/server/workbench-repository-factory";
 import { getOidcService } from "./auth/oidc-runtime";
 import { readRequestPrincipal } from "./auth/oidc-http";
+import { oidcLoginUrl } from "./auth/oidc-service";
 import { hasVisibleProjects } from "./auth/visibility-scope";
 import { resolveDefaultGoalWorkspaceScope } from
   "./control-plane/runtime/goal-workspace-runtime";
@@ -22,7 +23,7 @@ export default async function Home() {
     }),
     getOidcService(),
   );
-  if (!principal) redirect("/auth/login?returnTo=/");
+  if (!principal) redirect(oidcLoginUrl("/"));
   const loadResult = await (async () => {
     try {
       const visibility = await getWorkbenchVisibilityResolver().resolve(
