@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "harness.p12-recorded-contracts.v1",
+  "recordedAt": "2026-08-04T12:00:00.000Z",
+  "provenance": {
+    "codex": "Codex planner/verifier production adapter schemas",
+    "autodev": "AutoDev 0.4.16 isolated machine API smoke",
+    "git": "Git CLI and GitHub delivery adapter contract",
+    "objectStore": "P9 immutable object contract",
+    "oidc": "P3 OIDC RS256 session contract"
+  },
+  "fixed": {
+    "now": "2026-08-05T08:00:00.000Z",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "projectId": "00000000-0000-4000-8000-000000000002",
+    "goalId": "00000000-0000-4000-8000-000000000003",
+    "runId": "00000000-0000-4000-8000-000000000004",
+    "issueId": "H-001"
+  },
+  "codex": {
+    "plannerOutput": {
+      "schemaVersion": "planner-clarification.v1",
+      "knownFacts": [
+        {
+          "id": "fact-1",
+          "fact": "The release path must preserve human approval.",
+          "basis": "goal_contract"
+        }
+      ],
+      "uncertainties": [
+        {
+          "id": "uncertainty-1",
+          "statement": "The canary owner is not selected.",
+          "impact": "The release gate cannot be signed."
+        }
+      ],
+      "questions": [
+        {
+          "id": "question-1",
+          "prompt": "Who owns the canary stop decision?",
+          "rationale": "A named owner is required before execution.",
+          "blockingLevel": "high",
+          "answerType": "text",
+          "suggestedOptions": []
+        }
+      ]
+    },
+    "verifierOutput": {
+      "schemaVersion": "goal-verifier-output.v1",
+      "overallVerdict": "passed",
+      "criteria": [
+        {
+          "criterionRef": "00000000-0000-4000-8000-000000000031",
+          "verdict": "passed",
+          "evidenceRefs": ["artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+          "rationale": "The deterministic release gate passed."
+        }
+      ],
+      "nonGoals": [
+        {
+          "statement": "Public multi-tenant launch",
+          "verdict": "preserved",
+          "rationale": "The fixture is isolated to one internal project."
+        }
+      ],
+      "constraints": [
+        {
+          "statement": "No production credentials",
+          "verdict": "satisfied",
+          "rationale": "Only synthetic fixture identities are present."
+        }
+      ],
+      "regressionRisks": []
+    }
+  },
+  "autodev": {
+    "startStatus": {
+      "externalRunId": "p12-run-1",
+      "state": "running",
+      "phase": "builder",
+      "message": "Builder started"
+    },
+    "events": [
+      {
+        "schema_version": "autodev.run-event.v1",
+        "event_id": "p12-event-1",
+        "run_id": "p12-run-1",
+        "task_id": "H-001",
+        "sequence": 1,
+        "timestamp": "2026-08-05T08:00:01.000Z",
+        "phase": "builder",
+        "status": "running",
+        "message": "Builder started"
+      },
+      {
+        "schema_version": "autodev.run-event.v1",
+        "event_id": "p12-event-2",
+        "run_id": "p12-run-1",
+        "task_id": "H-001",
+        "sequence": 2,
+        "timestamp": "2026-08-05T08:00:02.000Z",
+        "phase": "loop_complete",
+        "status": "succeeded",
+        "message": "Execution completed"
+      }
+    ]
+  },
+  "git": {
+    "commit": {
+      "commitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "summary": "feat: P12 isolated delivery"
+    },
+    "push": {
+      "receiptId": "p12-push-receipt",
+      "remoteName": "origin",
+      "remoteBranch": "autodev/p12/H-001",
+      "commitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pushedAt": "2026-08-05T08:00:03.000Z"
+    },
+    "pullRequest": {
+      "externalId": "12",
+      "url": "https://github.example.invalid/acme/p12/pull/12",
+      "headBranch": "autodev/p12/H-001",
+      "baseBranch": "main"
+    },
+    "landing": {
+      "externalId": "12",
+      "landingCommitSha": "cccccccccccccccccccccccccccccccccccccccc",
+      "landedAt": "2026-08-05T08:00:05.000Z"
+    }
+  },
+  "objectStore": {
+    "content": "P12 immutable evidence\n",
+    "mediaType": "text/plain"
+  },
+  "oidc": {
+    "issuer": "https://p12-issuer.example.invalid",
+    "clientId": "p12-browser-client",
+    "subject": "p12-approver",
+    "email": "p12-approver@example.invalid",
+    "name": "P12 Approver"
+  }
+}
