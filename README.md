@@ -19,6 +19,7 @@
 - [Production V1 方案](docs/production-v1-plan.md)
 - [Web UI 交互设计说明](docs/web-ui-design.md)
 - [P11 软件供应链安全](docs/p11-supply-chain.md)
+- [P11 生产值班 Runbook](docs/runbooks/on-call.md)
 - [可交互 Web UI 原型](prototype/web-ui)
 - [AutoDev 执行引擎源码](autodev)
 

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "harness.production-runbooks.v1",
+  "environment": "production",
+  "requiredSections": [
+    "触发条件",
+    "权限",
+    "执行命令",
+    "验证",
+    "回退",
+    "升级联系人"
+  ],
+  "runbooks": [
+    {
+      "id": "deployment-rollback-upgrade",
+      "title": "部署、应用回滚与升级",
+      "path": "docs/runbooks/deployment-rollback-upgrade.md",
+      "owner": "release-engineering",
+      "escalation": [
+        "incident-commander",
+        "data-platform",
+        "platform-security"
+      ],
+      "operations": [
+        "deployment",
+        "application-rollback",
+        "expand-migrate-contract",
+        "dependency-upgrade"
+      ]
+    },
+    {
+      "id": "execution-stop-worker-loss",
+      "title": "全局/项目 Stop 与 Worker 失联",
+      "path": "docs/runbooks/execution-stop-worker-loss.md",
+      "owner": "execution-platform",
+      "escalation": [
+        "incident-commander",
+        "runtime-quality"
+      ],
+      "operations": [
+        "global-stop",
+        "project-stop",
+        "worker-loss"
+      ]
+    },
+    {
+      "id": "database-object-recovery",
+      "title": "数据库与对象存储恢复",
+      "path": "docs/runbooks/database-object-recovery.md",
+      "owner": "data-platform",
+      "escalation": [
+        "incident-commander",
+        "platform-security"
+      ],
+      "operations": [
+        "database-restore",
+        "point-in-time-recovery",
+        "object-recovery"
+      ]
+    },
+    {
+      "id": "credential-rotation-security-incident",
+      "title": "凭证轮换与安全事件",
+      "path": "docs/runbooks/credential-rotation-security-incident.md",
+      "owner": "platform-security",
+      "escalation": [
+        "incident-commander",
+        "data-platform",
+        "execution-platform"
+      ],
+      "operations": [
+        "credential-rotation",
+        "credential-revocation",
+        "security-incident"
+      ]
+    },
+    {
+      "id": "data-repair",
+      "title": "生产数据修复",
+      "path": "docs/runbooks/data-repair.md",
+      "owner": "data-platform",
+      "escalation": [
+        "incident-commander",
+        "control-plane"
+      ],
+      "operations": [
+        "data-diagnosis",
+        "repair-preview",
+        "repair-apply"
+      ]
+    },
+    {
+      "id": "on-call",
+      "title": "生产值班与事件指挥",
+      "path": "docs/runbooks/on-call.md",
+      "owner": "incident-management",
+      "escalation": [
+        "incident-commander",
+        "service-owner"
+      ],
+      "operations": [
+        "alert-triage",
+        "incident-command",
+        "handover"
+      ]
+    }
+  ],
+  "drill": {
+    "scenario": "stop-and-worker-loss",
+    "minimumIndependentExecutions": 1,
+    "receiptSchemaVersion": "harness.runbook-drill.v1"
+  }
+}

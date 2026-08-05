@@ -25,6 +25,8 @@
     "migration:drill:p11": "node --experimental-strip-types scripts/run-migration-rollback-drill.ts",
     "security:policy:p11": "node --experimental-strip-types scripts/check-supply-chain.ts",
     "security:artifacts:p11": "node --experimental-strip-types scripts/generate-supply-chain-artifacts.ts",
+    "runbook:check:p11": "node --experimental-strip-types scripts/check-runbooks.ts",
+    "runbook:drill:p11": "node --experimental-strip-types scripts/run-runbook-drill.ts",
     "test:p8": "node --experimental-strip-types --test tests/p8-*.test.mjs",
     "test:p9": "node --experimental-strip-types --test tests/p9-*.test.mjs",
     "test:p9:postgres": "node --experimental-strip-types scripts/run-postgres-integration-tests.ts tests/p9-postgres-integration.test.mjs",

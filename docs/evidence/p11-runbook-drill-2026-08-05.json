@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "harness.runbook-drill.v1",
+  "drillId": "517e5f9b-ca43-40c9-aab7-e4818c09bd7a",
+  "scenario": "stop-and-worker-loss",
+  "mode": "isolated-control-plane-real-code-path",
+  "startedAt": "2026-08-05T03:12:14.417Z",
+  "completedAt": "2026-08-05T03:12:14.444Z",
+  "durationSeconds": 0.027,
+  "executor": {
+    "authorRole": "platform-engineering",
+    "executorRole": "independent-on-call-verifier",
+    "independent": true,
+    "inputScope": "runbook-and-manifest-only"
+  },
+  "evidence": {
+    "manifest": "ops/production/runbook-manifest.json",
+    "manifestSha256": "95e384e6f2ed865432ed4dd3fe71d13ef2c2c6174744fd11cb11fda05fe34afd",
+    "runbook": "docs/runbooks/execution-stop-worker-loss.md",
+    "runbookSha256": "d043629cc1f8186a0009043df896e2782ad54eac4d76d4cca090af4431700d20",
+    "stopReceiptVersion": 2,
+    "finalEventSequence": 7
+  },
+  "assertions": {
+    "catalogValid": true,
+    "stopAudited": true,
+    "stoppedBeforeClaim": true,
+    "externalRunCancelled": true,
+    "workerLeaseExpired": true,
+    "workerLossReconciled": true,
+    "noDuplicateLaunch": true
+  },
+  "revisions": [
+    "Clarified the in-memory and fixture-only isolation boundary; added full Receipt existence, critical-field, and gaps verification."
+  ],
+  "gaps": [],
+  "result": "passed"
+}
