@@ -1503,7 +1503,7 @@ revision 跳跃、重复点击、暂停/排空/恢复、数据库短暂失败和
 
 </details>
 
-- [ ] **P12-04** 在隔离仓库完成真实 AutoDev 端到端执行及 Worker 失联/Stop/恢复演练。
+- [x] **P12-04** 在隔离仓库完成真实 AutoDev 端到端执行及 Worker 失联/Stop/恢复演练。（已完成：2026-08-05；实现提交：ai-dev-harness@6d037b5b0b61e8633abddf60589576156638be44）
 
 <details>
 <summary>快捷复制开发提示词 P12-04 · gpt-5.6-sol(深度) · high(高)</summary>
