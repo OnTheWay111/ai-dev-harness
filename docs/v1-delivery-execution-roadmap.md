@@ -1443,7 +1443,7 @@ P11-06 为 `[x]（已完成）`并提交、push 路线图。
 
 目标：用真实路径证明系统达到发布门槛。
 
-- [ ] **P12-01** 建立 fake Codex、fake AutoDev、fake Git 和固定测试数据的契约环境。
+- [x] **P12-01** 建立 fake Codex、fake AutoDev、fake Git 和固定测试数据的契约环境。（已完成：2026-08-05；实现提交：ai-dev-harness@f6a75657883c93c04ba31d6f563b4f7d57c850c3）
 
 <details>
 <summary>快捷复制开发提示词 P12-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
