@@ -1337,7 +1337,7 @@ Scheduler、Gateway 和 Worker 事件；输出结构化、脱敏日志以及关�
 
 </details>
 
-- [ ] **P11-02** 建立队列停滞、Worker 失联、失败率、预算、数据库和对象存储告警。
+- [x] **P11-02** 建立队列停滞、Worker 失联、失败率、预算、数据库和对象存储告警。（已完成：2026-08-05；实现提交：ai-dev-harness@d610374e6ec83ce663a957739176a4d3b4bbd601）
 
 <details>
 <summary>快捷复制开发提示词 P11-02 · gpt-5.6-terra(均衡) · medium(中等)</summary>
