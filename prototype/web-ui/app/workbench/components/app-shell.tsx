@@ -1,5 +1,6 @@
 import type { View } from "../contracts";
 import { globalNavItems, goalNavItems } from "../view-data";
+import Link from "next/link";
 
 function ProductMark() {
   return (
@@ -49,6 +50,10 @@ export function Sidebar({
             {item.badge && <span className="nav-badge">{item.badge}</span>}
           </button>
         ))}
+        <Link className="nav-item" href="/releases" aria-label="发布中心">
+          <span className="nav-symbol">发</span>
+          <span>发布中心</span>
+        </Link>
         <p className="nav-caption secondary-caption">已选择 · GOAL-2407</p>
         {goalNavItems.map((item) => (
           <button

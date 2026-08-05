@@ -2903,6 +2903,329 @@ export const auditEvents = pgTable(
   ],
 );
 
+export const releaseCanaries = pgTable(
+  "release_canaries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    candidateCommit: text("candidate_commit").notNull(),
+    status: text("status")
+      .$type<import("../app/release-center/domain.ts").CanaryStatus>()
+      .default("draft")
+      .notNull(),
+    attempt: integer("attempt").default(1).notNull(),
+    goalContractVersion: integer("goal_contract_version").notNull(),
+    allowedAreas: jsonb("allowed_areas").$type<string[]>().notNull(),
+    excludedAreas: jsonb("excluded_areas").$type<string[]>().notNull(),
+    successConditions: jsonb("success_conditions").$type<string[]>().notNull(),
+    stopConditions: jsonb("stop_conditions").$type<string[]>().notNull(),
+    rollbackRunbook: text("rollback_runbook").notNull(),
+    stopRunbook: text("stop_runbook").notNull(),
+    ownerId: text("owner_id"),
+    approvedAt: timestamp("approved_at", { withTimezone: true, mode: "date" }),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }),
+    endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
+    report: jsonb("report")
+      .$type<import("../app/release-center/domain.ts").CanaryReport | null>(),
+    version: integer("version").default(1).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "release_canaries_goal_fk",
+      columns: [table.organizationId, table.projectId, table.goalId],
+      foreignColumns: [goals.organizationId, goals.projectId, goals.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("release_canaries_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    index("release_canaries_project_status_idx").on(
+      table.organizationId, table.projectId, table.status, table.updatedAt,
+    ),
+    check(
+      "release_canaries_status_chk",
+      sql`${table.status} IN ('draft','observing','stopped','passed')`,
+    ),
+    check(
+      "release_canaries_identity_chk",
+      sql`${table.candidateCommit} ~ '^[0-9a-f]{40}$' AND ${table.attempt} > 0 AND ${table.goalContractVersion} > 0 AND ${table.version} > 0 AND char_length(btrim(${table.createdBy})) BETWEEN 1 AND 200`,
+    ),
+    check(
+      "release_canaries_scope_chk",
+      sql`jsonb_typeof(${table.allowedAreas})='array' AND jsonb_array_length(${table.allowedAreas}) BETWEEN 1 AND 100 AND jsonb_typeof(${table.excludedAreas})='array' AND jsonb_array_length(${table.excludedAreas}) BETWEEN 1 AND 100 AND jsonb_typeof(${table.successConditions})='array' AND jsonb_array_length(${table.successConditions}) BETWEEN 1 AND 100 AND jsonb_typeof(${table.stopConditions})='array' AND jsonb_array_length(${table.stopConditions}) BETWEEN 1 AND 100`,
+    ),
+    check(
+      "release_canaries_lifecycle_chk",
+      sql`(${table.status}='draft' AND ${table.ownerId} IS NULL AND ${table.approvedAt} IS NULL AND ${table.startedAt} IS NULL AND ${table.report} IS NULL) OR (${table.status}='observing' AND ${table.ownerId} IS NOT NULL AND ${table.approvedAt} IS NOT NULL AND ${table.startedAt} IS NOT NULL AND ${table.endedAt} IS NULL AND ${table.report} IS NULL) OR (${table.status}='stopped' AND ${table.ownerId} IS NOT NULL AND ${table.approvedAt} IS NOT NULL AND ${table.startedAt} IS NOT NULL AND ${table.endedAt} IS NOT NULL AND ${table.report} IS NULL) OR (${table.status}='passed' AND ${table.ownerId} IS NOT NULL AND ${table.approvedAt} IS NOT NULL AND ${table.startedAt} IS NOT NULL AND ${table.endedAt} IS NOT NULL AND jsonb_typeof(${table.report})='object')`,
+    ),
+    check(
+      "release_canaries_time_chk",
+      sql`${table.updatedAt} >= ${table.createdAt} AND (${table.approvedAt} IS NULL OR ${table.approvedAt} >= ${table.createdAt}) AND (${table.startedAt} IS NULL OR ${table.startedAt} >= ${table.approvedAt}) AND (${table.endedAt} IS NULL OR ${table.endedAt} >= ${table.startedAt})`,
+    ),
+  ],
+);
+
+export const releaseCanaryWindows = pgTable(
+  "release_canary_windows",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    canaryId: uuid("canary_id").notNull(),
+    attempt: integer("attempt").notNull(),
+    sequence: integer("sequence").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: text("status").notNull(),
+    p0Count: integer("p0_count").default(0).notNull(),
+    p1Count: integer("p1_count").default(0).notNull(),
+    evidenceRefs: jsonb("evidence_refs").$type<string[]>().notNull(),
+    recordedBy: text("recorded_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "release_canary_windows_canary_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.canaryId],
+      foreignColumns: [
+        releaseCanaries.organizationId, releaseCanaries.projectId,
+        releaseCanaries.goalId, releaseCanaries.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("release_canary_windows_attempt_sequence_uidx").on(
+      table.canaryId, table.attempt, table.sequence,
+    ),
+    check(
+      "release_canary_windows_state_chk",
+      sql`${table.attempt} > 0 AND ${table.sequence} > 0 AND ${table.status} IN ('healthy','unhealthy') AND ${table.p0Count} >= 0 AND ${table.p1Count} >= 0`,
+    ),
+    check(
+      "release_canary_windows_time_chk",
+      sql`${table.endedAt} > ${table.startedAt} AND ${table.endedAt} <= ${table.startedAt} + interval '1 hour'`,
+    ),
+    check(
+      "release_canary_windows_evidence_chk",
+      sql`jsonb_typeof(${table.evidenceRefs})='array' AND jsonb_array_length(${table.evidenceRefs}) > 0 AND char_length(btrim(${table.recordedBy})) BETWEEN 1 AND 200`,
+    ),
+  ],
+);
+
+export const releaseCanaryEvents = pgTable(
+  "release_canary_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    canaryId: uuid("canary_id").notNull(),
+    attempt: integer("attempt").notNull(),
+    eventKey: text("event_key").notNull(),
+    kind: text("kind").notNull(),
+    severity: text("severity"),
+    observedAt: timestamp("observed_at", { withTimezone: true, mode: "date" }).notNull(),
+    payload: jsonb("payload")
+      .$type<import("../app/release-center/domain.ts").CanaryEvent>()
+      .notNull(),
+    recordedBy: text("recorded_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "release_canary_events_canary_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.canaryId],
+      foreignColumns: [
+        releaseCanaries.organizationId, releaseCanaries.projectId,
+        releaseCanaries.goalId, releaseCanaries.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("release_canary_events_attempt_key_uidx").on(
+      table.canaryId, table.attempt, table.eventKey,
+    ),
+    check(
+      "release_canary_events_kind_chk",
+      sql`${table.kind} IN ('defect','alert','intervention') AND ((${table.kind}='intervention' AND ${table.severity} IS NULL) OR (${table.kind}<>'intervention' AND ${table.severity} IN ('P0','P1','P2','P3')))`,
+    ),
+    check(
+      "release_canary_events_payload_chk",
+      sql`${table.attempt} > 0 AND jsonb_typeof(${table.payload})='object' AND char_length(btrim(${table.eventKey})) BETWEEN 1 AND 128 AND char_length(btrim(${table.recordedBy})) BETWEEN 1 AND 200 AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const productionReleases = pgTable(
+  "production_releases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    canaryId: uuid("canary_id").notNull(),
+    candidateCommit: text("candidate_commit").notNull(),
+    status: text("status")
+      .$type<import("../app/release-center/domain.ts").ProductionReleaseStatus>()
+      .default("draft").notNull(),
+    canaryReport: jsonb("canary_report")
+      .$type<import("../app/release-center/domain.ts").CanaryReport>()
+      .notNull(),
+    defects: jsonb("defects")
+      .$type<import("../app/release-center/domain.ts").ProductionReleaseReport["defects"]>()
+      .notNull(),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true, mode: "date" }),
+    attestationDigest: text("attestation_digest"),
+    report: jsonb("report")
+      .$type<import("../app/release-center/domain.ts").ProductionReleaseReport | null>(),
+    version: integer("version").default(1).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "production_releases_canary_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.canaryId],
+      foreignColumns: [
+        releaseCanaries.organizationId, releaseCanaries.projectId,
+        releaseCanaries.goalId, releaseCanaries.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    unique("production_releases_scope_id_uidx").on(
+      table.organizationId, table.projectId, table.goalId, table.id,
+    ),
+    uniqueIndex("production_releases_canary_uidx").on(table.canaryId),
+    index("production_releases_project_status_idx").on(
+      table.organizationId, table.projectId, table.status, table.updatedAt,
+    ),
+    check(
+      "production_releases_status_chk",
+      sql`${table.status} IN ('draft','awaiting_signatures','approved')`,
+    ),
+    check(
+      "production_releases_identity_chk",
+      sql`${table.candidateCommit} ~ '^[0-9a-f]{40}$' AND ${table.version} > 0 AND char_length(btrim(${table.createdBy})) BETWEEN 1 AND 200 AND jsonb_typeof(${table.canaryReport})='object' AND jsonb_typeof(${table.defects})='object'`,
+    ),
+    check(
+      "production_releases_evaluation_chk",
+      sql`(${table.status}='draft' AND ${table.evaluatedAt} IS NULL AND ${table.attestationDigest} IS NULL AND ${table.report} IS NULL) OR (${table.status} IN ('awaiting_signatures','approved') AND ${table.evaluatedAt} IS NOT NULL AND ${table.attestationDigest} ~ '^[0-9a-f]{64}$' AND jsonb_typeof(${table.report})='object')`,
+    ),
+    check(
+      "production_releases_time_chk",
+      sql`${table.updatedAt} >= ${table.createdAt} AND (${table.evaluatedAt} IS NULL OR ${table.evaluatedAt} >= ${table.createdAt})`,
+    ),
+  ],
+);
+
+export const productionGateChecks = pgTable(
+  "production_gate_checks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    releaseId: uuid("release_id").notNull(),
+    gateId: text("gate_id")
+      .$type<import("../app/release-center/domain.ts").ProductionGateId>()
+      .notNull(),
+    status: text("status").default("passed").notNull(),
+    ownerRole: text("owner_role")
+      .$type<import("../app/release-center/domain.ts").ReleaseSignatureRole>()
+      .notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true, mode: "date" }).notNull(),
+    evidenceRefs: jsonb("evidence_refs").$type<string[]>().notNull(),
+    checkedBy: text("checked_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "production_gate_checks_release_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.releaseId],
+      foreignColumns: [
+        productionReleases.organizationId, productionReleases.projectId,
+        productionReleases.goalId, productionReleases.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("production_gate_checks_release_gate_uidx").on(
+      table.releaseId, table.gateId,
+    ),
+    check(
+      "production_gate_checks_gate_chk",
+      sql`${table.gateId} IN ('browser-e2e','identity-security','autodev-authorization','model-routing-write','supply-chain','git-traceability','recovery-stop','observability-oncall','canary-goal-verification','defect-budget') AND ${table.status}='passed'`,
+    ),
+    check(
+      "production_gate_checks_role_chk",
+      sql`${table.ownerRole} IN ('security','operations','product','project-owner') AND jsonb_typeof(${table.evidenceRefs})='array' AND jsonb_array_length(${table.evidenceRefs}) > 0 AND char_length(btrim(${table.checkedBy})) BETWEEN 1 AND 200 AND ${table.updatedAt} >= ${table.createdAt}`,
+    ),
+  ],
+);
+
+export const productionReleaseSignatures = pgTable(
+  "production_release_signatures",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    goalId: uuid("goal_id").notNull(),
+    releaseId: uuid("release_id").notNull(),
+    role: text("role")
+      .$type<import("../app/release-center/domain.ts").ReleaseSignatureRole>()
+      .notNull(),
+    signerId: text("signer_id").notNull(),
+    signedAt: timestamp("signed_at", { withTimezone: true, mode: "date" }).notNull(),
+    decision: text("decision").default("approved").notNull(),
+    reason: text("reason").notNull(),
+    authenticationMethod: text("authentication_method").default("oidc").notNull(),
+    requestId: text("request_id").notNull(),
+    auditReceiptId: uuid("audit_receipt_id").notNull(),
+    attestationDigest: text("attestation_digest").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "production_release_signatures_release_fk",
+      columns: [table.organizationId, table.projectId, table.goalId, table.releaseId],
+      foreignColumns: [
+        productionReleases.organizationId, productionReleases.projectId,
+        productionReleases.goalId, productionReleases.id,
+      ],
+    }).onDelete("restrict").onUpdate("restrict"),
+    foreignKey({
+      name: "production_release_signatures_audit_receipt_fk",
+      columns: [table.auditReceiptId],
+      foreignColumns: [auditEvents.id],
+    }).onDelete("restrict").onUpdate("restrict"),
+    uniqueIndex("production_release_signatures_release_role_uidx").on(
+      table.releaseId, table.role,
+    ),
+    uniqueIndex("production_release_signatures_release_signer_uidx").on(
+      table.releaseId, table.signerId,
+    ),
+    check(
+      "production_release_signatures_role_chk",
+      sql`${table.role} IN ('security','operations','product','project-owner') AND ${table.decision}='approved' AND ${table.authenticationMethod}='oidc'`,
+    ),
+    check(
+      "production_release_signatures_identity_chk",
+      sql`char_length(btrim(${table.signerId})) BETWEEN 1 AND 200 AND char_length(btrim(${table.reason})) BETWEEN 20 AND 4000 AND char_length(btrim(${table.requestId})) BETWEEN 1 AND 200 AND ${table.attestationDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+  ],
+);
+
 export const outboxEvents = pgTable(
   "outbox_events",
   {
@@ -3110,6 +3433,14 @@ export type Evidence = typeof evidence.$inferSelect;
 export type NewEvidence = typeof evidence.$inferInsert;
 export type AuditEvent = typeof auditEvents.$inferSelect;
 export type NewAuditEvent = typeof auditEvents.$inferInsert;
+export type ReleaseCanaryRecord = typeof releaseCanaries.$inferSelect;
+export type NewReleaseCanaryRecord = typeof releaseCanaries.$inferInsert;
+export type ReleaseCanaryWindowRecord = typeof releaseCanaryWindows.$inferSelect;
+export type ReleaseCanaryEventRecord = typeof releaseCanaryEvents.$inferSelect;
+export type ProductionReleaseRecord = typeof productionReleases.$inferSelect;
+export type ProductionGateCheckRecord = typeof productionGateChecks.$inferSelect;
+export type ProductionReleaseSignatureRecord =
+  typeof productionReleaseSignatures.$inferSelect;
 export type OutboxEvent = typeof outboxEvents.$inferSelect;
 export type NewOutboxEvent = typeof outboxEvents.$inferInsert;
 export type SchedulerJobRecord = typeof schedulerJobs.$inferSelect;

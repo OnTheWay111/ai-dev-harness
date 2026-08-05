@@ -3,6 +3,7 @@ import { OidcService } from "../../app/auth/oidc-service";
 export const p12BaseURL = "https://localhost:4175";
 export const p12OrganizationId = "00000000-0000-4000-8000-000000000001";
 export const p12ProjectId = "00000000-0000-4000-8000-000000000002";
+export const p12ReleaseGoalId = "00000000-0000-4000-8000-0000000000a1";
 
 const issuer = "https://p12-issuer.example.invalid";
 const clientId = "p12-browser-client";
@@ -67,7 +68,7 @@ export async function p12SessionCookie(
       clientId,
       redirectUri: `${p12BaseURL}/auth/callback`,
       cookieSecret,
-      allowedReturnToPaths: ["/"],
+      allowedReturnToPaths: ["/", "/releases"],
       sessionTtlSeconds: 3_600,
       transactionTtlSeconds: 600,
     },

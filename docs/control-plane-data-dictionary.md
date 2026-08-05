@@ -8,8 +8,8 @@ The current scope contains Organization, Project, Repository, Goal,
 AcceptanceCriterion, ClarificationRound, Clarification, Decision,
 ClassificationPolicyRevision, Classification, SpecRevision, Issue,
 IssuePlanRevision, ModelRecommendation, ExecutionWave, IssueDependency,
-QueueProjection, Run, Evidence, AuditEvent, OutboxEvent, and
-IdempotencyRecord.
+QueueProjection, Run, Evidence, ReleaseCanary, ProductionRelease, AuditEvent,
+OutboxEvent, and IdempotencyRecord.
 
 ## Shared rules
 
@@ -355,6 +355,30 @@ Immutable metadata for a Run artifact.
 
 PostgreSQL rejects updates and deletes. The same digest and kind is unique per
 Run; artifact content is never stored in this table.
+
+## P12 release-center tables
+
+`release_canaries` is the authoritative versioned Canary aggregate. It binds Organization, Project, Goal, full candidate
+Commit SHA, approved scope and conditions, Runbook paths, current Attempt, owner, lifecycle timestamps, validated final
+report, optimistic version, and server-derived creator. A composite foreign key prevents cross-Goal release state.
+
+`release_canary_windows` stores one immutable, at-most-one-hour evidence window per `(canary, attempt, sequence)`.
+`release_canary_events` stores disclosed defects, alerts, and interventions; alert resolution updates only its structured
+resolution state through an audited command and never removes the original event. P0/P1 transitions the parent Canary to
+`stopped`; a restart increments Attempt and preserves prior windows and events.
+
+`production_releases` binds exactly one passed Canary to the ten-gate draft, locked SHA-256 attestation digest, final
+report, lifecycle status, and optimistic version. `production_gate_checks` has one evidence-backed passed record per Gate
+and records both release role and authenticated checker. Gate rows remain editable only while the parent release is a
+draft; application state rejects all changes after digest evaluation.
+
+`production_release_signatures` has one row per required role and a second uniqueness constraint on signer identity, so
+one actor cannot fill two roles. The row binds the OIDC-derived signer, reason, request ID, timestamp, decision, exact
+attestation digest, and a foreign key to the Audit Event created in the same transaction. PostgreSQL update/delete triggers
+make both signatures and Canary observation windows append-only.
+
+Every release-center command also claims an Organization/actor/endpoint Idempotency Record, writes the aggregate and any
+child evidence, appends an Audit Event and Outbox Event, and completes the idempotency response inside one transaction.
 
 ## `audit_events`
 

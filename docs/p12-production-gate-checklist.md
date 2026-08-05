@@ -1,12 +1,13 @@
 # P12 Production V1 Gate 当前清单
 
-更新时间：2026-08-05。`evidence-ready` 表示开发与仓库证据已就绪，但不能代替最终 release 文件中的 OIDC
+更新时间：2026-08-05。Web 发布中心 `/releases` 已承载 Canary、十项 Gate 和四角色 OIDC 签署，状态与
+不可变证据持久化到 PostgreSQL；`evidence-ready` 表示开发与仓库证据已就绪，但不能代替真实 OIDC
 审计签署；`blocked` 表示真实外部门槛尚未发生。最终权威规则为
 `ops/production/p12-release-policy.json`，执行校验为 `npm run release:check:p12`。
 
 | Gate | 当前状态 | 证据/缺口 |
 |---|---|---|
-| browser-e2e | evidence-ready | P12-02/P12-03 真实浏览器、临时 PostgreSQL、主路径与失败路径测试 |
+| browser-e2e | evidence-ready | P12-02/P12-03 主路径与失败路径，以及发布中心 48 窗口/10 Gate/4 signer 数据库 E2E |
 | identity-security | evidence-ready | P3 OIDC/RBAC/CSRF/Audit 门禁与 P11 安全/Secret 扫描 |
 | autodev-authorization | evidence-ready | `docs/autodev-0.4.16-execution-compatibility.md` 与授权范围 |
 | model-routing-write | evidence-ready | P6 task-level `preferred_builder` 正式 Queue Import 接口与契约测试 |

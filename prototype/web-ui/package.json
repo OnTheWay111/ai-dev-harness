@@ -22,6 +22,8 @@
     "test:p12:browser": "node --experimental-strip-types scripts/run-p12-browser-e2e.ts",
     "test:p12:drill": "node --experimental-strip-types --test tests/p12-real-autodev-drill.test.mjs && node --experimental-strip-types scripts/check-p12-real-autodev-drill.ts",
     "test:p12:gates": "node --experimental-strip-types --test tests/p12-canary-gate.test.mjs tests/p12-production-release-gate.test.mjs && node --experimental-strip-types scripts/check-p12-release-policy.ts",
+    "test:p12:release-center": "node --experimental-strip-types --test tests/p12-release-center-domain.test.mjs tests/p12-release-center-service.test.mjs tests/p12-release-center-handler.test.mjs tests/p12-release-center-schema.test.mjs tests/p12-release-center-ui-contract.test.mjs",
+    "test:p12:release-center:postgres": "node --experimental-strip-types scripts/run-postgres-integration-tests.ts tests/p12-release-center-postgres-integration.test.mjs",
     "canary:check:p12": "node --experimental-strip-types scripts/check-p12-canary-report.ts",
     "release:check:p12": "node --experimental-strip-types scripts/check-p12-production-release.ts",
     "recovery:fixture:p11": "node --experimental-strip-types scripts/prepare-recovery-drill-fixture.ts",

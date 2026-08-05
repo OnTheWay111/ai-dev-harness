@@ -1525,8 +1525,9 @@ Worktree、开发、测试、Review、Commit/Push/PR；再注入 Worker 失联�
 
 - [ ] **P12-05** 选择低风险内部项目 Canary，连续 48 小时无 P0/P1 问题。
 
-> 开发门禁已就绪（ai-dev-harness@c4230cf394d86354d8e7b8b262b61c8c7e91dc47）：强制连续 48 小时证据窗口、
-> P0/P1=0、P2 owner/规避方案和 Goal Verification；真实内部项目 owner 尚未提供，故保持未完成。
+> 开发门禁和 Web 发布中心已就绪：`/releases`、API、PostgreSQL 事务持久化与浏览器 E2E 强制连续
+> 48 小时证据窗口、P0/P1=0、事件披露/告警解除、P2 owner/规避方案和 Goal Verification。E2E 的加速
+> 窗口不属于发布证据；真实内部项目 owner 尚未提供，故保持未完成。
 
 <details>
 <summary>快捷复制开发提示词 P12-05 · gpt-5.6-terra(均衡) · medium(中等)</summary>
@@ -1548,8 +1549,9 @@ Runbook 和候选项目约束。由有权限负责人选定低风险内部 Canar
 
 - [ ] **P12-06** 完成安全、运维、产品和项目负责人签字，逐项关闭 Production Gate。
 
-> 发布策略、十项 checklist 和四角色 OIDC/Audit Receipt/digest 签署门禁已实现
->（ai-dev-harness@c4230cf394d86354d8e7b8b262b61c8c7e91dc47）；Canary 与真实签署未完成，故保持未完成。
+> 发布策略、十项 checklist 和四角色 OIDC/Audit Receipt/digest 签署门禁已在 Web 发布中心实现；服务端
+> 从 OIDC 会话派生 signer，PostgreSQL 将 Gate、签署、Audit 与 Outbox 原子持久化，并由浏览器 E2E 验证
+> 越权失败关闭和四个不同 signer。真实 Canary 与真实签署未完成，故保持未完成。
 
 <details>
 <summary>快捷复制开发提示词 P12-06 · gpt-5.6-terra(均衡) · medium(中等)</summary>

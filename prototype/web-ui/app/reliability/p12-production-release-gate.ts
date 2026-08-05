@@ -1,31 +1,21 @@
 import { createHash } from "node:crypto";
 
+import {
+  P12_PRODUCTION_GATE_IDS,
+  P12_RELEASE_SIGNATURE_ROLES,
+} from "../release-center/constants.ts";
 import { validateP12CanaryReport } from "./p12-canary-gate.ts";
+
+export {
+  P12_PRODUCTION_GATE_IDS,
+  P12_RELEASE_SIGNATURE_ROLES,
+} from "../release-center/constants.ts";
 
 const SCHEMA_VERSION = "harness.p12-production-release-gate.v1";
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/;
 const PLACEHOLDER = /(?:^|[-_.])(test|example|placeholder|unknown|tbd|todo)(?:$|[-_.])/i;
-export const P12_PRODUCTION_GATE_IDS = [
-  "browser-e2e",
-  "identity-security",
-  "autodev-authorization",
-  "model-routing-write",
-  "supply-chain",
-  "git-traceability",
-  "recovery-stop",
-  "observability-oncall",
-  "canary-goal-verification",
-  "defect-budget",
-] as const;
-export const P12_RELEASE_SIGNATURE_ROLES = [
-  "security",
-  "operations",
-  "product",
-  "project-owner",
-] as const;
-
 type ObjectValue = Record<string, unknown>;
 
 function object(value: unknown, label: string): ObjectValue {

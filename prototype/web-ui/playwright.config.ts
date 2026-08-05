@@ -29,7 +29,7 @@ export default defineConfig({
       OIDC_CLIENT_ID: "p5-browser-client",
       OIDC_REDIRECT_URI: `${baseURL}/auth/callback`,
       OIDC_COOKIE_SECRET: cookieSecret,
-      OIDC_ALLOWED_RETURN_TO_PATHS: "/",
+      OIDC_ALLOWED_RETURN_TO_PATHS: "/,/releases",
       HARNESS_ALLOWED_ORIGINS: baseURL,
     },
   },

@@ -25,6 +25,11 @@ const fixed = {
   issuer: "https://p12-issuer.example.invalid",
   clientId: "p12-browser-client",
   subject: "p12-approver",
+  releaseGoalId: "00000000-0000-4000-8000-0000000000a1",
+  releaseSpecId: "00000000-0000-4000-8000-0000000000a2",
+  releaseIssuePlanId: "00000000-0000-4000-8000-0000000000a3",
+  releaseVerificationPlanId: "00000000-0000-4000-8000-0000000000a4",
+  releaseVerificationId: "00000000-0000-4000-8000-0000000000a5",
 };
 
 async function freePort(): Promise<number> {
@@ -433,6 +438,142 @@ async function seed(pool: InstanceType<typeof Pool>): Promise<void> {
              'Authorize the isolated P12 browser owner', 'p12-bootstrap')`,
     [crypto.randomUUID(), fixed.organizationId, actorId()],
   );
+  for (const [subject, role] of [
+    ["p12-operations", "operator"],
+    ["p12-product", "approver"],
+    ["p12-project-owner", "project_admin"],
+  ]) {
+    await pool.query(
+      `INSERT INTO role_bindings
+         (id,organization_id,project_id,actor_id,role,assigned_by_actor_id,
+          reason,request_id)
+       VALUES ($1,$2,$3,$4,$5,'p12-bootstrap',
+               'Authorize the isolated P12 release role','p12-release-bootstrap')`,
+      [
+        crypto.randomUUID(),
+        fixed.organizationId,
+        fixed.projectId,
+        `oidc_${createHash("sha256")
+          .update(`${fixed.issuer}\0${subject}`)
+          .digest("hex")}`,
+        role,
+      ],
+    );
+  }
+  await pool.query(
+    `INSERT INTO goals
+       (id,organization_id,project_id,title,problem_statement,desired_outcome,
+        status,created_at,updated_at)
+     VALUES ($1,$2,$3,'P12 Release Center Canary',
+             'Prove the release center through a real browser and PostgreSQL',
+             'A digest-bound Production V1 approval','completed',$4,$4)`,
+    [fixed.releaseGoalId, fixed.organizationId, fixed.projectId, generatedAt],
+  );
+  await pool.query(
+    `INSERT INTO spec_revisions
+       (id,organization_id,project_id,goal_id,revision,status,
+        source_goal_version,artifact_ref,artifact_digest,generated_at,
+        created_at,updated_at)
+     VALUES ($1,$2,$3,$4,1,'approved',1,'artifact://p12-release-spec',$5,$6,$6,$6)`,
+    [
+      fixed.releaseSpecId,
+      fixed.organizationId,
+      fixed.projectId,
+      fixed.releaseGoalId,
+      "1".repeat(64),
+      generatedAt,
+    ],
+  );
+  await pool.query(
+    `INSERT INTO issue_plan_revisions
+       (id,organization_id,project_id,goal_id,spec_revision_id,revision,status,
+        source_spec_version,source_spec_digest,plan_data,digest,planner_run_id,
+        planner_configuration,compiler_policy_revision,conflict_policy_revision,
+        model_router_policy_revision,generated_at,created_at,updated_at)
+     VALUES ($1,$2,$3,$4,$5,1,'approved',1,$6,'{}'::jsonb,$7,
+             'p12-release-planner','{}'::jsonb,'p12-compiler.v1',
+             'p12-conflict.v1','p12-router.v1',$8,$8,$8)`,
+    [
+      fixed.releaseIssuePlanId,
+      fixed.organizationId,
+      fixed.projectId,
+      fixed.releaseGoalId,
+      fixed.releaseSpecId,
+      "1".repeat(64),
+      "2".repeat(64),
+      generatedAt,
+    ],
+  );
+  const verificationEntries = [{
+    id: "p12-release-entry",
+    criterionRef: "criterion:p12-release",
+    environment: "test",
+    strategy: { type: "artifact", reference: "artifact:p12-release" },
+    successCondition: "Release center browser proof passes",
+    timeoutMs: 60_000,
+    responsibleParty: "p12-release-owner",
+  }];
+  await pool.query(
+    `INSERT INTO acceptance_verification_plans
+       (id,organization_id,project_id,goal_id,goal_version,issue_plan_id,
+        issue_plan_version,revision,entries,compilation,digest,compiled_at,
+        created_at)
+     VALUES ($1,$2,$3,$4,1,$5,1,1,$6::jsonb,$7::jsonb,$8,$9,$9)`,
+    [
+      fixed.releaseVerificationPlanId,
+      fixed.organizationId,
+      fixed.projectId,
+      fixed.releaseGoalId,
+      fixed.releaseIssuePlanId,
+      JSON.stringify(verificationEntries),
+      JSON.stringify({
+        valid: true,
+        coveredCriterionRefs: ["criterion:p12-release"],
+      }),
+      "3".repeat(64),
+      generatedAt,
+    ],
+  );
+  await pool.query(
+    `INSERT INTO goal_verifications
+       (id,organization_id,project_id,goal_id,verification_plan_id,
+        issue_plan_id,revision,goal_version,verdict,deterministic_results,
+        verifier_output,verifier_identity,verifier_version,session_id,
+        verified_at,created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,1,1,'passed',$7::jsonb,$8::jsonb,
+             'p12-release-verifier','p12-release-verifier.v1',
+             'p12-release-session',$9,$9)`,
+    [
+      fixed.releaseVerificationId,
+      fixed.organizationId,
+      fixed.projectId,
+      fixed.releaseGoalId,
+      fixed.releaseVerificationPlanId,
+      fixed.releaseIssuePlanId,
+      JSON.stringify([{
+        entryId: "p12-release-entry",
+        criterionRef: "criterion:p12-release",
+        status: "passed",
+        evidenceRefs: ["artifact:p12-release"],
+        summary: "P12 release fixture passed",
+        durationMs: 1,
+      }]),
+      JSON.stringify({
+        schemaVersion: "goal-verifier-output.v1",
+        overallVerdict: "passed",
+        criteria: [{
+          criterionRef: "criterion:p12-release",
+          verdict: "passed",
+          evidenceRefs: ["artifact:p12-release"],
+          rationale: "P12 release fixture passed",
+        }],
+        nonGoals: [],
+        constraints: [],
+        regressionRisks: [],
+      }),
+      generatedAt,
+    ],
+  );
   await pool.query(
     `INSERT INTO workbench_snapshots
        (scope_id, organization_id, project_id, revision, generated_at, summary)
@@ -531,7 +672,7 @@ async function main(): Promise<number> {
       OIDC_ISSUER: fixed.issuer,
       OIDC_CLIENT_ID: fixed.clientId,
       OIDC_COOKIE_SECRET: Buffer.alloc(32, 12).toString("base64url"),
-      OIDC_ALLOWED_RETURN_TO_PATHS: "/",
+      OIDC_ALLOWED_RETURN_TO_PATHS: "/,/releases",
     });
     if (status !== 0) throw new Error("P12 browser E2E failed");
     if (autoDev.imports.length !== 1) {

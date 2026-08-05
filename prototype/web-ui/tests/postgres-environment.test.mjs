@@ -102,7 +102,7 @@ test("keeps every environment template credential-free and correctly mapped", ()
       OIDC_REDIRECT_URI:
         `https://${environment}.example.invalid/auth/callback`,
       OIDC_COOKIE_SECRET: "",
-      OIDC_ALLOWED_RETURN_TO_PATHS: "/,/goals",
+      OIDC_ALLOWED_RETURN_TO_PATHS: "/,/goals,/releases",
       OIDC_SESSION_TTL_SECONDS: "28800",
       OIDC_TRANSACTION_TTL_SECONDS: "600",
     });
