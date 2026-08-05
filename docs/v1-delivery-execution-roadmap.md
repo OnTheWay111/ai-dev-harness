@@ -1231,7 +1231,7 @@ commit/push `main`，再标记 P9-05 为 `[x]（已完成）`并提交、push �
 
 目标：从“所有 Issue 完成”升级为“原始目标被证明满足”。
 
-- [ ] **P10-01** 对每条 AcceptanceCriterion 定义确定性证据和验证策略。
+- [x] **P10-01** 对每条 AcceptanceCriterion 定义确定性证据和验证策略。（已完成：2026-08-05；实现提交：ai-dev-harness@8d8613b2929641a09ef1dbd82a36456bf1df0cf5）
 
 <details>
 <summary>快捷复制开发提示词 P10-01 · gpt-5.6-terra(均衡) · medium(中等)</summary>
@@ -1251,7 +1251,7 @@ completionEvidence 和已保存 Artifact。定义 AcceptanceVerificationPlan Sch
 
 </details>
 
-- [ ] **P10-02** 使用独立 Verifier 会话逐条验收目标、非目标、约束和回归风险。
+- [x] **P10-02** 使用独立 Verifier 会话逐条验收目标、非目标、约束和回归风险。（已完成：2026-08-05；实现提交：ai-dev-harness@8d8613b2929641a09ef1dbd82a36456bf1df0cf5）
 
 <details>
 <summary>快捷复制开发提示词 P10-02 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -1271,7 +1271,7 @@ Git 操作必须按第 2.1 使用代码所属仓库的绝对路径和 `git -C`�
 
 </details>
 
-- [ ] **P10-03** 验收失败时生成差距报告并回流新的 IssueRevision，不篡改已完成证据。
+- [x] **P10-03** 验收失败时生成差距报告并回流新的 IssueRevision，不篡改已完成证据。（已完成：2026-08-05；实现提交：ai-dev-harness@8d8613b2929641a09ef1dbd82a36456bf1df0cf5）
 
 <details>
 <summary>快捷复制开发提示词 P10-03 · gpt-5.6-sol(深度) · high(高)</summary>
@@ -1291,7 +1291,7 @@ Compiler 和不可变证据规则。实现 VerificationGapReport，保存失败�
 
 </details>
 
-- [ ] **P10-04** 生成 Delivery Report，包含范围、证据、Commit/PR、已知风险和人工验收。
+- [x] **P10-04** 生成 Delivery Report，包含范围、证据、Commit/PR、已知风险和人工验收。（已完成：2026-08-05；实现提交：ai-dev-harness@8d8613b2929641a09ef1dbd82a36456bf1df0cf5）
 
 <details>
 <summary>快捷复制开发提示词 P10-04 · gpt-5.6-terra(均衡) · medium(中等)</summary>
